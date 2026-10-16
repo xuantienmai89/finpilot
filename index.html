@@ -239,6 +239,13 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:.85}
 #tooltip.show{opacity:1}
 
 /* ===== Status pill ===== */
+.profile-btn{display:inline-flex;align-items:center;gap:7px;height:34px;max-width:190px;padding:0 10px 0 4px;border-radius:999px;border:1px solid var(--border);background:var(--surface);font-weight:600;font-size:12.5px;color:var(--text-2);cursor:pointer}
+.profile-btn:hover{background:var(--surface-3)}
+.profile-btn .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.avatar{flex:none;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px}
+.avatar.lg{width:38px;height:38px;font-size:16px}
+.profile-row{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;background:var(--surface)}
+.profile-row.current{border-color:var(--primary);box-shadow:inset 3px 0 0 var(--primary)}
 .status-pill{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:999px;border:1px solid var(--border);background:var(--surface);font-size:12.5px;font-weight:600;color:var(--text-2);cursor:pointer;white-space:nowrap}
 .status-pill .dot{background:var(--muted)}
 .status-pill.ok .dot{background:var(--green)}
@@ -361,7 +368,8 @@ body.privacy .money:hover{filter:none}
   .btn-sm{min-height:34px}
   .icon-btn{width:40px;height:40px}
   .topbar-title h1{font-size:17px}
-  .topbar-sub,.status-pill .txt,#btn-privacy{display:none}
+  .topbar-sub,.status-pill .txt,#btn-privacy,.profile-btn .nm{display:none}
+  .profile-btn{padding:0 3px;width:34px;justify-content:center}
   .topbar{gap:8px}
   .seg-btn{font-size:12.5px;padding:7px 6px}
   .period-ctl select{min-width:0;width:auto;max-width:132px;font-size:14px;min-height:36px}
@@ -414,6 +422,7 @@ body.privacy .money:hover{filter:none}
       <div class="topbar-actions">
         <div class="period-ctl" id="period-ctl"><select id="period-select" aria-label="Kỳ báo cáo"></select></div>
         <button class="status-pill" id="save-status" type="button" title="Trạng thái lưu dữ liệu"><span class="dot"></span><span class="txt">Đang tải…</span></button>
+        <button class="profile-btn" id="btn-profile" type="button" aria-label="Chuyển hồ sơ người dùng"></button>
         <button class="icon-btn" id="btn-privacy" type="button" aria-label="Ẩn/hiện số tiền"></button>
         <button class="btn btn-primary" id="btn-add" type="button"></button>
       </div>
@@ -498,6 +507,58 @@ const Util = {
   },
   plural(n, word) { return Money.num(n) + ' ' + word; }
 };
+
+/* --------------------------- Hồ sơ người dùng trên thiết bị --------------------------- */
+/* Mỗi hồ sơ có kho dữ liệu, cấu hình đồng bộ và tùy chọn riêng. Hồ sơ "default" dùng khóa lưu trữ cũ để tương thích. */
+const Profiles = (() => {
+  const KEY = 'finpilot.profiles.v1';
+  const DEF = () => ({ active: 'default', list: [{ id: 'default', name: 'Hồ sơ chính', email: '', createdAt: Util.nowISO() }] });
+  function read() {
+    try {
+      const r = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (r && Array.isArray(r.list) && r.list.length && r.list.every(p => p && typeof p.id === 'string' && /^[a-z0-9_]+$/i.test(p.id) && typeof p.name === 'string')) return r;
+    } catch (e) {}
+    return DEF();
+  }
+  function write(r) { try { localStorage.setItem(KEY, JSON.stringify(r)); return true; } catch (e) { return false; } }
+  const initial = read();
+  // Hồ sơ của TAB NÀY được cố định khi mở trang; đổi hồ sơ = tải lại trang.
+  // Ưu tiên hồ sơ của chính tab này (sessionStorage) để tải lại trang không bị nhảy sang hồ sơ tab khác vừa chọn.
+  const TAB_KEY = 'finpilot.profile.tab';
+  let tabPref = null; try { tabPref = sessionStorage.getItem(TAB_KEY); } catch (e) {}
+  let current = tabPref && initial.list.some(p => p.id === tabPref) ? tabPref : (initial.list.some(p => p.id === initial.active) ? initial.active : initial.list[0].id);
+  try { sessionStorage.setItem(TAB_KEY, current); } catch (e) {}
+  const norm = s => String(s || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+  function mutate(fn) { const r = read(); const out = fn(r); write(r); return out; }
+  return {
+    list() { return read().list.slice(); },
+    activeId() { return current; },
+    active() { return read().list.find(p => p.id === current) || { id: current, name: 'Hồ sơ', email: '' }; },
+    suffix(id = current) { return id === 'default' ? '' : ':' + id; },
+    count() { return read().list.length; },
+    create(name) {
+      const n = norm(name);
+      if (!n) throw new AppError('Vui lòng nhập tên hồ sơ.');
+      return mutate(r => {
+        if (r.list.some(p => p.name.toLowerCase() === n.toLowerCase())) throw new AppError('Tên hồ sơ đã tồn tại.');
+        if (r.list.length >= 20) throw new AppError('Tối đa 20 hồ sơ trên một thiết bị.');
+        const p = { id: 'p' + Util.uid('x').replace(/[^a-z0-9]/gi, '').slice(-16), name: n, email: '', createdAt: Util.nowISO() };
+        r.list.push(p); return p;
+      });
+    },
+    rename(id, name) {
+      const n = norm(name); if (!n) throw new AppError('Vui lòng nhập tên hồ sơ.');
+      mutate(r => { if (r.list.some(p => p.id !== id && p.name.toLowerCase() === n.toLowerCase())) throw new AppError('Tên hồ sơ đã tồn tại.'); const p = r.list.find(x => x.id === id); if (p) p.name = n; });
+    },
+    setEmail(id, email) { mutate(r => { const p = r.list.find(x => x.id === id); if (p) p.email = String(email || '').toLowerCase(); }); },
+    /** Đặt hồ sơ dùng khi mở app lần tới (gọi trước khi tải lại trang). */
+    select(id) { mutate(r => { if (!r.list.some(p => p.id === id)) throw new AppError('Hồ sơ không tồn tại.'); r.active = id; }); try { sessionStorage.setItem(TAB_KEY, id); } catch (e) {} },
+    remove(id) {
+      if (id === current) throw new AppError('Không thể xóa hồ sơ đang mở. Hãy chuyển sang hồ sơ khác trước.');
+      mutate(r => { r.list = r.list.filter(p => p.id !== id); if (!r.list.length) Object.assign(r, DEF()); if (!r.list.some(p => p.id === r.active)) r.active = r.list[0].id; });
+    }
+  };
+})();
 
 /* --------------------------- Tiền tệ (số nguyên VND) --------------------------- */
 const Money = {
@@ -758,8 +819,10 @@ function LogoMark(size = 30) {
    - Kiểm tra số phiên bản (revision) để chống ghi đè khi mở nhiều tab
    ========================================================================== */
 const StorageService = (() => {
-  const DB_NAME = 'FinPilotOffline', STORE = 'kv', K_STATE = 'state', K_PREV = 'state_prev';
-  const LS_STATE = 'finpilot.offline.state', LS_PREV = 'finpilot.offline.state_prev', LS_REV = 'finpilot.offline.rev';
+  const DB_NAME = 'FinPilotOffline', STORE = 'kv';
+  // Khóa lưu trữ theo hồ sơ (hồ sơ "default" giữ khóa cũ)
+  const keys = (id = Profiles.activeId()) => { const sf = Profiles.suffix(id); return { K_STATE: 'state' + sf, K_PREV: 'state_prev' + sf, LS_STATE: 'finpilot.offline.state' + sf, LS_PREV: 'finpilot.offline.state_prev' + sf, LS_REV: 'finpilot.offline.rev' + sf }; };
+  const { K_STATE, K_PREV, LS_STATE, LS_PREV, LS_REV } = keys();
   let db = null, channel = null, externalHandler = null;
   const info = { mode: 'memory', probeOk: false, persisted: null, idbError: null, lsError: null, lastSavedAt: null, storedRevision: 0, source: null, protocol: location.protocol };
 
@@ -826,7 +889,7 @@ const StorageService = (() => {
       } catch (e) { info.persisted = null; }
       try {
         if ('BroadcastChannel' in window) {
-          channel = new BroadcastChannel('finpilot-offline');
+          channel = new BroadcastChannel('finpilot-offline' + Profiles.suffix());
           channel.onmessage = ev => { if (ev.data && ev.data.type === 'saved' && externalHandler) externalHandler(ev.data.revision); };
         }
       } catch (e) { channel = null; }
@@ -841,7 +904,7 @@ const StorageService = (() => {
       if (info.mode === 'indexeddb') {
         st = await idbGet(K_STATE);
         if (st) { info.source = 'indexeddb'; info.storedRevision = st.meta && Number(st.meta.revision) || 0; }
-        else {
+        else if (Profiles.activeId() === 'default') {
           // Di chuyển dữ liệu cũ từng lưu bằng localStorage (nếu có)
           try { const legacy = lsRead(LS_STATE); if (legacy) { st = legacy; info.source = 'localstorage-migrated'; } } catch (e) { /* bỏ qua */ }
           info.storedRevision = 0;
@@ -895,6 +958,21 @@ const StorageService = (() => {
       if (info.mode === 'indexeddb') await idbTx('readwrite', s => { s.delete(K_STATE); s.delete(K_PREV); });
       try { localStorage.removeItem(LS_STATE); localStorage.removeItem(LS_PREV); localStorage.removeItem(LS_REV); } catch (e) {}
       info.storedRevision = 0; broadcast(0);
+    },
+    /** Xóa toàn bộ dữ liệu cục bộ của một hồ sơ KHÁC hồ sơ đang mở. */
+    async deleteProfileData(id) {
+      if (id === Profiles.activeId()) throw new AppError('Không thể xóa dữ liệu của hồ sơ đang mở.');
+      const k = keys(id);
+      if (db) await idbTx('readwrite', s => { s.delete(k.K_STATE); s.delete(k.K_PREV); });
+      else { try { const d = await openDB(); d.close(); } catch (e) {} }
+      try { localStorage.removeItem(k.LS_STATE); localStorage.removeItem(k.LS_PREV); localStorage.removeItem(k.LS_REV); } catch (e) {}
+    },
+    /** Đọc nhanh số liệu của một hồ sơ khác (để hiển thị). */
+    async peekProfile(id) {
+      const k = keys(id); let st = null;
+      try { if (db) st = await idbGet(k.K_STATE); else if (info.mode === 'localstorage') st = lsRead(k.LS_STATE); } catch (e) { return null; }
+      if (!st) return { transactions: 0, accounts: 0, updatedAt: '' };
+      return { transactions: Array.isArray(st.transactions) ? st.transactions.length : 0, accounts: Array.isArray(st.accounts) ? st.accounts.length : 0, updatedAt: st.meta && st.meta.updatedAt || '' };
     },
     async estimate() {
       try { if (navigator.storage && navigator.storage.estimate) return await navigator.storage.estimate(); } catch (e) {}
@@ -1826,7 +1904,8 @@ const ImportExport = {
    - Hợp nhất theo từng bản ghi (MergeService): sửa sau cùng thắng, thao tác xóa được đồng bộ.
    ========================================================================== */
 const SyncService = (() => {
-  const LS_KEY = 'finpilot.sync.v1', LS_OAUTH = 'finpilot.sync.oauthState', SS_SILENT = 'finpilot.sync.silentTried';
+  const cfgKey = (id = Profiles.activeId()) => 'finpilot.sync.v1' + Profiles.suffix(id);
+  const LS_KEY = cfgKey(), LS_OAUTH = 'finpilot.sync.oauthState', SS_SILENT = 'finpilot.sync.silentTried' + Profiles.suffix();
   const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
   const FILE_NAME = 'finpilot-sync.json';
   const DEFAULT_CLIENT = { host: 'xuantienmai89.github.io', id: '1035349944787-7imjiue19uja8lq10klu9mplqqsrm1e0.apps.googleusercontent.com' };
@@ -1837,9 +1916,10 @@ const SyncService = (() => {
   const listeners = [];
 
   // Client ID mặc định cho bản cài trên GitHub Pages của chủ sở hữu (Client ID là định danh công khai, không phải mật khẩu)
-  function readCfg() {
+  let verifiedToken = null; // token đã được xác minh đúng Gmail của hồ sơ (chỉ giữ trong bộ nhớ)
+  function readCfg(key = LS_KEY) {
     let c = {};
-    try { c = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); if (!Util.isObj(c)) c = {}; } catch (e) { c = {}; }
+    try { c = JSON.parse(localStorage.getItem(key) || '{}'); if (!Util.isObj(c)) c = {}; } catch (e) { c = {}; }
     if (!c.clientId && location.host === DEFAULT_CLIENT.host) c.clientId = DEFAULT_CLIENT.id;
     return c;
   }
@@ -1851,14 +1931,16 @@ const SyncService = (() => {
   function deviceId() { if (!cfg.deviceId) { cfg.deviceId = Util.uid('dev'); writeCfg(); } return cfg.deviceId; }
   function isStandaloneIOS() { return window.navigator.standalone === true; }
   function err(code, message) { const e = new Error(message); e.code = code; return e; }
+  const normEmail = e => String(e || '').trim().toLowerCase();
+  function boundEmail() { return normEmail(Profiles.active().email || cfg.boundEmail || cfg.email || ''); }
 
   /* ---------- Đăng nhập: chuyển trang (tự gia hạn khi mở app) ---------- */
   function startRedirectAuth({ silent = false } = {}) {
     const state = Util.uid('st');
-    try { localStorage.setItem(LS_OAUTH, JSON.stringify({ state, route: location.hash && !/access_token|error=/.test(location.hash) ? location.hash : '#/data', silent, at: Date.now() })); } catch (e) {}
+    try { localStorage.setItem(LS_OAUTH, JSON.stringify({ state, profile: Profiles.activeId(), route: location.hash && !/access_token|error=/.test(location.hash) ? location.hash : '#/data', silent, at: Date.now() })); } catch (e) {}
     const p = new URLSearchParams({ client_id: cfg.clientId, redirect_uri: redirectUri(), response_type: 'token', scope: SCOPE, include_granted_scopes: 'true', state });
     if (silent) p.set('prompt', 'none');
-    if (cfg.email) p.set('login_hint', cfg.email);
+    const hint = boundEmail() || cfg.email; if (hint) p.set('login_hint', hint);
     location.assign('https://accounts.google.com/o/oauth2/v2/auth?' + p.toString());
   }
   /** Xử lý kết quả trả về sau khi đăng nhập (nằm trong phần # của URL). Gọi trước khi định tuyến. */
@@ -1874,6 +1956,15 @@ const SyncService = (() => {
     if (p.get('error')) return { ok: false, silent: !!saved.silent, error: p.get('error') };
     const scope = p.get('scope') || '';
     if (scope && !scope.includes('drive.appdata')) return { ok: false, silent: false, error: 'Bạn chưa cấp quyền lưu dữ liệu ứng dụng trên Google Drive.' };
+    const prof = saved.profile && Profiles.list().some(x => x.id === saved.profile) ? saved.profile : Profiles.activeId();
+    if (prof !== Profiles.activeId()) {
+      // Đăng nhập được khởi tạo từ hồ sơ khác → ghi token vào đúng hồ sơ đó rồi mở lại hồ sơ đó
+      const key = cfgKey(prof); const c = readCfg(key);
+      c.token = p.get('access_token'); c.expiresAt = Date.now() + (Number(p.get('expires_in')) || 3600) * 1000; c.enabled = true;
+      try { localStorage.setItem(key, JSON.stringify(c)); } catch (e) {}
+      Profiles.select(prof);
+      return { ok: true, silent: !!saved.silent, reload: true };
+    }
     cfg.token = p.get('access_token'); cfg.expiresAt = Date.now() + (Number(p.get('expires_in')) || 3600) * 1000; cfg.enabled = true; writeCfg();
     return { ok: true, silent: !!saved.silent };
   }
@@ -1896,7 +1987,7 @@ const SyncService = (() => {
     return new Promise((resolve, reject) => {
       if (!(window.google && window.google.accounts && window.google.accounts.oauth2)) { reject(new Error('Thư viện đăng nhập Google chưa sẵn sàng, vui lòng bấm lại sau vài giây.')); return; }
       const client = window.google.accounts.oauth2.initTokenClient({
-        client_id: cfg.clientId, scope: SCOPE, prompt: cfg.email ? '' : 'consent', login_hint: cfg.email || undefined,
+        client_id: cfg.clientId, scope: SCOPE, prompt: (boundEmail() || cfg.email) ? '' : 'consent', login_hint: boundEmail() || cfg.email || undefined,
         callback: resp => {
           if (resp.error) { reject(new Error(resp.error_description || resp.error)); return; }
           cfg.token = resp.access_token; cfg.expiresAt = Date.now() + (Number(resp.expires_in) || 3600) * 1000; cfg.enabled = true; writeCfg(); resolve();
@@ -1944,7 +2035,23 @@ const SyncService = (() => {
   }
   async function deleteFile(id) { await api(`${API}/files/${encodeURIComponent(id)}`, { method: 'DELETE' }); }
   async function fetchEmail() {
-    try { const r = await api(`${API}/about?fields=user(emailAddress)`); const j = await r.json(); return (j.user && j.user.emailAddress) || ''; } catch (e) { return ''; }
+    const r = await api(`${API}/about?fields=user(emailAddress)`); const j = await r.json();
+    const e = normEmail(j.user && j.user.emailAddress);
+    if (!e) throw err('IDENTITY', 'Không xác định được tài khoản Google đang đăng nhập.');
+    return e;
+  }
+  /** Bảo đảm token thuộc đúng Gmail đã gắn với hồ sơ — kiểm tra TRƯỚC mọi thao tác đọc/ghi dữ liệu. */
+  async function ensureIdentity() {
+    if (verifiedToken && verifiedToken === cfg.token) return;
+    const email = await fetchEmail();
+    const bound = boundEmail();
+    if (bound && email !== bound) {
+      cfg.token = null; cfg.expiresAt = null; writeCfg(); verifiedToken = null;
+      throw err('ACCOUNT', `Hồ sơ "${Profiles.active().name}" đã gắn với tài khoản ${bound}, nhưng bạn vừa đăng nhập ${email}.\n\nĐể không trộn dữ liệu của hai người, ứng dụng đã dừng đồng bộ và KHÔNG gửi dữ liệu nào lên tài khoản ${email}.\n\n• Nếu đây là hồ sơ của bạn: bấm "Đăng nhập lại Google" và chọn đúng ${bound}.\n• Nếu bạn là người khác: vào Cài đặt → Hồ sơ trên thiết bị này, tạo hồ sơ mới cho ${email}.`);
+    }
+    if (!bound) Profiles.setEmail(Profiles.activeId(), email);
+    cfg.email = email; cfg.boundEmail = email; writeCfg();
+    verifiedToken = cfg.token;
   }
 
   function payload(st) {
@@ -1962,6 +2069,7 @@ const SyncService = (() => {
 
   /* ---------- Quy trình đồng bộ ---------- */
   async function run(reason) {
+    await ensureIdentity();
     const dirty = App.state.meta.revision !== cfg.syncedRevision;
     let syncedRev = App.state.meta.revision;
     const upload = async id => {
@@ -2000,7 +2108,6 @@ const SyncService = (() => {
     }
     cfg.syncedRevision = syncedRev;
     cfg.lastSyncAt = Util.nowISO(); cfg.lastError = null;
-    if (!cfg.email) cfg.email = await fetchEmail();
     writeCfg();
     return { uploaded, merged, reason };
   }
@@ -2023,6 +2130,7 @@ const SyncService = (() => {
     } catch (e) {
       cfg.lastError = e.message; writeCfg();
       if (e.code === 'AUTH') setStatus('auth', 'Cần đăng nhập lại Google');
+      else if (e.code === 'ACCOUNT') { setStatus('auth', 'Sai tài khoản Google — đã chặn đồng bộ'); Modal.alert({ title: 'Đăng nhập sai tài khoản Google', message: e.message, tone: 'danger' }); return null; }
       else if (e.code === 'NETWORK') setStatus('offline', 'Mất kết nối — sẽ thử lại');
       else setStatus('error', 'Lỗi đồng bộ: ' + e.message);
       if (reason === 'manual' || reason === 'connect') Toast.show(e.message, { type: 'error' });
@@ -2056,6 +2164,11 @@ const SyncService = (() => {
       if (!cfg.clientId) throw new AppError('Vui lòng nhập OAuth Client ID trước.');
       if (!supported()) throw new AppError('Đăng nhập Google chỉ hoạt động khi ứng dụng được mở qua địa chỉ https (ví dụ GitHub Pages).');
       if (!navigator.onLine) throw new AppError('Thiết bị đang ngoại tuyến.');
+      const st = App.state;
+      if (!boundEmail() && st && (st.transactions.length || st.accounts.length)) {
+        const ok = await Modal.confirm({ title: 'Gắn hồ sơ với tài khoản Google', message: `Hồ sơ "${Profiles.active().name}" đang có ${st.accounts.length} tài khoản và ${st.transactions.length} giao dịch.\n\nKhi kết nối, toàn bộ dữ liệu này sẽ được đưa lên Google Drive của tài khoản bạn sắp đăng nhập, và hồ sơ sẽ gắn cố định với tài khoản đó.\n\nNếu dữ liệu này KHÔNG phải của bạn, hãy bấm Hủy và tạo hồ sơ mới (Cài đặt → Hồ sơ trên thiết bị này).`, confirmText: 'Đây là dữ liệu của tôi — kết nối' });
+        if (!ok) return;
+      }
       cfg.enabled = true; writeCfg();
       if (this.authMode() === 'popup') { await popupAuth(); await syncNow('connect'); startPolling(); }
       else { await App.flush(); startRedirectAuth({ silent: false }); }
@@ -2067,7 +2180,7 @@ const SyncService = (() => {
       startPolling();
       if (!supported()) { setStatus('error', 'Cần mở qua https để đồng bộ'); return; }
       if (tokenValid()) { syncNow('open'); return; }
-      if (this.authMode() === 'redirect' && navigator.onLine && cfg.email) {
+      if (this.authMode() === 'redirect' && navigator.onLine && (boundEmail() || cfg.email)) {
         let tried = 0; try { tried = Number(sessionStorage.getItem(SS_SILENT) || 0); } catch (e) {}
         if (Date.now() - tried > 5 * 60000) {
           try { sessionStorage.setItem(SS_SILENT, String(Date.now())); } catch (e) {}
@@ -2077,15 +2190,16 @@ const SyncService = (() => {
       setStatus('auth', 'Cần đăng nhập lại Google');
     },
     afterRedirect(res) {
-      if (!res) return;
+      if (!res || res.reload) return;
       if (res.ok) { setStatus('idle', 'Đã đăng nhập Google'); }
       else if (res.silent) setStatus('auth', 'Cần đăng nhập lại Google');
       else { setStatus('error', 'Đăng nhập thất bại'); Toast.show('Đăng nhập Google thất bại: ' + res.error, { type: 'error', timeout: 8000 }); }
     },
-    syncNow, schedule,
+    syncNow, schedule, boundEmail,
     disconnect({ keepConfig = true } = {}) {
-      const id = cfg.clientId, mode = cfg.authMode, dev = cfg.deviceId;
-      cfg = keepConfig ? { clientId: id, authMode: mode, deviceId: dev } : { deviceId: dev };
+      const id = cfg.clientId, mode = cfg.authMode, dev = cfg.deviceId, be = cfg.boundEmail;
+      cfg = keepConfig ? { clientId: id, authMode: mode, deviceId: dev, boundEmail: be } : { deviceId: dev, boundEmail: be };
+      verifiedToken = null;
       writeCfg(); stopPolling(); setStatus('off', 'Chưa bật đồng bộ');
     },
     async deleteRemote() {
@@ -3609,7 +3723,7 @@ Pages.syncCard = function () {
     return C.card('Đồng bộ Google Drive (iPhone ↔ máy tính)', body, { sub: 'Tự động đồng bộ qua thư mục ẩn của ứng dụng trên Google Drive của bạn' });
   }
   const tone = { ok: 'green', busy: 'blue', idle: 'blue', offline: 'amber', auth: 'amber', error: 'red', off: '' }[s.state] || '';
-  body.append(h('div', { class: 'flex flex-wrap between mb-12' }, h('div', { class: 'flex flex-wrap' }, C.badge(enabled ? (s.text || 'Đã bật') : 'Chưa bật', tone), cfg.email ? h('span', { class: 'small muted' }, 'Tài khoản: ', h('b', {}, cfg.email)) : null, cfg.lastSyncAt ? h('span', { class: 'small muted' }, 'Đồng bộ gần nhất: ' + DateUtil.dateTimeVN(cfg.lastSyncAt)) : null)));
+  body.append(h('div', { class: 'flex flex-wrap between mb-12' }, h('div', { class: 'flex flex-wrap' }, C.badge(enabled ? (s.text || 'Đã bật') : 'Chưa bật', tone), h('span', { class: 'small muted' }, 'Hồ sơ: ', h('b', {}, Profiles.active().name), SyncService.boundEmail() ? ' · gắn với ' : ' · chưa gắn Gmail', SyncService.boundEmail() ? h('b', {}, SyncService.boundEmail()) : null), cfg.lastSyncAt ? h('span', { class: 'small muted' }, 'Đồng bộ gần nhất: ' + DateUtil.dateTimeVN(cfg.lastSyncAt)) : null)));
   if (cfg.lastError && s.state === 'error') body.append(C.callout('alert', cfg.lastError, 'danger'), h('div', { style: { height: '10px' } }));
   if (SyncService.isStandaloneIOS()) body.append(C.callout('alert', 'Bạn đang mở ứng dụng từ biểu tượng trên màn hình chính iPhone. iOS thường không trả kết quả đăng nhập Google về chế độ này. Nếu đăng nhập không thành công, hãy mở cùng đường link bằng Safari (dùng dấu trang).', 'warn'), h('div', { style: { height: '10px' } }));
   const idInput = F.input('clientId', cfg.clientId || '', { placeholder: '1234567890-xxxx.apps.googleusercontent.com', spellcheck: 'false' });
@@ -3740,6 +3854,7 @@ Pages.settings = function (view) {
   const st = App.state; const s = st.settings;
   view.append(C.pageHead('Cài đặt', 'Tùy chỉnh hiển thị, danh mục, ngân sách mặc định. Giao diện sáng/tối và chế độ ẩn số tiền lưu riêng trên từng thiết bị.', null));
   const grid = h('div', { class: 'grid-12' }); view.append(grid);
+  grid.append(Pages.profilesCard());
   const save = async (label, fn) => { try { await App.commit(label, d => fn(d.settings)); Toast.show('Đã lưu cài đặt', { type: 'success' }); } catch (e) { Toast.show(e.message, { type: 'error' }); } };
   const themeS = F.select('theme', [{ value: 'system', label: 'Theo hệ thống' }, { value: 'light', label: 'Sáng' }, { value: 'dark', label: 'Tối' }], App.prefs.theme || 'system');
   themeS.addEventListener('change', () => { App.setPref('theme', themeS.value); App.applyTheme(); App.render(); });
@@ -3789,6 +3904,95 @@ Pages.settings = function (view) {
     h('div', { class: 'btn-group mt-12' }, C.btn('Khôi phục cài đặt mặc định', async () => { if (!(await Modal.confirm({ title: 'Khôi phục cài đặt mặc định?', message: 'Chỉ đặt lại các tùy chọn hiển thị và mặc định. Không xóa dữ liệu tài chính, danh mục hay ngân sách mặc định.', confirmText: 'Khôi phục' }))) return; App.setPref('theme', 'system'); App.setPref('privacyMode', false); App.applyTheme(); App.applyPrivacy(); save('Khôi phục cài đặt', x => { const d = Defaults.settings(); const keep = x.defaultBudgets; Object.assign(x, d, { defaultBudgets: keep }); }); }, { icon: 'undo' }))), { cls: 'span-12' }));
 };
 
+
+/* ======================= HỒ SƠ NGƯỜI DÙNG TRÊN THIẾT BỊ ======================= */
+const AVATAR_COLORS = ['#1d3f8f', '#0b8f63', '#c2410c', '#7c3aed', '#be123c', '#0e7490', '#a16207', '#4338ca'];
+Pages.avatar = function (p, lg = false) {
+  let hsh = 0; for (const ch of p.id) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
+  const letter = (p.name || '?').trim().charAt(0).toUpperCase() || '?';
+  return h('span', { class: 'avatar' + (lg ? ' lg' : ''), style: { background: AVATAR_COLORS[hsh % AVATAR_COLORS.length] }, 'aria-hidden': 'true' }, letter);
+};
+Pages.switchProfile = async function (id) {
+  if (id === Profiles.activeId()) return;
+  await App.flush();
+  if (App.unsaved && !(await Modal.confirm({ title: 'Còn thay đổi chưa lưu', message: 'Hồ sơ hiện tại có thay đổi chưa được lưu bền vững. Vẫn chuyển hồ sơ?', confirmText: 'Vẫn chuyển', danger: true }))) return;
+  Profiles.select(id);
+  App.unsaved = false;
+  location.hash = '#/dashboard';
+  location.reload();
+};
+Pages.createProfileDialog = function (after) {
+  const form = h('form', { novalidate: true, id: 'prof-form' }); const fe = F.formError();
+  form.append(h('div', { class: 'form-grid' }, F.field('Tên hồ sơ', F.input('pname', '', { maxlength: 40, placeholder: 'VD: Vợ, Bố mẹ, Công việc', autofocus: true }), { required: true, name: 'pname', full: true })),
+    h('div', { class: 'mt-12' }, C.callout('info', 'Hồ sơ mới bắt đầu trống, có kho dữ liệu và kết nối Google Drive riêng. Mỗi hồ sơ chỉ gắn với MỘT tài khoản Google, nên dữ liệu các hồ sơ không bao giờ bị trộn.')), fe);
+  let m;
+  form.addEventListener('submit', e => {
+    e.preventDefault(); F.clearErrors(form);
+    try { const p = Profiles.create(F.val(form, 'pname')); m.close(); if (after) after(p); }
+    catch (er) { F.showErrors(form, { pname: er.message }); }
+  });
+  m = Modal.open({ title: 'Tạo hồ sơ mới', size: 'sm', body: form, footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'prof-form' }, 'Tạo hồ sơ')] });
+};
+Pages.profileSwitcher = function () {
+  const cur = Profiles.activeId();
+  const list = h('div', {});
+  for (const p of Profiles.list()) {
+    const isCur = p.id === cur;
+    list.append(h('div', { class: 'profile-row' + (isCur ? ' current' : '') }, Pages.avatar(p, true),
+      h('div', { class: 'grow' }, h('div', { class: 'cell-main', text: p.name }), h('div', { class: 'cell-sub', text: p.email ? 'Google: ' + p.email : 'Chưa gắn tài khoản Google' })),
+      isCur ? C.badge('Đang dùng', 'blue') : C.btn('Mở', () => Pages.switchProfile(p.id), { cls: 'btn-sm btn-primary' })));
+  }
+  const m = Modal.open({ title: 'Hồ sơ trên thiết bị này', size: 'sm', body: h('div', {}, list, h('p', { class: 'small muted mt-12', text: 'Mỗi người dùng một hồ sơ riêng, đăng nhập bằng Gmail của chính họ. Hồ sơ không có mật khẩu — ai dùng được trình duyệt này đều mở được, nên chỉ chia sẻ máy với người tin cậy.' })),
+    footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => { m.close(); App.navigate('settings'); } }, 'Quản lý hồ sơ'), h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { m.close(); Pages.createProfileDialog(p => Pages.switchProfile(p.id)); } }, Icon('plus', 16), 'Tạo hồ sơ mới')] });
+};
+Pages.profilesCard = function () {
+  const cur = Profiles.activeId();
+  const body = h('div', {});
+  const draw = async () => {
+    const rows = [];
+    for (const p of Profiles.list()) {
+      const isCur = p.id === cur;
+      const stats = isCur ? { transactions: App.state.transactions.length, accounts: App.state.accounts.length } : await StorageService.peekProfile(p.id);
+      rows.push(h('div', { class: 'profile-row' + (isCur ? ' current' : '') }, Pages.avatar(p, true),
+        h('div', { class: 'grow' }, h('div', { class: 'cell-main' }, p.name, isCur ? ' ' : '', isCur ? C.badge('Đang dùng', 'blue') : null),
+          h('div', { class: 'cell-sub', text: (p.email ? 'Google: ' + p.email : 'Chưa gắn tài khoản Google') + (stats ? ` · ${stats.accounts} tài khoản, ${stats.transactions} giao dịch` : '') })),
+        h('div', { class: 'btn-group' },
+          !isCur ? C.btn('Mở', () => Pages.switchProfile(p.id), { cls: 'btn-sm' }) : null,
+          C.iconBtn('edit', 'Đổi tên', () => Pages.renameProfile(p, draw)),
+          !isCur ? C.iconBtn('trash', 'Xóa hồ sơ khỏi thiết bị', () => Pages.deleteProfile(p, draw), 'danger') : null)));
+    }
+    body.replaceChildren(...rows,
+      h('div', { class: 'btn-group mt-12' }, C.btn('Tạo hồ sơ mới', () => Pages.createProfileDialog(() => draw()), { icon: 'plus', cls: 'btn-primary' })),
+      h('div', { class: 'mt-12' }, C.callout('info', h('div', {}, h('b', {}, 'Cho người khác dùng: '), 'gửi họ đường link ứng dụng. Mỗi người mở trên máy của mình, bấm Kết nối Google Drive bằng Gmail của họ — dữ liệu nằm trong Google Drive riêng của từng người, không ai xem được của ai (kể cả người tạo ứng dụng). Nếu dùng chung một máy/trình duyệt, mỗi người tạo một hồ sơ riêng ở đây.'))));
+  };
+  draw();
+  return C.card('Hồ sơ trên thiết bị này', body, { cls: 'span-12', sub: 'Mỗi hồ sơ là một bộ dữ liệu độc lập, gắn cố định với một tài khoản Google' });
+};
+Pages.renameProfile = function (p, after) {
+  const form = h('form', { novalidate: true, id: 'pren-form' }); const fe = F.formError();
+  form.append(F.field('Tên hồ sơ', F.input('pname', p.name, { maxlength: 40, autofocus: true }), { name: 'pname', required: true }), fe);
+  let m;
+  form.addEventListener('submit', e => { e.preventDefault(); F.clearErrors(form); try { Profiles.rename(p.id, F.val(form, 'pname')); m.close(); App.renderHeader(); if (after) after(); } catch (er) { F.showErrors(form, { pname: er.message }); } });
+  m = Modal.open({ title: 'Đổi tên hồ sơ', size: 'sm', body: form, footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'pren-form' }, 'Lưu')] });
+};
+Pages.deleteProfile = async function (p, after) {
+  const input = h('input', { type: 'text', placeholder: p.name, autocomplete: 'off' });
+  const ok = await Modal.confirm({ title: `Xóa hồ sơ "${p.name}" khỏi thiết bị?`, danger: true, confirmText: 'Xóa hồ sơ', message: h('div', {},
+    h('p', { text: 'Toàn bộ dữ liệu của hồ sơ này trên thiết bị sẽ bị xóa. Dữ liệu trên Google Drive (nếu đã đồng bộ) vẫn còn — đăng nhập lại ở hồ sơ mới sẽ tải về.' }),
+    !p.email ? C.callout('alert', 'Hồ sơ này chưa đồng bộ Google Drive: dữ liệu sẽ mất vĩnh viễn nếu chưa sao lưu ra file.', 'danger') : null,
+    h('p', { class: 'mt-12', text: `Nhập chính xác tên hồ sơ "${p.name}" để xác nhận:` }), input) });
+  if (!ok) return;
+  if (input.value.trim() !== p.name) return Toast.show('Tên xác nhận không đúng — đã hủy.', { type: 'warn' });
+  try {
+    await StorageService.deleteProfileData(p.id);
+    const sf = Profiles.suffix(p.id);
+    for (const k of ['finpilot.sync.v1' + sf, 'finpilot.offline.prefs' + sf]) { try { localStorage.removeItem(k); } catch (e) {} }
+    Profiles.remove(p.id);
+    Toast.show(`Đã xóa hồ sơ "${p.name}" khỏi thiết bị`, { type: 'success' });
+    App.renderHeader(); if (after) after();
+  } catch (e) { Modal.alert({ title: 'Không xóa được hồ sơ', message: e.message, tone: 'danger' }); }
+};
+
 /* ==========================================================================
    APP — khởi tạo, điều hướng, ghi dữ liệu (commit), hoàn tác, đồng bộ
    ========================================================================== */
@@ -3804,7 +4008,7 @@ const ROUTES = {
   data: { title: 'Sao lưu & dữ liệu', icon: 'database' },
   settings: { title: 'Cài đặt', icon: 'settings' }
 };
-const PREFS_KEY = 'finpilot.offline.prefs';
+const PREFS_KEY = 'finpilot.offline.prefs' + Profiles.suffix();
 
 const App = {
   state: null,
@@ -3834,6 +4038,7 @@ const App = {
     this.loadPrefs(); this.applyTheme(); this.applyPrivacy();
     Tooltip.init(); this.buildShell(); this.bindGlobal();
     const oauth = SyncService.handleRedirect();
+    if (oauth && oauth.reload) { location.reload(); return; }
     this.setSave('busy', 'Đang tải…');
     try { await StorageService.init(); } catch (e) { console.error(e); }
     let loaded = null, loadError = null;
@@ -3995,6 +4200,7 @@ const App = {
     document.getElementById('sidebar-scrim').addEventListener('click', () => this.toggleNav(false));
     document.getElementById('nav').addEventListener('click', e => { if (e.target.closest('a')) this.toggleNav(false); });
     document.getElementById('btn-add').addEventListener('click', () => Forms.openTxn());
+    document.getElementById('btn-profile').addEventListener('click', () => Pages.profileSwitcher());
     document.getElementById('btn-privacy').addEventListener('click', () => { this.setPref('privacyMode', !this.prefs.privacyMode); this.applyPrivacy(); });
     document.getElementById('save-status').addEventListener('click', () => this.navigate('data'));
     document.getElementById('period-select').addEventListener('change', e => this.onPeriodChange(e.target.value));
@@ -4035,7 +4241,10 @@ const App = {
   renderHeader() {
     const r = ROUTES[this.route];
     document.getElementById('page-title').textContent = r.title;
-    document.title = `${r.title} · ${APP_NAME}`;
+    const prof = Profiles.active(); const multi = Profiles.count() > 1;
+    document.title = `${r.title}${multi ? ' · ' + prof.name : ''} · ${APP_NAME}`;
+    const pb = document.getElementById('btn-profile');
+    if (pb) { pb.replaceChildren(Pages.avatar(prof), h('span', { class: 'nm', text: prof.name })); pb.title = `Hồ sơ: ${prof.name}${prof.email ? ' (' + prof.email + ')' : ''} — bấm để chuyển hồ sơ`; }
     const pc = document.getElementById('period-ctl'); pc.style.display = r.period ? '' : 'none';
     const p = this.period(); const sel = document.getElementById('period-select'); sel.value = p.key;
     document.getElementById('page-sub').textContent = r.period ? p.range : '';
@@ -4052,6 +4261,7 @@ const App = {
     const el = document.getElementById('sidebar-foot'); if (!el || !this.state) return;
     const info = StorageService.info;
     el.replaceChildren(
+      h('div', { class: 'row', style: { cursor: 'pointer' }, onclick: () => Pages.profileSwitcher(), title: 'Chuyển hồ sơ' }, Icon('eye', 13), 'Hồ sơ: ' + Profiles.active().name),
       h('div', { class: 'row' }, Icon('database', 13), ({ indexeddb: 'Lưu: IndexedDB', localstorage: 'Lưu: localStorage', memory: 'Lưu: tạm thời!' })[info.mode]),
       h('div', { class: 'row' }, Icon(SyncService.isEnabled() ? 'cloud' : 'cloudOff', 13), SyncService.isEnabled() ? 'Đồng bộ: ' + (SyncService.status.text || 'bật') : 'Đồng bộ: tắt'),
       h('div', { class: 'row', style: { opacity: .7 } }, `v${APP_VERSION} · #${this.state.meta.revision}`));
