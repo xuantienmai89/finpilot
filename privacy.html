@@ -1,0 +1,31 @@
+<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><title>Chính sách quyền riêng tư · FinPilot</title><style>:root{--bg:#f3f5fa;--card:#fff;--text:#0f1b33;--muted:#5b6880;--primary:#1d3f8f;--border:#e2e7f0}
+@media (prefers-color-scheme:dark){:root{--bg:#0a1120;--card:#111a2d;--text:#e7ecf6;--muted:#9aa7c0;--primary:#86a8ff;--border:#1f2b45}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:760px;margin:0 auto;padding:32px 16px 64px}.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px}
+h1{font-size:26px;line-height:1.25;margin:0 0 4px}h2{font-size:18px;margin:28px 0 6px}.muted{color:var(--muted);font-size:14px}a{color:var(--primary)}
+ul{padding-left:20px}li{margin:4px 0}nav{display:flex;gap:16px;margin-bottom:16px;font-size:14px;flex-wrap:wrap}
+</style></head>
+<body><main><nav><a href="./">← Mở ứng dụng FinPilot</a><a href="privacy.html">Chính sách quyền riêng tư</a><a href="terms.html">Điều khoản sử dụng</a></nav><div class="card">
+<h1>Chính sách quyền riêng tư</h1><p class="muted">Ứng dụng FinPilot Offline · Cập nhật ngày 17/10/2026</p>
+<p>FinPilot Offline là ứng dụng quản lý tài chính cá nhân chạy hoàn toàn trong trình duyệt của bạn. Ứng dụng <b>không có máy chủ</b>, không có hệ thống tài khoản riêng và không thu thập dữ liệu của người dùng.</p>
+<h2>1. Dữ liệu bạn nhập được lưu ở đâu</h2>
+<ul><li>Dữ liệu tài chính (tài khoản, giao dịch, ngân sách, tài sản, khoản nợ, mục tiêu…) được lưu trong bộ nhớ của trình duyệt trên thiết bị bạn đang dùng (IndexedDB/localStorage).</li>
+<li>Nếu bạn bật đồng bộ, một bản sao dữ liệu được lưu trong <b>thư mục ẩn dành riêng cho ứng dụng (appDataFolder)</b> trên Google Drive của chính bạn, để dùng chung giữa các thiết bị của bạn.</li>
+<li>Người phát hành ứng dụng <b>không có quyền truy cập</b> vào dữ liệu trong trình duyệt hay Google Drive của bạn.</li></ul>
+<h2>2. Dữ liệu người dùng Google mà ứng dụng truy cập</h2>
+<ul><li>Phạm vi quyền duy nhất: <code>https://www.googleapis.com/auth/drive.appdata</code> — xem, tạo và xóa dữ liệu cấu hình riêng của FinPilot trong Google Drive của bạn. Ứng dụng <b>không</b> đọc được bất kỳ tệp, thư mục, ảnh hay tài liệu nào khác trong Drive.</li>
+<li>Địa chỉ email tài khoản Google được đọc để gắn hồ sơ dữ liệu với đúng tài khoản, tránh trộn dữ liệu giữa nhiều người dùng chung một thiết bị. Email chỉ được lưu trong trình duyệt của bạn.</li>
+<li>Mã truy cập (access token) do Google cấp chỉ được lưu trong trình duyệt của bạn, có hiệu lực khoảng 1 giờ và chỉ được gửi tới máy chủ Google API.</li></ul>
+<h2>3. Cách ứng dụng sử dụng dữ liệu</h2>
+<p>Dữ liệu chỉ được dùng để hiển thị, tính toán báo cáo và đồng bộ giữa các thiết bị của chính bạn. Ứng dụng không bán, không chia sẻ, không chuyển giao dữ liệu cho bên thứ ba, không dùng cho quảng cáo, không dùng để huấn luyện mô hình AI và không có công cụ theo dõi/phân tích hành vi.</p>
+<p>Việc FinPilot sử dụng và chuyển giao thông tin nhận được từ Google API tuân thủ <a href="https://developers.google.com/terms/api-services-user-data-policy">Chính sách dữ liệu người dùng của Google API Services</a>, bao gồm các yêu cầu về Sử dụng giới hạn (Limited Use).</p>
+<h2>4. Kết nối mạng</h2>
+<p>Mã nguồn ứng dụng được tải từ GitHub Pages. Ngoài ra, ứng dụng chỉ kết nối mạng tới Google (đăng nhập và Google Drive API) khi bạn chủ động bật đồng bộ.</p>
+<h2>5. Lưu giữ và xóa dữ liệu</h2>
+<ul><li>Xóa dữ liệu trên thiết bị: <i>Sao lưu &amp; dữ liệu → Xóa toàn bộ dữ liệu</i>, hoặc xóa dữ liệu trang web trong cài đặt trình duyệt.</li>
+<li>Xóa bản đồng bộ trên Google Drive: <i>Sao lưu &amp; dữ liệu → Xóa bản trên Drive</i>.</li>
+<li>Thu hồi quyền truy cập Google của ứng dụng bất kỳ lúc nào tại <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li></ul>
+<h2>6. Bảo mật</h2>
+<p>Dữ liệu lưu cục bộ trong trình duyệt <b>không được mã hóa</b> bởi ứng dụng; người có quyền truy cập thiết bị hoặc hồ sơ trình duyệt của bạn có thể xem được. Hãy bảo vệ thiết bị bằng mật khẩu/khóa màn hình và chỉ dùng chung máy với người tin cậy.</p>
+<h2>7. Liên hệ</h2>
+<p>Mọi câu hỏi về chính sách này: <a href="mailto:xuantienmai89@gmail.com">xuantienmai89@gmail.com</a>.</p></div></main></body></html>
