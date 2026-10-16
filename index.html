@@ -1829,14 +1829,19 @@ const SyncService = (() => {
   const LS_KEY = 'finpilot.sync.v1', LS_OAUTH = 'finpilot.sync.oauthState', SS_SILENT = 'finpilot.sync.silentTried';
   const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
   const FILE_NAME = 'finpilot-sync.json';
+  const DEFAULT_CLIENT = { host: 'xuantienmai89.github.io', id: '1035349944787-7imjiue19uja8lq10klu9mplqqsrm1e0.apps.googleusercontent.com' };
   const API = 'https://www.googleapis.com/drive/v3', UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
   let cfg = readCfg();
   const status = { state: cfg.enabled ? 'idle' : 'off', text: cfg.enabled ? 'Chờ đồng bộ' : 'Chưa bật đồng bộ', at: null };
   let syncing = false, pending = false, timer = null, pollTimer = null;
   const listeners = [];
 
+  // Client ID mặc định cho bản cài trên GitHub Pages của chủ sở hữu (Client ID là định danh công khai, không phải mật khẩu)
   function readCfg() {
-    try { const c = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); return Util.isObj(c) ? c : {}; } catch (e) { return {}; }
+    let c = {};
+    try { c = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); if (!Util.isObj(c)) c = {}; } catch (e) { c = {}; }
+    if (!c.clientId && location.host === DEFAULT_CLIENT.host) c.clientId = DEFAULT_CLIENT.id;
+    return c;
   }
   function writeCfg() { try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch (e) {} }
   function setStatus(state, text) { status.state = state; status.text = text; status.at = Util.nowISO(); for (const f of listeners) { try { f(status); } catch (e) {} } }
