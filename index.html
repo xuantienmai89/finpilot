@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="format-detection" content="telephone=no">
 <meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://bgapidatafeed.vps.com.vn https://dchart-api.vndirect.com.vn">
 <meta name="description" content="FinPilot Offline — quản lý tài chính cá nhân chạy hoàn toàn trên thiết bị, đồng bộ tùy chọn qua Google Drive.">
 <title>FinPilot Offline</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%232f5bd3'/%3E%3Cpath d='M8 22l5-6 4 3 7-9' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='24' cy='10' r='2.4' fill='%237ef0c0'/%3E%3C/svg%3E">
@@ -405,6 +406,74 @@ body.privacy .money:hover{filter:none}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media print{.sidebar,.topbar,.bottom-nav,.banners,#toast-root{display:none!important}.main{margin:0}.card{break-inside:avoid}}
 
+/* ======================= Kỷ luật tài chính ======================= */
+.mt-8{margin-top:8px}.center{text-align:center}
+.disc-hero-wrap{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.disc-hero{border:1.5px solid var(--primary-100);background:linear-gradient(135deg,var(--primary-50),var(--surface) 60%)}
+.disc-hero.neg{border-color:var(--red);background:var(--red-50)}
+.disc-hero .hero-value{font-size:clamp(30px,7vw,40px);font-weight:800;letter-spacing:-.02em;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+.disc-hero.neg .hero-value{color:var(--red)}
+.hero-break{margin-top:10px;color:var(--text-2);display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}
+.hero-break b{color:var(--text)}
+.earmark{display:inline-flex;align-items:center;gap:3px;border:1px dashed var(--primary);border-radius:6px;padding:1px 6px;color:var(--primary-strong)}
+.disc-cta{display:flex;gap:12px;align-items:center;margin-bottom:16px;border-left:4px solid var(--primary)}
+.disc-cta>svg{color:var(--primary);flex:none}
+.chip-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.chip-btn{min-height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font:inherit;font-size:13px;cursor:pointer}
+.chip-btn.active{background:var(--primary);border-color:var(--primary);color:var(--on-primary);font-weight:600}
+.chip-btn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.note-input{width:100%;margin:4px 0 8px}
+.disc-prompt{display:flex;flex-direction:column;gap:12px}
+.disc-viol{margin:0;padding-left:18px;font-weight:600}
+.commit-quote{margin:0;padding:10px 14px;border-left:3px solid var(--primary);background:var(--primary-50);border-radius:0 var(--radius-sm) var(--radius-sm) 0;font-style:italic}
+.disc-sec{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px}
+.disc-sec.primary{border-color:var(--primary-100);background:var(--primary-50)}
+.disc-sec-title{font-weight:700;margin-bottom:4px}
+.alloc-sheet{display:flex;flex-direction:column;gap:12px}
+.alloc-total{font-size:28px;font-weight:800}
+.alloc-free{background:var(--green-50);border-radius:var(--radius-sm);padding:12px;text-align:center}
+.alloc-free .money.big{font-size:24px;font-weight:800;color:var(--green)}
+.alloc-flow{display:flex;flex-direction:column;gap:6px}
+.alloc-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:10px 12px;border-radius:var(--radius-sm);border:1px dashed var(--primary);background:var(--surface)}
+.alloc-row.spend{border:1px solid var(--border);background:var(--surface-2);font-weight:600}
+.alloc-row .nm{font-weight:600}
+.btn-lg{min-height:52px;font-size:16px;font-weight:700}
+.btn-block{width:100%;justify-content:center}
+.xfer-list{display:flex;flex-direction:column;gap:8px}
+.xfer{border:1px dashed var(--primary);border-radius:var(--radius-sm);padding:10px 12px;background:var(--surface)}
+.xfer.done{border-style:solid;border-color:var(--green);background:var(--green-50)}
+.xfer.partial{border-color:var(--amber);background:var(--amber-50)}
+.xfer.released{opacity:.65;border-style:solid;border-color:var(--border)}
+.xfer-main{display:flex;gap:10px;align-items:center;cursor:pointer;min-height:48px}
+.xfer-main input{width:22px;height:22px;flex:none}
+.xfer-main .grow{display:flex;flex-direction:column;min-width:0}
+.xfer-actions{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.req-list,.log-list{display:flex;flex-direction:column;gap:8px}
+.req{padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border)}
+.req.ripe{border-color:var(--amber);background:var(--amber-50)}
+.req.cancelled,.req.expired,.req.stale{opacity:.7}
+.log-item{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:13px;padding:6px 0;border-bottom:1px solid var(--border)}
+.log-note{display:inline-flex;gap:4px;align-items:center;color:var(--text-2)}
+.rule-block{padding:8px 0;border-bottom:1px solid var(--border)}
+.rule-steps{margin:6px 0 0;padding-left:20px;font-size:13.5px}
+.disc-config{display:flex;flex-direction:column;gap:14px}
+.rule-edit{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px}
+.steps-list{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.step-row{display:grid;grid-template-columns:22px minmax(0,1.4fr) minmax(0,1fr) 110px auto;gap:6px;align-items:center}
+.step-n{font-weight:700;color:var(--muted);text-align:center}
+.step-btns{display:flex;gap:2px}
+.step-btns .icon-btn:nth-child(1) svg{transform:rotate(90deg)}.step-btns .icon-btn:nth-child(2) svg{transform:rotate(90deg)}
+.share-input{text-align:right}
+.preview{margin-top:8px;padding:8px 10px;background:var(--surface-2);border-radius:var(--radius-sm);display:flex;flex-direction:column;gap:3px}
+.consent ul{margin:0 0 8px;padding-left:18px}
+.consent-full{margin-top:8px;padding:10px;background:var(--surface-2);border-radius:var(--radius-sm);max-height:40vh;overflow:auto}
+@media (max-width:760px){
+  .step-row{grid-template-columns:22px 1fr 1fr;}
+  .step-row .share-input{grid-column:2}
+  .step-row .step-btns{grid-column:3;justify-content:flex-end}
+  .disc-cta{flex-wrap:wrap}
+}
+
 </style>
 </head>
 <body>
@@ -443,8 +512,8 @@ body.privacy .money:hover{filter:none}
    FinPilot Offline — CORE: hằng số, tiện ích, tiền tệ, ngày tháng, DOM helpers
    ========================================================================== */
 const APP_NAME = 'FinPilot Offline';
-const APP_VERSION = '1.1.0';
-const SCHEMA_VERSION = 1;
+const APP_VERSION = '1.2.0';
+const SCHEMA_VERSION = 2;
 const MAX_AMOUNT = 100000000000000; // 100 nghìn tỷ đồng / một khoản
 const TZ = 'Asia/Ho_Chi_Minh';
 const INTEREST_CAT_ID = 'cat_exp_interest';
@@ -469,8 +538,10 @@ const GOAL_MODES = { manual: 'Ghi nhận thủ công', account: 'Theo số dư m
 const GOAL_STATUS = { active: 'Đang thực hiện', paused: 'Tạm dừng', done: 'Hoàn thành' };
 const PRIORITIES = { high: 'Cao', medium: 'Trung bình', low: 'Thấp' };
 const FREQUENCIES = { daily: 'ngày', weekly: 'tuần', monthly: 'tháng', yearly: 'năm' };
-const COLLECTIONS = ['categories', 'accounts', 'transactions', 'budgets', 'assets', 'debts', 'goals', 'recurring', 'snapshots'];
-const COLL_LABELS = { categories: 'Danh mục', accounts: 'Tài khoản', transactions: 'Giao dịch', budgets: 'Ngân sách', assets: 'Tài sản', debts: 'Khoản nợ', goals: 'Mục tiêu', recurring: 'Giao dịch định kỳ', snapshots: 'Bản chụp tài sản ròng' };
+const COLLECTIONS = ['categories', 'accounts', 'transactions', 'budgets', 'assets', 'debts', 'goals', 'recurring', 'snapshots', 'allocations', 'commitLog', 'commitNotes', 'holdings'];
+/** Phiên bản cấu trúc bắt đầu có từng danh sách — file cũ hơn được coi là danh sách rỗng. */
+const COLL_SINCE = { allocations: 2, commitLog: 2, commitNotes: 2, holdings: 2 };
+const COLL_LABELS = { categories: 'Danh mục', accounts: 'Tài khoản', transactions: 'Giao dịch', budgets: 'Ngân sách', assets: 'Tài sản', debts: 'Khoản nợ', goals: 'Mục tiêu', recurring: 'Giao dịch định kỳ', snapshots: 'Bản chụp tài sản ròng', allocations: 'Phân bổ thu nhập', commitLog: 'Nhật ký cam kết', commitNotes: 'Ghi chú cam kết', holdings: 'Danh mục chứng khoán' };
 const PALETTE = ['#2563eb', '#0b8f63', '#f97316', '#8b5cf6', '#e11d48', '#0891b2', '#db2777', '#d97706', '#4f46e5', '#65a30d', '#c026d3', '#64748b', '#b91c1c', '#0d9488', '#a16207', '#1d3f8f'];
 const EMOJIS = ['💼', '🎁', '🏪', '📈', '➕', '🍜', '🏠', '🚗', '👨‍👩‍👧', '💊', '📚', '🛍️', '🎬', '🧾', '🏦', '📦', '☕', '✈️', '🐶', '💡', '📱', '🎓', '🏋️', '💰', '🧒', '🎉', '🔧', '⛽', '🛒', '💳', '🎮', '🍼'];
 
@@ -623,6 +694,21 @@ const DateUtil = {
   timeVN(iso) {
     try { return new Intl.DateTimeFormat('vi-VN', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }).format(iso ? new Date(iso) : new Date()); }
     catch (e) { return ''; }
+  },
+  /** Ngày (YYYY-MM-DD) theo giờ Việt Nam của một mốc thời gian ISO. */
+  isoDateVN(iso) {
+    const d = new Date(iso); if (isNaN(d)) return '';
+    try {
+      const p = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+      const g = t => (p.find(x => x.type === t) || {}).value;
+      return `${g('year')}-${g('month')}-${g('day')}`;
+    } catch (e) { return d.toISOString().slice(0, 10); }
+  },
+  /** "09:12 Thứ Hai 20/10/2026" — giờ tuyệt đối theo giờ Việt Nam. */
+  whenVN(iso) {
+    const d = new Date(iso); if (isNaN(d)) return '—';
+    const day = this.isoDateVN(iso); const names = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+    return `${this.timeVN(iso)} ${names[this.dow(day)]} ${this.toVN(day)}`;
   },
   dateTimeVN(iso) {
     if (!iso) return '—';
@@ -792,6 +878,11 @@ const ICON_PATHS = {
   coins: '<circle cx="8" cy="8" r="6"/><path d="M18.1 10.4A6 6 0 1 1 10.3 18"/><path d="M7 6h1v4"/>',
   history: '<path d="M3 3v5h5"/><path d="M3.1 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>',
   copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  unlock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>',
+  flag: '<path d="M4 22V4"/><path d="M4 4h13l-2 4 2 4H4"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  layers: '<path d="M12 2l10 6-10 6L2 8z"/><path d="M2 16l10 6 10-6"/>',
   link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>'
 };
 function Icon(name, size = 18, extraClass = '') {
@@ -965,7 +1056,7 @@ const StorageService = (() => {
       const k = keys(id);
       if (db) await idbTx('readwrite', s => { s.delete(k.K_STATE); s.delete(k.K_PREV); });
       else { try { const d = await openDB(); d.close(); } catch (e) {} }
-      try { localStorage.removeItem(k.LS_STATE); localStorage.removeItem(k.LS_PREV); localStorage.removeItem(k.LS_REV); } catch (e) {}
+      try { localStorage.removeItem(k.LS_STATE); localStorage.removeItem(k.LS_PREV); localStorage.removeItem(k.LS_REV); const sf = Profiles.suffix(id); for (const b of ['finpilot.clock.v1', 'finpilot.dev.v1', 'finpilot.prices.v1', 'finpilot.quotes.v1']) localStorage.removeItem(b + sf); } catch (e) {}
     },
     /** Đọc nhanh số liệu của một hồ sơ khác (để hiển thị). */
     async peekProfile(id) {
@@ -1037,13 +1128,13 @@ const Defaults = {
     ];
   },
   settings() {
-    return { currencySymbol: '₫', defaultAccountId: '', pageSize: 25, savingsRateTarget: 20, emergencyTargetMonths: 6, compactCharts: true, showInsights: true, defaultBudgets: [], updatedAt: '' };
+    return { currencySymbol: '₫', defaultAccountId: '', pageSize: 25, savingsRateTarget: 20, emergencyTargetMonths: 6, compactCharts: true, showInsights: true, defaultBudgets: [], disciplineEpoch: 0, updatedAt: '' };
   },
   state() {
     return {
       meta: { schemaVersion: SCHEMA_VERSION, appVersion: APP_VERSION, createdAt: Util.nowISO(), revision: 0, updatedAt: '' },
       settings: this.settings(), categories: this.categories(), accounts: [], transactions: [], budgets: [],
-      assets: [], debts: [], goals: [], recurring: [], snapshots: [], tombstones: []
+      assets: [], debts: [], goals: [], recurring: [], snapshots: [], allocations: [], commitLog: [], commitNotes: [], holdings: [], tombstones: []
     };
   }
 };
@@ -1081,6 +1172,9 @@ const Model = {
       interest: type === 'debt_payment' ? r.interest : 0,
       direction: type === 'adjustment' ? r.direction : '',
       goalId: type === 'transfer' ? this.s(r.goalId, 80) : '',
+      goalDir: type === 'transfer' && r.goalId ? (r.goalDir === 'out' ? 'out' : 'in') : '',
+      archivedGoalId: type === 'transfer' ? this.s(r.archivedGoalId, 80) : '',
+      allocationId: type === 'transfer' ? this.s(r.allocationId, 140) : '',
       payee: this.s(r.payee, 120), note: this.s(r.note, 500), tags: this.tags(r.tags),
       reconciled: r.reconciled === true,
       recurringId: this.s(r.recurringId, 80), recurringDate: DateUtil.isISO(r.recurringDate) ? r.recurringDate : '',
@@ -1124,6 +1218,52 @@ const Model = {
     r = Util.isObj(r) ? r : {};
     return { id: this.s(r.id, 40) || ('snap_' + r.date), date: r.date, cash: r.cash, otherAssets: r.otherAssets, totalAssets: r.totalAssets, liabilities: r.liabilities, netWorth: r.netWorth, source: r.source === 'manual' ? 'manual' : 'auto', updatedAt: this.ts(r.updatedAt) };
   },
+  allocStep(x) {
+    x = Util.isObj(x) ? x : {};
+    return { key: this.s(x.key, 40), goalId: this.s(x.goalId, 80), toAccountId: this.s(x.toAccountId, 80), bp: Number.isInteger(x.bp) && x.bp > 0 && x.bp <= 10000 ? x.bp : null, fixed: Number.isSafeInteger(x.fixed) && x.fixed > 0 && x.fixed <= MAX_AMOUNT ? x.fixed : null, label: this.s(x.label, 80) };
+  },
+  discConfig(c) {
+    c = Util.isObj(c) ? c : {};
+    const rules = Array.isArray(c.rules) ? c.rules.filter(Util.isObj).slice(0, 4).map(r => ({ id: this.s(r.id, 30), name: this.s(r.name, 40), categoryIds: Array.isArray(r.categoryIds) ? Array.from(new Set(r.categoryIds.map(x => this.s(x, 80)).filter(Boolean))).slice(0, 20) : [], steps: Array.isArray(r.steps) ? r.steps.slice(0, 20).map(x => this.allocStep(x)) : [] })) : [];
+    return { enabled: c.enabled !== false, rules };
+  },
+  allocation(r) {
+    r = Util.isObj(r) ? r : {};
+    const steps = Array.isArray(r.steps) ? r.steps.slice(0, 20).map(x => this.allocStep(x)) : [];
+    const caps = {}; if (Util.isObj(r.caps)) for (const k of Object.keys(r.caps).slice(0, 20)) { const v = r.caps[k]; caps[this.s(k, 40)] = Number.isSafeInteger(v) && v >= 0 ? v : null; }
+    return { id: this.s(r.id, 160), incomeTxnId: this.s(r.incomeTxnId, 120), ruleId: this.s(r.ruleId, 30), ruleName: this.s(r.ruleName, 40), ruleVersion: this.s(r.ruleVersion, 160), date: r.date, incomeAmount: r.incomeAmount, steps, caps, createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
+  },
+  CEV_KINDS: ['set', 'arm', 'request', 'cancel', 'confirm', 'release', 'override', 'wouldBlock', 'income_revised', 'audit'],
+  cevPayload(p) {
+    if (!Util.isObj(p)) return null;
+    switch (p.type) {
+      case 'config': return { type: 'config', config: this.discConfig(p.config), baseVersion: typeof p.baseVersion === 'string' ? this.s(p.baseVersion, 160) : undefined };
+      case 'exit': return { type: 'exit', baseVersion: typeof p.baseVersion === 'string' ? this.s(p.baseVersion, 160) : undefined };
+      case 'release': return { type: 'release', alc: this.s(p.alc, 160), key: this.s(p.key, 40), amount: Number.isSafeInteger(p.amount) ? p.amount : 0 };
+      case 'txn': return { type: 'txn', op: 'add', txn: this.transaction(p.txn) };
+      case 'deleteGoal': return { type: 'deleteGoal', goalId: this.s(p.goalId, 80), name: this.s(p.name, 80) };
+      case 'goal': return { type: 'goal', goal: this.goal(p.goal), baseUpdatedAt: this.ts(p.baseUpdatedAt) };
+      case 'note': return { type: 'note', note: this.s(p.note, 160) };
+      default: return null;
+    }
+  },
+  cev(r) {
+    r = Util.isObj(r) ? r : {};
+    const p = this.cevPayload(r.payload);
+    const o = { id: this.s(r.id, 160), kind: this.CEV_KINDS.includes(r.kind) ? r.kind : 'audit', refId: this.s(r.refId, 160), cls: this.s(r.cls, 30), amount: Number.isSafeInteger(r.amount) && r.amount >= 0 ? r.amount : 0, at: this.ts(r.at), effectiveAt: this.ts(r.effectiveAt), epoch: Number.isInteger(r.epoch) && r.epoch >= 0 ? r.epoch : 0, device: this.s(r.device, 40) };
+    if (p) { if (p.baseVersion === undefined) delete p.baseVersion; o.payload = p; }
+    return o;
+  },
+  note(r) {
+    r = Util.isObj(r) ? r : {};
+    return { id: this.s(r.id, 170), cevId: this.s(r.cevId, 160), kind: r.kind === 'commitment' ? 'commitment' : 'reason', code: this.s(r.code, 30), text: this.s(r.text, r.kind === 'commitment' ? 120 : 140), createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
+  },
+  holding(r) {
+    r = Util.isObj(r) ? r : {};
+    const opt = v => (Number.isSafeInteger(v) && v > 0 ? v : null);
+    const tp = typeof r.targetPct === 'number' && Number.isFinite(r.targetPct) && r.targetPct >= 0 && r.targetPct <= 100 ? Math.round(r.targetPct * 10) / 10 : null;
+    return { id: this.s(r.id, 120), accountId: this.s(r.accountId, 80), symbol: this.s(r.symbol, 10).toUpperCase(), qty: r.qty, avgCost: opt(r.avgCost), targetPct: tp, manualPrice: opt(r.manualPrice), manualPriceAt: this.ts(r.manualPriceAt), note: this.s(r.note, 200), createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
+  },
   settings(r) {
     const d = Defaults.settings(); r = Util.isObj(r) ? r : {};
     const out = { ...d };
@@ -1135,6 +1275,7 @@ const Model = {
     if (typeof r.compactCharts === 'boolean') out.compactCharts = r.compactCharts;
     if (typeof r.showInsights === 'boolean') out.showInsights = r.showInsights;
     if (Array.isArray(r.defaultBudgets)) out.defaultBudgets = r.defaultBudgets.filter(Util.isObj).map(x => ({ categoryId: this.s(x.categoryId, 80), limit: x.limit })).filter(x => Validation.amt(x.limit));
+    if (Number.isInteger(r.disciplineEpoch) && r.disciplineEpoch >= 0) out.disciplineEpoch = r.disciplineEpoch;
     out.updatedAt = this.ts(r.updatedAt);
     return out;
   },
@@ -1155,6 +1296,10 @@ const Model = {
       goals: (d.goals || []).map(x => this.goal(x)),
       recurring: (d.recurring || []).map(x => this.recurring(x)),
       snapshots: (d.snapshots || []).map(x => this.snapshot(x)),
+      allocations: (d.allocations || []).map(x => this.allocation(x)),
+      commitLog: CommitLog.sort((d.commitLog || []).filter(Util.isObj).map(x => this.cev(x)).filter(e => e.id && e.at)),
+      commitNotes: (d.commitNotes || []).map(x => this.note(x)),
+      holdings: (d.holdings || []).map(x => this.holding(x)),
       tombstones: this.tombstones(d.tombstones)
     };
     if (!ds.categories.some(c => c.id === INTEREST_CAT_ID)) ds.categories.push(Defaults.categories().find(c => c.id === INTEREST_CAT_ID));
@@ -1208,6 +1353,7 @@ const Validation = {
         amount(); acct('accountId', t.accountId, 'tài khoản chuyển'); acct('toAccountId', t.toAccountId, 'tài khoản nhận');
         if (t.accountId && t.accountId === t.toAccountId) set('toAccountId', 'Tài khoản nhận phải khác tài khoản chuyển.');
         if (t.goalId && !ctx.goal.has(t.goalId)) set('goalId', 'Mục tiêu không tồn tại.');
+        if (t.goalDir === 'out' && !t.goalId) set('goalId', 'Chọn mục tiêu cần rút.');
         break;
       case 'debt_payment': {
         amount('principal', true); amount('interest', true);
@@ -1302,6 +1448,7 @@ const Validation = {
     if (!GOAL_STATUS[g.status]) e.status = 'Trạng thái không hợp lệ.';
     if (!GOAL_MODES[g.mode]) e.mode = 'Cách theo dõi không hợp lệ.';
     if (g.mode === 'account' && !ctx.acc.has(g.accountId)) e.accountId = 'Vui lòng chọn tài khoản liên kết.';
+    else if (g.mode === 'account' && o.checkShared && g.status !== 'done') { const other = st.goals.find(x => x.id !== g.id && x.mode === 'account' && x.status !== 'done' && x.accountId === g.accountId); if (other) e.accountId = `Tài khoản này đã theo dõi mục tiêu "${other.name}" — mỗi tài khoản chỉ gắn một mục tiêu để không tính trùng tiền.`; }
     let saved = 0;
     for (const x of g.contributions || []) {
       if (!x.id || !DateUtil.isISO(x.date) || !this.amt(x.amount)) { e.contributions = 'Có khoản tích lũy không hợp lệ.'; break; }
@@ -1328,6 +1475,16 @@ const Validation = {
     if (t.type === 'transfer') { needAcc('toAccountId', t.toAccountId); if (t.accountId && t.accountId === t.toAccountId) e.toAccountId = 'Tài khoản nhận phải khác tài khoản chuyển.'; }
     if (t.type === 'income' || t.type === 'expense') { const c = ctx.cat.get(t.categoryId); if (!c || c.kind !== t.type) e.categoryId = 'Vui lòng chọn danh mục phù hợp.'; }
     if (t.type === 'debt_payment' && !ctx.debt.has(t.debtId)) e.debtId = 'Vui lòng chọn khoản nợ.';
+    return e;
+  },
+  holding(x, st, o = {}) {
+    const e = {}; const ctx = o.ctx || this.ctx(st);
+    if (!Portfolio.SYM_RE.test(x.symbol)) e.symbol = 'Mã chứng khoán gồm 3–10 chữ in hoa/số (VD: FPT, E1VFVN30).';
+    if (!(Number.isSafeInteger(x.qty) && x.qty >= 0 && x.qty <= 1e12)) e.qty = 'Khối lượng phải là số nguyên ≥ 0.';
+    const a = ctx.acc.get(x.accountId);
+    if (!a) e.accountId = 'Chọn tài khoản chứng khoán.';
+    else if (a.type !== 'investment') e.accountId = 'Danh mục phải gắn với tài khoản loại "Tài khoản đầu tư".';
+    if (x.id && x.accountId && x.symbol && x.id !== `hld_${x.accountId}_${x.symbol}`) e.symbol = 'Mã định danh danh mục không khớp.';
     return e;
   },
   snapshot(s) {
@@ -1373,6 +1530,9 @@ const Validation = {
       if (g.mode === 'account' && g.status !== 'done') { if (goalAcc.has(g.accountId)) add(warnings, `Hai mục tiêu cùng liên kết một tài khoản ("${goalAcc.get(g.accountId)}" và "${g.name}") — số dư bị tính cho cả hai.`); goalAcc.set(g.accountId, g.name); }
     }
     for (const r of st.recurring) { const e = this.recurring(r, st, { ctx }); if (Object.keys(e).length) add(errors, `Giao dịch định kỳ "${r.name || r.id}": ${this.first(e)}`); }
+    for (const x of st.holdings || []) { const e = this.holding(x, st, { ctx }); if (Object.keys(e).length) add(errors, `Danh mục ${x.symbol || x.id}: ${this.first(e)}`); }
+    if ((st.holdings || []).some(x => x.qty > 0) && st.assets.some(a => a.group === 'securities' && Ledger.assetValue(a, DateUtil.today()) > 0)) add(warnings, 'Vừa có tài sản nhập tay nhóm "Chứng khoán / đầu tư" vừa có danh mục cổ phiếu — nếu là cùng một khoản, tài sản ròng đang bị tính trùng.');
+    for (const a of st.allocations || []) { if (!st.transactions.some(t => t.id === a.incomeTxnId)) add(warnings, `Phân bổ ${a.ruleName || ''} ngày ${DateUtil.toVN(a.date)}: khoản thu gốc đã bị xóa.`); }
     const sdates = new Set();
     for (const s of st.snapshots) { const m = this.snapshot(s); if (m) add(errors, `Bản chụp tài sản ròng: ${m}.`); if (sdates.has(s.date)) add(errors, `Bản chụp trùng ngày ${s.date}.`); sdates.add(s.date); }
     if (!errors.length) {
@@ -1486,16 +1646,19 @@ const Ledger = {
   assetLatest(a) { return a.history.length ? a.history[a.history.length - 1] : null; },
   current(st) {
     const asOf = DateUtil.today();
-    return memo(st, 'cur:' + asOf, () => {
+    const qv = typeof PriceService !== 'undefined' ? PriceService.version : 0;
+    return memo(st, 'cur:' + asOf + ':' + qv, () => {
       const ab = this.accountBalances(st, asOf);
       let cash = 0, liquid = 0; const byType = {};
       for (const a of st.accounts) { const b = ab.get(a.id) || 0; cash += b; if (LIQUID_TYPES.includes(a.type)) liquid += b; byType[a.type] = (byType[a.type] || 0) + b; }
       let otherAssets = 0; const byGroup = {};
       for (const as of st.assets) { const v = this.assetValue(as, asOf); otherAssets += v; byGroup[as.group] = (byGroup[as.group] || 0) + v; }
+      const pf = typeof Holdings !== 'undefined' ? Holdings.total(st) : 0;
+      if (pf > 0) { otherAssets += pf; byGroup.securities = (byGroup.securities || 0) + pf; }
       const db = this.debtBalances(st, asOf);
       let liabilities = 0; const byDebtType = {};
       for (const d of st.debts) { const b = db.get(d.id) || 0; liabilities += b; byDebtType[d.type] = (byDebtType[d.type] || 0) + b; }
-      return { asOf, cash, liquid, byType, otherAssets, byGroup, totalAssets: cash + otherAssets, liabilities, byDebtType, netWorth: cash + otherAssets - liabilities, balances: ab, debtBalances: db };
+      return { asOf, cash, liquid, byType, otherAssets, portfolio: pf, byGroup, totalAssets: cash + otherAssets, liabilities, byDebtType, netWorth: cash + otherAssets - liabilities, balances: ab, debtBalances: db };
     });
   },
   bounds(st) {
@@ -1641,7 +1804,7 @@ const Goals = {
   progress(st, g, today = DateUtil.today()) {
     let saved = 0;
     if (g.mode === 'account') saved = Math.max(0, Ledger.current(st).balances.get(g.accountId) || 0);
-    else if (g.mode === 'transfer') { for (const t of st.transactions) if (t.type === 'transfer' && t.goalId === g.id && t.date <= today) saved += t.amount; }
+    else if (g.mode === 'transfer') { for (const t of st.transactions) if (t.type === 'transfer' && t.goalId === g.id && t.date <= today) saved += t.goalDir === 'out' ? -t.amount : t.amount; saved = Math.max(0, saved); }
     else for (const c of g.contributions) saved += c.direction === 'out' ? -c.amount : c.amount;
     const target = g.target;
     const pct = target > 0 ? Math.min(saved / target * 100, 999) : 0;
@@ -1780,7 +1943,7 @@ const Changes = {
         const tk = c + '|' + r.id;
         if (tomb.has(tk) && tomb.get(tk).at < r.updatedAt) tomb.delete(tk);
       }
-      for (const id of prev.keys()) if (!ids.has(id)) { tomb.set(c + '|' + id, { c, id, at: now }); changed++; }
+      for (const id of prev.keys()) if (!ids.has(id)) { if (c !== 'commitLog') tomb.set(c + '|' + id, { c, id, at: now }); changed++; }
     }
     const sKey = s => { const { updatedAt, ...rest } = s; void updatedAt; return JSON.stringify(rest); };
     if (sKey(before.settings) !== sKey(draft.settings)) draft.settings.updatedAt = now;
@@ -1800,7 +1963,17 @@ const MergeService = {
     const out = { tombstones: [] }; let localChanged = false, remoteChanged = false;
     const stats = { added: 0, updated: 0, deleted: 0 };
     const ts = r => (r && r.updatedAt) || '';
+    const ls0 = local.settings || {}, rs0 = remote.settings || {};
+    const epoch = Math.max(ls0.disciplineEpoch || 0, rs0.disciplineEpoch || 0);
     for (const c of COLLECTIONS) {
+      if (c === 'commitLog') {
+        const res = CommitLog.merge(local[c], remote[c], epoch);
+        const ids = arr => new Set((arr || []).filter(e => (e.epoch || 0) >= epoch).map(e => e.id));
+        const lIds = ids(local[c]), rIds = ids(remote[c]);
+        if (res.length !== lIds.size || res.length !== (local[c] || []).length) { localChanged = true; stats.added += Math.max(0, res.length - lIds.size); }
+        if (res.length !== rIds.size || res.length !== (remote[c] || []).length) remoteChanged = true;
+        out[c] = res; continue;
+      }
       const lm = new Map((local[c] || []).map(r => [r.id, r])), rm = new Map((remote[c] || []).map(r => [r.id, r]));
       const ids = new Set([...lm.keys(), ...rm.keys()]);
       const res = [];
@@ -1832,6 +2005,7 @@ const MergeService = {
     const ls = local.settings || {}, rs = remote.settings || {};
     if ((rs.updatedAt || '') > (ls.updatedAt || '')) { out.settings = rs; localChanged = true; }
     else { out.settings = ls; if ((ls.updatedAt || '') !== (rs.updatedAt || '')) remoteChanged = true; }
+    if ((out.settings.disciplineEpoch || 0) !== epoch) { out.settings = { ...out.settings, disciplineEpoch: epoch }; if ((ls.disciplineEpoch || 0) !== epoch) localChanged = true; if ((rs.disciplineEpoch || 0) !== epoch) remoteChanged = true; }
     return { data: out, localChanged, remoteChanged, stats };
   }
 };
@@ -1860,12 +2034,13 @@ const ImportExport = {
     if (!Util.isObj(d)) return fail('Thiếu phần dữ liệu (data).');
     const errors = [], warnings = [];
     for (const c of COLLECTIONS) {
+      if (d[c] === undefined && v < (COLL_SINCE[c] || 1)) { d[c] = []; continue; }
       if (!Array.isArray(d[c])) errors.push(`Thiếu hoặc sai kiểu danh sách "${COLL_LABELS[c]}".`);
       else if (d[c].some(x => !Util.isObj(x))) errors.push(`Danh sách "${COLL_LABELS[c]}" có phần tử không hợp lệ.`);
     }
     if (errors.length) return { ok: false, errors, warnings };
     if (!Util.isObj(d.settings)) warnings.push('File không có phần cài đặt — sẽ dùng cài đặt mặc định.');
-    if (Util.isObj(obj.counts)) for (const c of COLLECTIONS) if (Number.isInteger(obj.counts[c]) && obj.counts[c] !== d[c].length) errors.push(`Số lượng ${COLL_LABELS[c]} (${d[c].length}) không khớp thông tin trong file (${obj.counts[c]}) — file có thể bị cắt hoặc chỉnh sửa.`);
+    if (Util.isObj(obj.counts)) for (const c of COLLECTIONS) if (c !== 'commitLog' && Number.isInteger(obj.counts[c]) && obj.counts[c] !== d[c].length) errors.push(`Số lượng ${COLL_LABELS[c]} (${d[c].length}) không khớp thông tin trong file (${obj.counts[c]}) — file có thể bị cắt hoặc chỉnh sửa.`);
     const ds = Model.dataset(d);
     const integ = Validation.integrity(ds);
     errors.push(...integ.errors); warnings.push(...integ.warnings);
@@ -1895,6 +2070,766 @@ const ImportExport = {
     }
     return '﻿' + lines.join('\r\n');
   }
+};
+
+/* ==========================================================================
+   ENGINE — lõi thuần của tính năng Kỷ luật & Danh mục
+   Quy ước bắt buộc (build.py kiểm tra): không DOM, không mạng, không lưu trữ,
+   không tự đọc đồng hồ. Mọi thời điểm được truyền vào qua tham số (ms hoặc ISO).
+   Tiền luôn là số nguyên VND; tỷ lệ dùng basis point (1% = 100 bp).
+   ========================================================================== */
+const DISC = Object.freeze({
+  COOLDOWN_MS: 72 * 3600000,     // chờ 72 giờ khi nới lỏng cam kết
+  GRACE_MS: 24 * 3600000,        // 24 giờ đầu sửa giao dịch vào quỹ tự do
+  TRIAL_MS: 7 * 86400000,        // 7 ngày chạy thử
+  REQUEST_TTL_MS: 7 * 86400000,  // yêu cầu hết hạn nếu không xác nhận trong 7 ngày sau khi chín
+  NOTE_TTL_MS: 365 * 86400000,   // ghi chú lý do tự xóa sau 12 tháng
+  SKEW_MAX_MS: 10 * 60000,       // lệch giờ tối đa so với máy chủ Google
+  BP_FULL: 10000
+});
+
+const _ms = v => (typeof v === 'number' ? v : (typeof v === 'string' && v ? Date.parse(v) : NaN));
+const _byAtId = (a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+/* --------------------------- Thác nước phân bổ --------------------------- */
+const Alloc = {
+  /** Phần của một bậc tính trên toàn bộ khoản thu (chưa áp trần). An toàn số học tới 100 nghìn tỷ. */
+  share(amount, step) {
+    if (Number.isSafeInteger(step.fixed) && step.fixed > 0) return step.fixed;
+    if (Number.isInteger(step.bp) && step.bp > 0) {
+      const q = Math.floor(amount / DISC.BP_FULL), r = amount % DISC.BP_FULL;
+      return q * step.bp + Math.floor(r * step.bp / DISC.BP_FULL);
+    }
+    return 0;
+  },
+  /**
+   * Chia khoản thu theo thứ tự bậc. Bậc chạm trần (mục tiêu sắp đầy) thì phần dư tràn xuống bậc kế.
+   * caps: { [stepKey]: số tiền còn được nhận | null (không trần) }.
+   * Bất biến: Σ lines.amount + spend === amount (đúng từng đồng).
+   */
+  plan(amount, steps, caps = {}) {
+    if (!Number.isSafeInteger(amount) || amount <= 0) return { lines: [], spend: Math.max(0, amount | 0), overflow: 0 };
+    let left = amount, carry = 0; const lines = [];
+    for (const s of steps || []) {
+      const want = this.share(amount, s) + carry;
+      let take = Math.min(want, left);
+      const cap = caps ? caps[s.key] : null;
+      if (Number.isSafeInteger(cap)) take = Math.min(take, Math.max(0, cap));
+      carry = left > take ? want - take : 0;
+      if (take > 0) lines.push({ key: s.key, amount: take });
+      left -= take;
+    }
+    return { lines, spend: left, overflow: carry };
+  },
+  /** Kiểm tra danh sách bậc. Trả về thông báo lỗi đầu tiên hoặc null. */
+  validateSteps(steps) {
+    if (!Array.isArray(steps)) return 'Danh sách bậc không hợp lệ.';
+    const keys = new Set(); let bp = 0;
+    for (const s of steps) {
+      if (!s || typeof s.key !== 'string' || !s.key) return 'Bậc thiếu mã.';
+      if (keys.has(s.key)) return 'Trùng mã bậc.';
+      keys.add(s.key);
+      const hasFixed = Number.isSafeInteger(s.fixed) && s.fixed > 0, hasBp = Number.isInteger(s.bp) && s.bp > 0;
+      if (hasFixed === hasBp) return 'Mỗi bậc cần đúng một trong hai: tỷ lệ % hoặc số tiền cố định.';
+      if (hasBp) { if (s.bp > DISC.BP_FULL) return 'Tỷ lệ một bậc không vượt quá 100%.'; bp += s.bp; }
+      if (!s.toAccountId) return 'Mỗi bậc cần tài khoản nhận.';
+    }
+    if (bp > DISC.BP_FULL) return 'Tổng tỷ lệ các bậc vượt quá 100%.';
+    return null;
+  }
+};
+
+/* --------------------------- So sánh quy tắc: siết hay nới --------------------------- */
+const RuleDiff = {
+  _cmpShare(o, n) {
+    const of = Number.isSafeInteger(o.fixed) && o.fixed > 0, nf = Number.isSafeInteger(n.fixed) && n.fixed > 0;
+    if (of !== nf) return 'đổi cách tính một bậc (% ↔ số cố định)';
+    if (of) return n.fixed < o.fixed ? 'giảm số tiền một bậc' : null;
+    return (n.bp || 0) < (o.bp || 0) ? 'giảm tỷ lệ một bậc' : null;
+  },
+  /** Trả về danh sách lý do "nới lỏng". Rỗng = chỉ siết chặt hoặc giữ nguyên (áp dụng ngay). */
+  loosening(oldCfg, newCfg) {
+    const out = [];
+    if (!oldCfg) return out;
+    if (oldCfg.enabled && !newCfg.enabled) out.push('tắt chế độ kỷ luật');
+    const nRules = new Map((newCfg.rules || []).map(r => [r.id, r]));
+    for (const o of oldCfg.rules || []) {
+      const n = nRules.get(o.id);
+      if (!n) { if ((o.steps || []).length) out.push(`xóa quy tắc "${o.name}"`); continue; }
+      const nc = new Set(n.categoryIds || []);
+      if ((o.categoryIds || []).some(c => !nc.has(c))) out.push(`bớt danh mục kích hoạt của "${o.name}"`);
+      const nSteps = new Map((n.steps || []).map((s, i) => [s.key, { s, i }]));
+      let lastIdx = -1;
+      for (const os of o.steps || []) {
+        const hit = nSteps.get(os.key);
+        if (!hit) { out.push(`bỏ một bậc của "${o.name}"`); continue; }
+        if ((hit.s.goalId || '') !== (os.goalId || '') || hit.s.toAccountId !== os.toAccountId) out.push(`đổi đích một bậc của "${o.name}"`);
+        const c = this._cmpShare(os, hit.s); if (c) out.push(`${c} của "${o.name}"`);
+        if (hit.i < lastIdx) out.push(`hạ thứ tự ưu tiên trong "${o.name}"`);
+        lastIdx = Math.max(lastIdx, hit.i);
+      }
+    }
+    // Mô phỏng: thêm/chèn bậc không được làm phần của bậc cũ (cùng đích) giảm ở bất kỳ mức thu nhập mẫu nào.
+    for (const o of oldCfg.rules || []) {
+      const n = nRules.get(o.id); if (!n || !(o.steps || []).length) continue;
+      const same = new Map((n.steps || []).map(s => [s.key, s]));
+      const keys = (o.steps || []).filter(s => { const x = same.get(s.key); return x && (x.goalId || '') === (s.goalId || '') && x.toAccountId === s.toAccountId; }).map(s => s.key);
+      for (const amt of [5e6, 2e7, 5e7, 1e8, 3e8]) {
+        const a = Alloc.plan(amt, o.steps, {}), b = Alloc.plan(amt, n.steps, {});
+        const get = (p, k) => (p.lines.find(l => l.key === k) || { amount: 0 }).amount;
+        if (keys.some(k => get(b, k) < get(a, k))) { out.push(`bậc mới làm giảm phần của bậc cũ trong "${o.name}"`); break; }
+      }
+    }
+    return Array.from(new Set(out));
+  }
+};
+
+/* --------------------------- Nhật ký cam kết (chỉ ghi thêm, hợp tập) --------------------------- */
+const CommitLog = {
+  sort(arr) { return arr.slice().sort(_byAtId); },
+  /** Hợp nhất hai nhật ký: hợp tập theo id, bỏ sự kiện thuộc epoch cũ (sau "xóa toàn bộ mọi thiết bị"). */
+  merge(a, b, epoch = 0) {
+    const m = new Map();
+    for (const e of a || []) if (e && e.id) m.set(e.id, e);
+    for (const e of b || []) if (e && e.id && !m.has(e.id)) m.set(e.id, e);
+    return this.sort(Array.from(m.values()).filter(e => (e.epoch || 0) >= epoch));
+  },
+  /**
+   * Gấp nhật ký thành trạng thái hiệu lực. Giao hoán & lũy đẳng: cùng tập sự kiện → cùng kết quả,
+   * bất kể thứ tự đồng bộ. Hủy luôn thắng xác nhận của cùng một yêu cầu.
+   * opts: { epoch, nowMs, skewMs, facts: Set(id giao dịch đang tồn tại) }
+   */
+  fold(events, { epoch = 0, nowMs = 0, skewMs = null, facts = null } = {}) {
+    const evs = this.sort((events || []).filter(e => e && (e.epoch || 0) >= epoch));
+    const cancelled = new Set(); const confirms = new Map();
+    for (const e of evs) {
+      if (e.kind === 'cancel') cancelled.add(e.refId);
+      else if (e.kind === 'confirm' && !confirms.has(e.refId)) confirms.set(e.refId, e);
+    }
+    const st = { config: null, version: '', armedAt: null, requests: [], released: new Set(), counts: {}, overrides: [], events: evs };
+    const reqs = new Map();
+    const bump = k => { st.counts[k] = (st.counts[k] || 0) + 1; };
+    const applyPayload = (p, ev) => {
+      if (!p) return;
+      if (p.type === 'config' && p.config) { st.config = p.config; st.version = ev.id; }
+      else if (p.type === 'exit' && st.config) { st.config = { ...st.config, enabled: false }; st.version = ev.id; }
+      else if (p.type === 'release' && p.alc && p.key) st.released.add(p.alc + '|' + p.key);
+    };
+    for (const e of evs) {
+      switch (e.kind) {
+        case 'set': {
+          if (!(e.payload && e.payload.config)) break;
+          const base = e.payload.baseVersion;
+          // Hai thiết bị cùng "siết" trên nền cũ: bản đến sau không được âm thầm nới bản kia.
+          if (base !== undefined && base !== st.version && st.config && RuleDiff.loosening(st.config, e.payload.config).length) { bump('set:conflict'); st.conflicts = (st.conflicts || 0) + 1; break; }
+          st.config = e.payload.config; st.version = e.id; bump('set:' + (e.cls || '')); break;
+        }
+        case 'arm': if (!st.armedAt) st.armedAt = e.at; bump('arm'); break;
+        case 'release': if (e.payload) st.released.add(e.payload.alc + '|' + e.payload.key); bump('release:' + (e.cls || '')); st.overrides.push(e); break;
+        case 'request': { const r = { ev: e, status: 'pending', confirm: null }; reqs.set(e.id, r); st.requests.push(r); bump('request'); break; }
+        case 'confirm': {
+          const r = reqs.get(e.refId); if (!r || r.status !== 'pending') break;
+          if (cancelled.has(r.ev.id)) break;
+          const eff = _ms(r.ev.effectiveAt), at = _ms(e.at);
+          if (!(at >= eff) || at > eff + DISC.REQUEST_TTL_MS) break;
+          const p = r.ev.payload || {};
+          if (p.type === 'config' && p.baseVersion !== undefined && p.baseVersion !== st.version) { r.status = 'stale'; r.confirm = e; break; }
+          r.status = 'confirmed'; r.confirm = e; applyPayload(p, e); bump('confirm'); break;
+        }
+        case 'override': bump('override:' + (e.cls || '')); st.overrides.push(e); break;
+        default: if (e.kind) bump(e.kind);
+      }
+    }
+    for (const r of st.requests) {
+      const fact = facts && facts.has('txn_req_' + r.ev.id);
+      if (cancelled.has(r.ev.id)) { r.status = fact ? 'done-elsewhere' : 'cancelled'; continue; }
+      if (r.status !== 'pending') continue;
+      if (fact) { r.status = 'confirmed'; continue; }
+      const eff = _ms(r.ev.effectiveAt);
+      if (nowMs > eff + DISC.REQUEST_TTL_MS) r.status = 'expired';
+      else if (Clock.ripe(eff, nowMs, skewMs)) r.status = 'ripe';
+    }
+    return st;
+  }
+};
+
+/* --------------------------- Đồng hồ tin cậy (phần thuần) --------------------------- */
+const Clock = {
+  /** Mốc thời gian lớn nhất trong dữ liệu; bỏ qua mốc vượt capMs (giờ máy chủ + 10 phút) khi biết giờ máy chủ. */
+  floorOf(values, capMs = null) {
+    let m = 0;
+    for (const v of values) { const t = _ms(v); if (!Number.isFinite(t)) continue; if (capMs !== null && t > capMs) continue; if (t > m) m = t; }
+    return m;
+  },
+  effectiveAt(nowMs, floorMs, waitMs = DISC.COOLDOWN_MS) { return Math.max(nowMs, floorMs || 0) + waitMs; },
+  /** "Chín" khi đã tới hạn và đồng hồ máy không lệch quá 10 phút so với Google (nếu đã đo được). */
+  ripe(effMs, nowMs, skewMs = null) {
+    if (skewMs !== null && Math.abs(skewMs) > DISC.SKEW_MAX_MS) return false;
+    return nowMs >= effMs;
+  }
+};
+
+/* --------------------------- Danh mục chứng khoán (phần thuần) --------------------------- */
+const Portfolio = {
+  SYM_RE: /^[A-Z0-9]{3,10}$/,
+  BANDS: { HOSE: 0.07, HSX: 0.07, HNX: 0.10, UPCOM: 0.15 },
+  /** Giá người dùng gõ: "95.5" / "95,5" / số < 1000 = nghìn đồng; số nguyên ≥ 1000 = đồng. */
+  parsePrice(raw) {
+    let s = String(raw == null ? '' : raw).trim().replace(/\s/g, '');
+    if (!s) return null;
+    if (/^\d{1,3}(\.\d{3})+$/.test(s)) return Number(s.replace(/\./g, ''));
+    if (/^\d+([.,]\d+)?$/.test(s)) {
+      const v = Number(s.replace(',', '.'));
+      if (!Number.isFinite(v) || v <= 0) return null;
+      if (/[.,]/.test(s) || v < 1000) return Math.round(v * 1000);
+      return Math.round(v);
+    }
+    return null;
+  },
+  parseQty(raw) {
+    const s = String(raw == null ? '' : raw).trim().replace(/\s/g, '');
+    if (/^\d+$/.test(s)) return Number(s);
+    if (/^\d{1,3}([.,]\d{3})+$/.test(s)) return Number(s.replace(/[.,]/g, ''));
+    return null;
+  },
+  /** Phân tích văn bản dán: mỗi dòng "MÃ KHỐI_LƯỢNG [GIÁ_VỐN]". */
+  parseLines(text) {
+    const items = [], errors = [];
+    const lines = String(text || '').split(/\r?\n/);
+    lines.forEach((ln, i) => {
+      const raw = ln.trim(); if (!raw) return;
+      const tok = raw.split(/[\s;|\t]+/).filter(Boolean);
+      const sym = (tok[0] || '').toUpperCase();
+      if (!this.SYM_RE.test(sym)) { errors.push({ line: i + 1, text: raw, msg: 'Mã chứng khoán không hợp lệ' }); return; }
+      const qty = this.parseQty(tok[1]);
+      if (!Number.isSafeInteger(qty) || qty <= 0) { errors.push({ line: i + 1, text: raw, msg: 'Khối lượng phải là số nguyên dương' }); return; }
+      let avgCost = null;
+      if (tok[2] !== undefined) { avgCost = this.parsePrice(tok[2]); if (!Number.isSafeInteger(avgCost) || avgCost <= 0) { errors.push({ line: i + 1, text: raw, msg: 'Giá vốn không hợp lệ' }); return; } }
+      items.push({ symbol: sym, qty, avgCost, line: i + 1 });
+    });
+    return { items, errors };
+  },
+  /** Chuẩn hóa phản hồi VPS (giá theo nghìn đồng) về VND nguyên. Mã thiếu bị bỏ qua, không bao giờ thành 0. */
+  parseVps(json) {
+    if (!Array.isArray(json)) throw new Error('VPS_SHAPE');
+    const out = new Map();
+    const k = v => { const n = typeof v === 'string' ? Number(v) : v; return typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.round(n * 1000) : null; };
+    for (const it of json) {
+      if (!it || typeof it.sym !== 'string') continue;
+      const sym = it.sym.toUpperCase();
+      const ref = k(it.r), ceil = k(it.c), floor = k(it.f);
+      let price = k(it.lastPrice); let basis = 'last';
+      if (price === null) { price = ref; basis = 'ref'; }
+      if (price === null) continue;
+      if (ceil !== null && floor !== null && (price > ceil || price < floor)) continue;
+      out.set(sym, { price, ref, ceil, floor, basis, market: typeof it.marketId === 'string' ? it.marketId.toUpperCase() : '' });
+    }
+    return out;
+  },
+  /** Chuẩn hóa phản hồi VNDirect dchart (TradingView, nghìn đồng). */
+  parseVnd(json) {
+    if (!json || json.s !== 'ok' || !Array.isArray(json.c) || !Array.isArray(json.t) || !json.c.length) throw new Error('VND_SHAPE');
+    const i = json.c.length - 1; const c = json.c[i];
+    if (typeof c !== 'number' || !Number.isFinite(c) || c <= 0) throw new Error('VND_SHAPE');
+    return { price: Math.round(c * 1000), tMs: json.t[i] * 1000, prevClose: i > 0 && json.c[i - 1] > 0 ? Math.round(json.c[i - 1] * 1000) : null };
+  },
+  /** Giá dùng để định giá: nguồn → giá nhập tay → giá vốn. */
+  priceFor(holding, quote) {
+    if (quote && Number.isSafeInteger(quote.price) && quote.price > 0) return { price: quote.price, source: quote.source || 'quote' };
+    if (Number.isSafeInteger(holding.manualPrice) && holding.manualPrice > 0) return { price: holding.manualPrice, source: 'manual' };
+    if (Number.isSafeInteger(holding.avgCost) && holding.avgCost > 0) return { price: holding.avgCost, source: 'cost' };
+    return { price: null, source: 'none' };
+  },
+  value(qty, price) { if (!Number.isSafeInteger(qty) || !Number.isSafeInteger(price)) return 0; const v = qty * price; return Number.isSafeInteger(v) ? v : 0; },
+  /** Nghi sự kiện quyền: giá tham chiếu hôm nay thấp hơn đóng cửa phiên trước vượt biên độ sàn của sàn niêm yết. */
+  rightsFlag(ref, prevClose, market) {
+    if (!Number.isSafeInteger(ref) || !Number.isSafeInteger(prevClose) || prevClose <= 0) return false;
+    const band = this.BANDS[market] || this.BANDS.HOSE;
+    return ref < prevClose * (1 - band) - 1;
+  },
+  /** Lệch tỷ trọng theo quy tắc 5/25: ngưỡng = min(5 điểm %, 25% của tỷ trọng mục tiêu). */
+  drift(rows) {
+    const total = rows.reduce((s, r) => s + (r.value > 0 ? r.value : 0), 0);
+    return rows.map(r => {
+      const actual = total > 0 ? r.value / total * 100 : 0;
+      const target = typeof r.targetPct === 'number' && r.targetPct >= 0 ? r.targetPct : null;
+      if (target === null) return { ...r, actual, target: null, diff: null, band: null, flag: false };
+      const band = Math.min(5, target * 0.25 || 5);
+      const diff = actual - target;
+      return { ...r, actual, target, diff, band, flag: Math.abs(diff) > band };
+    });
+  }
+};
+
+/* ==========================================================================
+   DISCIPLINE — kỷ luật tài chính: phân bổ khi tiền về, khóa ảo, "Được phép chi",
+   nhật ký cam kết, khóa 72 giờ. Nguyên tắc: chặn ý định, không chặn sự thật.
+   ========================================================================== */
+
+/* --------------------------- Đồng hồ tin cậy (riêng từng hồ sơ trên thiết bị) --------------------------- */
+const TrustedClock = (() => {
+  const KEY = 'finpilot.clock.v1' + Profiles.suffix();
+  let s = { floor: 0, skew: null, skewAt: '' };
+  try { const r = JSON.parse(localStorage.getItem(KEY) || 'null'); if (r && typeof r.floor === 'number') s = { floor: r.floor, skew: typeof r.skew === 'number' ? r.skew : null, skewAt: typeof r.skewAt === 'string' ? r.skewAt : '' }; } catch (e) {}
+  let lastSave = 0;
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} };
+  return {
+    skew() { return s.skew; },
+    /** Giờ dùng cho khóa 72h: hiệu chỉnh theo Google khi đã đo; không bao giờ lùi so với mốc đã thấy. */
+    now() {
+      const raw = Date.now(); const base = s.skew === null ? raw : raw - s.skew;
+      if (s.skew !== null && s.floor > base + DISC.SKEW_MAX_MS) { s.floor = base; save(); }
+      const t = Math.max(base, s.floor);
+      if (t > s.floor) { s.floor = t; if (raw - lastSave > 30000 || raw < lastSave) { lastSave = raw; save(); } }
+      return t;
+    },
+    iso() { return new Date(this.now()).toISOString(); },
+    /** Gọi với modifiedTime do máy chủ Google Drive đóng dấu khi tải lên. */
+    observeServer(iso) {
+      const t = Date.parse(iso); if (!Number.isFinite(t)) return;
+      s.skew = Date.now() - t; s.skewAt = new Date().toISOString();
+      if (s.floor > t + DISC.SKEW_MAX_MS) s.floor = t;
+      save();
+    },
+    skewTooLarge() { return s.skew !== null && Math.abs(s.skew) > DISC.SKEW_MAX_MS; },
+    _reset() { s = { floor: 0, skew: null, skewAt: '' }; save(); }
+  };
+})();
+
+const Discipline = (() => {
+  const DEV_KEY = 'finpilot.dev.v1' + Profiles.suffix();
+  let dev = ''; try { dev = localStorage.getItem(DEV_KEY) || ''; } catch (e) {}
+  if (!/^[a-z0-9]{4,16}$/.test(dev)) { dev = Util.uid('d').replace(/[^a-z0-9]/gi, '').slice(-10).toLowerCase(); try { localStorage.setItem(DEV_KEY, dev); } catch (e) {} }
+  let hlc = 0;
+
+  const EMG_CODES = [['emg_unspecified', 'Khẩn cấp (không ghi rõ)'], ['health', 'Sức khỏe'], ['income_loss', 'Mất/giảm thu nhập'], ['repair', 'Sửa nhà/xe'], ['family', 'Gia đình'], ['other', 'Khác']];
+  const HF_CODES = [['invest', 'Cơ hội đầu tư'], ['big_spend', 'Chi lớn ngoài kế hoạch'], ['reprioritize', 'Đổi ưu tiên'], ['other', 'Khác']];
+  const CLS_LABEL = { fix: 'Sửa lỗi nhập', withdrawn: 'Ghi nhận đã rút', emg: 'Khẩn cấp', hf: 'Lý do muốn chi', trial: 'Chạy thử', import: 'Nhập/khôi phục dữ liệu', request: 'Yêu cầu đã chín', tighten: 'Siết chặt', setup: 'Thiết lập', goal_account_out: 'Chi từ tài khoản mục tiêu' };
+
+  const D = {
+    EMG_CODES, HF_CODES, CLS_LABEL,
+    device() { return dev; },
+    epoch(st) { return (st.settings && st.settings.disciplineEpoch) || 0; },
+    newEvent(kind, f = {}, st = App.state) {
+      const nowMs = TrustedClock.now();
+      hlc = Math.max(nowMs, hlc + 1);
+      return Model.cev({ id: `cev_${dev}_${hlc.toString(36)}_${Util.uid('r').slice(-4)}`, kind, at: new Date(nowMs).toISOString(), epoch: this.epoch(st), device: dev, ...f });
+    },
+    facts(st) { return memo(st, 'txnIds', () => new Set(st.transactions.map(t => t.id))); },
+    txnById(st) { return memo(st, 'txnById', () => Util.byId(st.transactions)); },
+
+    /** Trạng thái hiệu lực (gấp từ nhật ký) — tính lại mỗi 15 giây vì phụ thuộc thời gian. */
+    view(st) {
+      const now = TrustedClock.now();
+      return memo(st, 'disc:' + Math.floor(now / 15000), () => {
+        const f = CommitLog.fold(st.commitLog || [], { epoch: this.epoch(st), nowMs: now, skewMs: TrustedClock.skew(), facts: this.facts(st) });
+        const cfg = f.config;
+        const armedMs = f.armedAt ? Date.parse(f.armedAt) : null;
+        const trialEnd = armedMs !== null ? armedMs + DISC.TRIAL_MS : null;
+        const active = !!(cfg && cfg.enabled);
+        return { ...f, cfg, active, armedMs, trialEnd, inTrial: active && trialEnd !== null && now < trialEnd, enforce: active && trialEnd !== null && now >= trialEnd, now, skewBad: TrustedClock.skewTooLarge() };
+      });
+    },
+    ruleFor(cfg, categoryId) { return cfg && cfg.enabled ? (cfg.rules || []).find(r => (r.categoryIds || []).includes(categoryId) && (r.steps || []).length) || null : null; },
+    referencedGoals(cfg) { const s = new Set(); for (const r of (cfg && cfg.rules) || []) for (const x of r.steps || []) if (x.goalId) s.add(x.goalId); return s; },
+
+    /* ---------- Phân bổ & khóa ảo ---------- */
+    lines(st, alc) {
+      const v = this.view(st); const tx = this.txnById(st);
+      const plan = Alloc.plan(alc.incomeAmount, alc.steps, alc.caps);
+      const steps = new Map(alc.steps.map(s => [s.key, s]));
+      const today = DateUtil.today(); const reserved = this.reservedAccounts(st, v.cfg);
+      return { spend: plan.spend, lines: plan.lines.map(l => {
+        const txnId = `txn_alc_${alc.incomeTxnId}_${l.key}`; const t = tx.get(txnId); const step = steps.get(l.key);
+        // Chỉ tính "đã chuyển" khi đúng là tiền đã rời tài khoản tự do sang đúng tài khoản đích, không đề ngày tương lai.
+        const valid = !!t && t.type === 'transfer' && step && t.toAccountId === step.toAccountId && t.date <= today && !reserved.has(t.accountId);
+        const doneAmt = valid ? t.amount : 0;
+        const released = v.released.has(alc.id + '|' + l.key);
+        const open = released ? 0 : Math.max(0, l.amount - doneAmt);
+        return { ...l, step: steps.get(l.key), txnId, txn: t || null, doneAmt, released, open, status: released ? 'released' : open === 0 ? 'done' : doneAmt > 0 ? 'partial' : 'open' };
+      }) };
+    },
+    allocInfo(st, alc) {
+      const inc = this.txnById(st).get(alc.incomeTxnId);
+      const L = this.lines(st, alc);
+      return { alc, income: inc || null, orphan: !inc, revised: !!inc && inc.amount !== alc.incomeAmount, ...L, open: inc ? Util.sum(L.lines, l => l.open) : 0, locked: Util.sum(L.lines, l => l.amount) };
+    },
+    allAllocs(st) { return memo(st, 'allocInfo', () => (st.allocations || []).map(a => this.allocInfo(st, a)).sort((a, b) => a.alc.date < b.alc.date ? 1 : a.alc.date > b.alc.date ? -1 : 0)); },
+    openLines(st) {
+      return memo(st, 'openLines:' + Math.floor(TrustedClock.now() / 15000), () => {
+        const out = [];
+        for (const a of this.allAllocs(st)) { if (a.orphan) continue; for (const l of a.lines) if (l.open > 0) out.push({ info: a, line: l }); }
+        return out;
+      });
+    },
+    openReservedForGoal(st, goalId, excludeAlcId = null) { let s = 0; for (const o of this.openLines(st)) if (o.info.alc.id !== excludeAlcId && o.line.step && o.line.step.goalId === goalId) s += o.line.open; return s; },
+    goalCap(st, goalId, excludeAlcId) {
+      const g = st.goals.find(x => x.id === goalId);
+      if (!g || g.status !== 'active') return 0;
+      return Math.max(0, Goals.progress(st, g).remaining - this.openReservedForGoal(st, goalId, excludeAlcId));
+    },
+    /** Tạo bản phân bổ trong CÙNG lần ghi với khoản thu (gọi bên trong commit). */
+    createAllocation(draft, txn, v) {
+      const rule = this.ruleFor(v.cfg, txn.categoryId); if (!rule) return null;
+      const id = 'alc_' + txn.id;
+      if ((draft.allocations || []).some(a => a.id === id)) return null;
+      const caps = {};
+      for (const s of rule.steps) caps[s.key] = s.goalId ? this.goalCap(draft, s.goalId, id) : null;
+      const alc = Model.allocation({ id, incomeTxnId: txn.id, ruleId: rule.id, ruleName: rule.name, ruleVersion: v.version, date: txn.date, incomeAmount: txn.amount, steps: Util.clone(rule.steps), caps, createdAt: Util.nowISO() });
+      draft.allocations.push(alc); clearMemo(draft);
+      return alc;
+    },
+
+    /* ---------- "Được phép chi" ---------- */
+    reservedAccounts(st, cfg) {
+      const s = new Set();
+      for (const g of st.goals) if (g.mode === 'account' && g.status !== 'done' && g.accountId) s.add(g.accountId);
+      for (const r of (cfg && cfg.rules) || []) for (const x of r.steps || []) if (x.toAccountId) s.add(x.toAccountId);
+      return s;
+    },
+    payday(st, today, cfg) {
+      const cats = new Set(); for (const r of (cfg && cfg.rules) || []) if (r.id === 'salary') (r.categoryIds || []).forEach(c => cats.add(c));
+      if (!cats.size) cats.add('cat_inc_salary');
+      let best = null;
+      for (const r of st.recurring) {
+        if (!r.active || r.template.type !== 'income' || !cats.has(r.template.categoryId)) continue;
+        const occ = Recurring.occurrences(r, DateUtil.addDays(today, 400)).find(d => d > today);
+        if (occ && (!best || occ < best)) best = occ;
+      }
+      return best ? { date: best, source: 'recurring' } : { date: DateUtil.addDays(DateUtil.monthEnd(DateUtil.monthKey(today)), 1), source: 'month' };
+    },
+    spendable(st, today = DateUtil.today()) {
+      return memo(st, 'spend:' + today + ':' + Math.floor(TrustedClock.now() / 15000), () => {
+        const v = this.view(st); const cfg = v.cfg;
+        const reserved = this.reservedAccounts(st, cfg);
+        const bal = Ledger.accountBalances(st, today);
+        let free = 0; const freeAccs = [];
+        for (const a of st.accounts) if (a.active && LIQUID_TYPES.includes(a.type) && !reserved.has(a.id)) { const b = bal.get(a.id) || 0; free += b; freeAccs.push({ acc: a, balance: b }); }
+        const freeIds = new Set(freeAccs.map(x => x.acc.id));
+        const open = Util.sum(this.openLines(st), o => o.line.open);
+        const pd = this.payday(st, today, cfg);
+        let fixed = 0; const fixedItems = [];
+        for (const r of st.recurring) {
+          const t = r.template;
+          if (!r.active || !(t.type === 'expense' || t.type === 'debt_payment') || t.debtId && t.type === 'expense' || !freeIds.has(t.accountId)) continue;
+          const handled = Recurring.handled(st, r);
+          for (const d of Recurring.occurrences(r, DateUtil.addDays(pd.date, -1))) if (d >= today && !handled.has(d)) { const amt = Recurring.amount(t); fixed += amt; fixedItems.push({ rule: r, date: d, amount: amt }); }
+        }
+        const value = free - open - fixed;
+        const daysLeft = Math.max(1, DateUtil.diffDays(today, pd.date));
+        return { value, free, open, fixed, fixedItems, freeAccs, reserved, payday: pd, daysLeft, perDay: value > 0 ? Math.floor(value / daysLeft) : 0 };
+      });
+    },
+
+    /* ---------- Guard: chặn ý định, không chặn sự thật ---------- */
+    age(rec, now) { const t = Date.parse(rec.createdAt || rec.updatedAt || ''); return Number.isFinite(t) ? now - t : Infinity; },
+    guard(before, draft) {
+      const v = this.view(before);
+      if (!v.active) return { viol: [], warns: [], v };
+      const now = v.now; const viol = [], warns = []; const today = DateUtil.today();
+      const bt = this.txnById(before), dt = new Map(draft.transactions.map(t => [t.id, t]));
+      const dAlc = new Set((draft.allocations || []).map(a => a.id));
+      const dGoalIds = new Set(draft.goals.map(g => g.id));
+      const inGoal = t => t && t.type === 'transfer' && t.goalId && (t.goalDir || 'in') === 'in';
+      const outGoal = t => t && t.type === 'transfer' && t.goalId && t.goalDir === 'out';
+      for (const [id, t] of bt) {
+        if (!inGoal(t)) continue;
+        if (t.allocationId && dAlc.has(t.allocationId)) continue; // gỡ xác nhận → khóa ảo mở lại, tiền vẫn được giữ
+        if (!dGoalIds.has(t.goalId)) continue; // thuộc thao tác xóa mục tiêu (xét riêng bên dưới)
+        if (this.age(t, now) < DISC.GRACE_MS) continue;
+        const n = dt.get(id);
+        if (!n) viol.push({ kind: 'goalTxnRemove', txn: t, goalId: t.goalId, amount: t.amount });
+        else {
+          const moved = !inGoal(n) || n.goalId !== t.goalId || n.date > today || n.accountId !== t.accountId || n.toAccountId !== t.toAccountId;
+          const dec = moved ? t.amount : Math.max(0, t.amount - n.amount);
+          if (dec > 0) viol.push({ kind: 'goalTxnEdit', txn: t, goalId: t.goalId, amount: dec });
+        }
+      }
+      for (const [id, n] of dt) {
+        if (!outGoal(n)) continue;
+        const o = bt.get(id);
+        const inc = n.amount - (outGoal(o) && o.goalId === n.goalId ? o.amount : 0);
+        if (inc > 0) viol.push({ kind: 'goalWithdraw', txn: n, goalId: n.goalId, amount: inc, edited: !!o });
+      }
+      const refs = this.referencedGoals(v.cfg); const dg = Util.byId(draft.goals);
+      for (const g of before.goals) {
+        const n = dg.get(g.id); const saved = Goals.progress(before, g).saved;
+        if (!n) { if (saved > 0 || refs.has(g.id)) viol.push({ kind: 'goalDelete', goal: g, goalId: g.id, amount: saved, young: this.age(g, now) < DISC.GRACE_MS }); continue; }
+        if (!refs.has(g.id) && g.mode !== 'account') continue;
+        const what = [];
+        if (n.target < g.target) what.push('giảm số tiền mục tiêu');
+        if (g.status === 'active' && n.status === 'paused') what.push('tạm dừng mục tiêu');
+        if (g.status !== 'done' && n.status === 'done' && Goals.progress(before, g).saved < g.target) what.push('đánh dấu hoàn thành khi chưa đủ tiền');
+        if (n.mode !== g.mode || n.accountId !== g.accountId) what.push('đổi cách theo dõi');
+        if (what.length && refs.has(g.id)) viol.push({ kind: 'goalLoosen', goal: g, newGoal: n, baseUpdatedAt: g.updatedAt, goalId: g.id, what, amount: Math.max(0, g.target - n.target), young: this.age(g, now) < DISC.GRACE_MS });
+      }
+      // Mọi khoản tiền rời tài khoản tích lũy (đích của quy tắc / mục tiêu theo số dư) sang nơi khác đều được ghi & đếm.
+      const goalAccs = this.reservedAccounts(before, v.cfg);
+      for (const [id, n] of dt) {
+        if (bt.has(id) || !goalAccs.has(n.accountId)) continue;
+        const outflow = n.type === 'expense' || n.type === 'debt_payment' || (n.type === 'transfer' && !goalAccs.has(n.toAccountId)) || (n.type === 'adjustment' && n.direction === 'out');
+        if (outflow) warns.push({ kind: 'goalAccountOut', txn: n, amount: n.amount });
+      }
+      return { viol, warns, v };
+    },
+    routes(x) {
+      switch (x.kind) {
+        case 'goalTxnRemove': case 'goalTxnEdit': return ['fix', 'withdrawn'];
+        case 'goalWithdraw': return x.edited ? ['fix', 'withdrawn'] : ['request', 'withdrawn', 'emg'];
+        case 'goalDelete': case 'goalLoosen': return x.young ? ['fix', 'request'] : ['request'];
+        default: return ['request'];
+      }
+    },
+    describe(st, x) {
+      const g = st.goals.find(y => y.id === x.goalId) || x.goal; const gn = g ? `"${g.name}"` : 'mục tiêu';
+      switch (x.kind) {
+        case 'goalTxnRemove': return `Xóa giao dịch đã vào quỹ ${gn} hơn 24 giờ (${Money.format(x.amount)})`;
+        case 'goalTxnEdit': return `Sửa giao dịch đã vào quỹ ${gn} hơn 24 giờ — quỹ giảm ${Money.format(x.amount)}`;
+        case 'goalWithdraw': return `Rút ${Money.format(x.amount)} khỏi quỹ ${gn}`;
+        case 'goalDelete': return `Xóa mục tiêu ${gn}${x.amount > 0 ? ` đang giữ ${Money.format(x.amount)}` : ''}`;
+        case 'goalLoosen': return `Nới mục tiêu ${gn}: ${x.what.join(', ')}`;
+        default: return 'Thay đổi làm nới lỏng cam kết';
+      }
+    },
+    /** Gọi trong App._commit (không áp dụng cho dữ liệu đến từ đồng bộ). Có thể ném lỗi DISCIPLINE. */
+    beforeSave(before, draft, opts) {
+      // Nhập/khôi phục không được đổi epoch (tránh xóa nhật ký trên mọi thiết bị bằng file cũ hoặc file sửa tay).
+      if (opts.discipline && opts.discipline.reason === 'import' && draft.settings) draft.settings.disciplineEpoch = this.epoch(before);
+      const epoch = this.epoch(draft);
+      draft.commitLog = opts.resetLog ? CommitLog.merge([], draft.commitLog, epoch) : CommitLog.merge(before.commitLog, draft.commitLog, epoch);
+      clearMemo(draft);
+      const created = [];
+      if (opts.resetLog) return { created };
+      const dv = this.view(draft);
+      if (!opts.noAlloc && dv.active && dv.armedAt) {
+        const armDay = DateUtil.isoDateVN(dv.armedAt); const bIds = this.facts(before);
+        for (const t of draft.transactions.slice()) {
+          if (t.type !== 'income' || bIds.has(t.id) || t.date < armDay) continue;
+          const a = this.createAllocation(draft, t, dv); if (a) created.push(a.id);
+        }
+      }
+      const g = this.guard(before, draft);
+      const push = ev => { draft.commitLog.push(ev); };
+      if (g.viol.length) {
+        const d = opts.discipline;
+        if (g.v.inTrial) for (const x of g.viol) push(this.newEvent('wouldBlock', { refId: x.txn ? x.txn.id : x.goalId, amount: x.amount, payload: { type: 'note', note: this.describe(before, x).slice(0, 160) } }, draft));
+        else if (g.v.enforce) {
+          const ok = d && g.viol.every(x => d.reason === 'request' || d.reason === 'import' || this.routes(x).includes(d.reason));
+          if (!ok) { const e = new AppError('Thao tác này làm nới lỏng cam kết tài chính của bạn.'); e.code = 'DISCIPLINE'; e.info = { viol: g.viol, offered: d ? d.reason : null }; throw e; }
+          for (const x of g.viol) {
+            const ev = this.newEvent('override', { cls: d.reason, refId: d.reqId || (x.txn ? x.txn.id : x.goalId), amount: x.amount, payload: { type: 'note', note: this.describe(before, x).slice(0, 160) } }, draft);
+            push(ev);
+            if (d.code || d.note) this.addNote(draft, ev.id, d.code || '', d.note || '');
+          }
+        }
+      }
+      const warned = g.v.active && !opts.discipline ? g.warns.length : 0;
+      if (g.v.active && !opts.discipline) for (const w of g.warns) push(this.newEvent('override', { cls: 'goal_account_out', refId: w.txn.id, amount: w.amount }, draft));
+      this.purgeNotes(draft);
+      draft.commitLog = CommitLog.sort(draft.commitLog);
+      clearMemo(draft);
+      return { created, warned };
+    },
+    addNote(draft, cevId, code, text, kind = 'reason') {
+      const now = Util.nowISO();
+      draft.commitNotes.push(Model.note({ id: 'cnt_' + cevId, cevId, kind, code, text, createdAt: now, updatedAt: now }));
+    },
+    purgeNotes(draft) {
+      const cut = TrustedClock.now() - DISC.NOTE_TTL_MS;
+      const before = draft.commitNotes.length;
+      draft.commitNotes = draft.commitNotes.filter(n => n.kind !== 'reason' || !(Date.parse(n.createdAt) < cut));
+      return before - draft.commitNotes.length;
+    },
+    commitmentText(st) { const n = (st.commitNotes || []).filter(x => x.kind === 'commitment').sort((a, b) => a.createdAt < b.createdAt ? 1 : -1)[0]; return n ? n.text : ''; },
+    noteFor(st, cevId) { return (st.commitNotes || []).find(n => n.cevId === cevId) || null; },
+
+    /** Phát hiện bất thường sau đồng bộ: sự kiện mang giờ tương lai (máy khác chỉnh đồng hồ nhanh). */
+    audit(st) {
+      const lim = TrustedClock.now() + DISC.SKEW_MAX_MS;
+      return (st.commitLog || []).filter(e => Date.parse(e.at) > lim).length;
+    },
+    /** Mốc sàn trong dữ liệu (đồng bộ) để yêu cầu mới không bị tính từ giờ máy đã lùi. */
+    clockFloor(st) {
+      const skew = TrustedClock.skew(); const cap = skew === null ? null : Date.now() - skew + DISC.SKEW_MAX_MS;
+      return memo(st, 'cfloor:' + (cap === null ? 'x' : Math.floor(cap / 60000)), () => {
+        const vals = [];
+        for (const e of st.commitLog || []) vals.push(e.at);
+        for (const c of COLLECTIONS) if (c !== 'commitLog') for (const r of st[c]) if (r.updatedAt) vals.push(r.updatedAt);
+        return Clock.floorOf(vals, cap);
+      });
+    },
+    effectiveAtISO(st) { return new Date(Clock.effectiveAt(TrustedClock.now(), this.clockFloor(st))).toISOString(); },
+
+    /* ---------- Chỉ số kỷ luật ---------- */
+    metrics(st, today = DateUtil.today()) {
+      const v = this.view(st);
+      const from6 = DateUtil.addMonths(today, -6, Number(today.slice(8, 10)));
+      const allocs = this.allAllocs(st).filter(a => !a.orphan && a.alc.date >= from6);
+      let ontime = 0; let saved = 0; let income = 0;
+      for (const a of allocs) {
+        income += a.income.amount;
+        const deadline = Date.parse(a.alc.createdAt) + DISC.COOLDOWN_MS;
+        const allDone = a.lines.every(l => l.status === 'done' || l.status === 'released');
+        if (allDone && a.lines.every(l => !l.txn || Date.parse(l.txn.createdAt) <= deadline)) ontime++;
+        saved += Util.sum(a.lines, l => Math.min(l.doneAmt, l.amount));
+      }
+      const mStart = Date.parse(DateUtil.monthStart(DateUtil.monthKey(today)) + 'T00:00:00+07:00');
+      const month = v.events.filter(e => Date.parse(e.at) >= mStart);
+      const cnt = f => month.filter(f).length;
+      const stale = this.openLines(st).filter(o => v.now - Date.parse(o.info.alc.createdAt) > 7 * 86400000).length;
+      return {
+        allocCount: allocs.length, onTimePct: allocs.length ? ontime / allocs.length * 100 : null,
+        savingsPct: income > 0 ? saved / income * 100 : null, saved, income,
+        emg: cnt(e => (e.kind === 'override' || e.kind === 'release') && e.cls === 'emg'),
+        withdrawn: cnt(e => e.kind === 'override' && e.cls === 'withdrawn'),
+        fix: cnt(e => e.kind === 'override' && e.cls === 'fix'),
+        requests: cnt(e => e.kind === 'request'), cancels: cnt(e => e.kind === 'cancel'),
+        goalAccOut: cnt(e => e.kind === 'override' && e.cls === 'goal_account_out'),
+        staleEarmarks: stale
+      };
+    },
+    requestStatusText(r) {
+      return ({ pending: 'Đang chờ', ripe: 'Đã đến hạn — cần xác nhận lại', confirmed: 'Đã thực hiện', cancelled: 'Đã hủy', expired: 'Hết hạn (không xác nhận trong 7 ngày)', stale: 'Không áp dụng (quy tắc đã đổi sau khi tạo yêu cầu)', 'done-elsewhere': 'Đã thực hiện trên thiết bị khác' })[r.status] || r.status;
+    }
+  };
+  return D;
+})();
+
+/* ==========================================================================
+   PORTFOLIO — danh mục chứng khoán: định giá & lấy giá (TẮT mặc định, bật riêng
+   từng hồ sơ trên từng thiết bị). Chỉ gửi DANH SÁCH MÃ tới VPS/VNDirect —
+   không gửi khối lượng, giá vốn, email. Bộ nhớ đệm giá nằm ngoài dữ liệu đồng bộ.
+   ========================================================================== */
+const PriceService = (() => {
+  const CK = 'finpilot.prices.v1' + Profiles.suffix();
+  const QK = 'finpilot.quotes.v1' + Profiles.suffix();
+  const CONSENT_VERSION = '4a-2026-10-17';
+  const VPS = 'https://bgapidatafeed.vps.com.vn/getliststockdata/';
+  const VND = 'https://dchart-api.vndirect.com.vn/dchart/history';
+  const read = k => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return Util.isObj(v) ? v : null; } catch (e) { return null; } };
+  const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+  let consent = read(CK) || { enabled: false };
+  let cache = read(QK) || { quotes: {} };
+  if (!Util.isObj(cache.quotes)) cache.quotes = {};
+  let busy = null; let ctrl = null;
+  const vnParts = ms => {
+    const p = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(ms));
+    const g = t => (p.find(x => x.type === t) || {}).value;
+    return { date: `${g('year')}-${g('month')}-${g('day')}`, hm: Number(g('hour')) % 24 * 60 + Number(g('minute')) };
+  };
+  /** Ngày phiên giao dịch gần nhất đã mở (bỏ thứ Bảy, Chủ nhật; chưa tính ngày lễ). */
+  const lastSession = ms => {
+    const n = vnParts(ms); let d = n.date;
+    if (n.hm < 9 * 60) d = DateUtil.addDays(d, -1);
+    while (DateUtil.dow(d) === 0 || DateUtil.dow(d) === 6) d = DateUtil.addDays(d, -1);
+    return d;
+  };
+  async function getJSON(url) {
+    ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const t = setTimeout(() => { if (ctrl) ctrl.abort(); }, 4000);
+    try {
+      const r = await fetch(url, { method: 'GET', mode: 'cors', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', signal: ctrl ? ctrl.signal : undefined });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.json();
+    } finally { clearTimeout(t); }
+  }
+  const svc = {
+    version: 0,
+    CONSENT_VERSION,
+    HOSTS: ['bgapidatafeed.vps.com.vn', 'dchart-api.vndirect.com.vn'],
+    enabled() { return !!(consent.enabled && consent.consentVersion === CONSENT_VERSION); },
+    consentInfo() { return { ...consent }; },
+    needsReconsent() { return !!(consent.enabled && consent.consentVersion !== CONSENT_VERSION); },
+    enable() { consent = { enabled: true, enabledAt: new Date().toISOString(), consentVersion: CONSENT_VERSION }; write(CK, consent); },
+    disable() { consent = { enabled: false, disabledAt: new Date().toISOString(), consentVersion: consent.consentVersion || '' }; write(CK, consent); if (ctrl) try { ctrl.abort(); } catch (e) {} },
+    clearCache() { cache = { quotes: {} }; write(QK, cache); this.version++; },
+    quote(sym) { return cache.quotes[sym] || null; },
+    lastSession() { return lastSession(Date.now()); },
+    freshness(q) {
+      if (!q || !q.fetchedAt) return 'none';
+      const fetched = Date.parse(q.fetchedAt); const ls = lastSession(Date.now());
+      const f = vnParts(fetched);
+      if (q.closeDate && q.closeDate >= ls) return 'fresh';
+      if (f.date === ls && f.hm >= 9 * 60) return 'fresh';
+      if (f.date > ls) return 'fresh';
+      return 'stale';
+    },
+    label(q) {
+      if (!q) return '';
+      const f = vnParts(Date.parse(q.fetchedAt)); const today = vnParts(Date.now()).date;
+      const when = q.closeDate ? `đóng cửa ${DateUtil.toVN(q.closeDate)}` : (f.date === today ? `${DateUtil.timeVN(q.fetchedAt)} hôm nay` : DateUtil.dateTimeVN(q.fetchedAt));
+      return `${when} · ${q.source}${this.freshness(q) === 'stale' ? ' · cũ' : ''}`;
+    },
+    /** Lấy giá cho danh sách mã. Không bao giờ chạy khi chưa đồng ý. */
+    async refresh(symbols, { force = false } = {}) {
+      if (!this.enabled()) throw new AppError('Chưa bật "Cập nhật giá chứng khoán" cho hồ sơ này trên thiết bị này.');
+      while (busy) { try { await busy; } catch (e) {} } // xếp hàng: không bỏ yêu cầu của mã khác đang chờ
+      const syms = Array.from(new Set((symbols || []).map(s => String(s).toUpperCase()).filter(s => Portfolio.SYM_RE.test(s)))).slice(0, 60);
+      const now = Date.now(); const nowP = vnParts(now);
+      const needs = syms.filter(s => {
+        if (force) return true;
+        const q = cache.quotes[s]; if (!q || !q.fetchedAt) return true;
+        const age = now - Date.parse(q.fetchedAt);
+        const inSession = DateUtil.dow(nowP.date) % 6 !== 0 && nowP.hm >= 9 * 60 && nowP.hm <= 15 * 60;
+        return inSession ? age > 15 * 60000 : this.freshness(q) !== 'fresh';
+      });
+      const res = { updated: [], missing: [], errors: [], skipped: syms.length - needs.length };
+      if (!needs.length) return res;
+      busy = (async () => {
+        const got = new Set(); const at = new Date().toISOString(); const today = nowP.date;
+        try {
+          if (!this.enabled()) throw new Error('đã tắt');
+          const json = await getJSON(VPS + needs.map(encodeURIComponent).join(','));
+          const m = Portfolio.parseVps(json);
+          for (const [sym, q] of m) {
+            if (!needs.includes(sym)) continue;
+            const prev = cache.quotes[sym];
+            const prevClose = prev && prev.sessionDate && prev.sessionDate < today && Number.isSafeInteger(prev.price) ? prev.price : null;
+            const suspect = Portfolio.rightsFlag(q.ref, prevClose, q.market);
+            cache.quotes[sym] = { price: q.price, ref: q.ref, ceil: q.ceil, floor: q.floor, market: q.market, basis: q.basis, source: 'VPS', fetchedAt: at, sessionDate: lastSession(now), rightsSuspect: suspect || (prev && prev.rightsSuspect && prev.sessionDate === lastSession(now)) || false, prevClose: prevClose || (prev && prev.prevClose) || null };
+            got.add(sym); res.updated.push(sym);
+          }
+        } catch (e) { res.errors.push('VPS: ' + (e && e.name === 'AbortError' ? 'quá 4 giây' : (e && e.message) || 'lỗi')); }
+        const rest = needs.filter(s => !got.has(s));
+        for (const sym of rest) {
+          if (!this.enabled()) break; // "Tắt" là dừng ngay, kể cả giữa vòng dự phòng
+          try {
+            const to = Math.floor(now / 1000), from = to - 20 * 86400;
+            const json = await getJSON(`${VND}?resolution=D&symbol=${encodeURIComponent(sym)}&from=${from}&to=${to}`);
+            const q = Portfolio.parseVnd(json);
+            cache.quotes[sym] = { price: q.price, ref: null, ceil: null, floor: null, market: '', basis: 'close', source: 'VNDirect', fetchedAt: at, closeDate: DateUtil.isoDateVN(new Date(q.tMs).toISOString()), sessionDate: lastSession(now), prevClose: q.prevClose, rightsSuspect: false };
+            got.add(sym); res.updated.push(sym);
+          } catch (e) { res.missing.push(sym); if (e && e.message !== 'VND_SHAPE') res.errors.push(`VNDirect ${sym}: ${e && e.name === 'AbortError' ? 'quá 4 giây' : (e && e.message) || 'lỗi'}`); }
+        }
+        cache.updatedAt = at; write(QK, cache); this.version++;
+        return res;
+      })();
+      try { return await busy; } finally { busy = null; }
+    },
+    clearRightsFlag(sym) { const q = cache.quotes[sym]; if (q) { q.rightsSuspect = false; q.rightsAck = new Date().toISOString(); write(QK, cache); this.version++; } }
+  };
+  return svc;
+})();
+
+/* --------------------------- Định giá danh mục (dựa trên dữ liệu đã lưu + giá đệm) --------------------------- */
+const Holdings = {
+  id(accountId, sym) { return `hld_${accountId}_${sym}`; },
+  rows(st) {
+    return memo(st, 'hold:' + PriceService.version, () => {
+      const acc = Util.byId(st.accounts);
+      const rows = (st.holdings || []).map(x => {
+        const q = PriceService.quote(x.symbol);
+        const pr = Portfolio.priceFor(x, q);
+        const value = pr.price ? Portfolio.value(x.qty, pr.price) : 0;
+        const cost = x.avgCost ? Portfolio.value(x.qty, x.avgCost) : null;
+        return { holding: x, account: acc.get(x.accountId) || null, quote: q, price: pr.price, priceSource: pr.source, value, cost, pnl: cost !== null && pr.price ? value - cost : null, fresh: pr.source === 'quote' || pr.source === 'VPS' || pr.source === 'VNDirect' ? PriceService.freshness(q) : pr.source, rightsSuspect: !!(q && q.rightsSuspect) };
+      });
+      rows.sort((a, b) => b.value - a.value || (a.holding.symbol < b.holding.symbol ? -1 : 1));
+      return rows;
+    });
+  },
+  total(st) { return Util.sum(this.rows(st), r => r.value); },
+  symbols(st) { return Array.from(new Set((st.holdings || []).filter(x => x.qty > 0).map(x => x.symbol))); }
 };
 
 /* ==========================================================================
@@ -2063,7 +2998,7 @@ const SyncService = (() => {
     let obj; try { obj = JSON.parse(text); } catch (e) { throw err('REMOTE', 'Tệp đồng bộ trên Drive bị hỏng (không phải JSON hợp lệ).'); }
     if (!Util.isObj(obj) || obj.format !== 'finpilot-sync' || !Util.isObj(obj.data)) throw err('REMOTE', 'Tệp đồng bộ trên Drive không đúng định dạng FinPilot.');
     if (!Number.isInteger(obj.schemaVersion) || obj.schemaVersion > SCHEMA_VERSION) throw err('VERSION', `Dữ liệu trên Drive dùng cấu trúc phiên bản ${obj.schemaVersion} mới hơn ứng dụng này. Hãy cập nhật FinPilot trên thiết bị này.`);
-    for (const c of COLLECTIONS) if (!Array.isArray(obj.data[c])) throw err('REMOTE', `Tệp đồng bộ thiếu danh sách ${COLL_LABELS[c]}.`);
+    for (const c of COLLECTIONS) { if (obj.data[c] === undefined && obj.schemaVersion < (COLL_SINCE[c] || 1)) { obj.data[c] = []; continue; } if (!Array.isArray(obj.data[c])) throw err('REMOTE', `Tệp đồng bộ thiếu danh sách ${COLL_LABELS[c]}.`); }
     return Model.dataset(obj.data);
   }
 
@@ -2077,6 +3012,7 @@ const SyncService = (() => {
       const content = payload(App.state);
       const r = id ? await updateFile(id, content) : await createFile(content);
       cfg.fileId = r.id || id; cfg.lastRemoteModified = r.modifiedTime;
+      if (r.modifiedTime && typeof TrustedClock !== 'undefined') TrustedClock.observeServer(r.modifiedTime);
     };
     let files = null, fileId = cfg.fileId || null, remoteMod = null;
     if (fileId) {
@@ -2587,7 +3523,7 @@ const Forms = {
     return st.categories.filter(c => c.kind === kind && (c.active || includeIds.includes(c.id))).map(c => ({ value: c.id, label: `${c.icon ? c.icon + ' ' : ''}${c.name}` }));
   },
   rawFromTxn(t) {
-    const raw = { amount: t.amount ? Money.num(t.amount) : '', date: t.date ? DateUtil.toVN(t.date) : DateUtil.toVN(DateUtil.today()), accountId: t.accountId || '', toAccountId: t.toAccountId || '', categoryId: t.categoryId || '', debtId: t.debtId || '', principal: t.principal ? Money.num(t.principal) : '', interest: t.interest ? Money.num(t.interest) : '', direction: t.direction || 'in', goalId: t.goalId || '', payee: t.payee || '', note: t.note || '', tags: (t.tags || []).join(', '), reconciled: !!t.reconciled };
+    const raw = { amount: t.amount ? Money.num(t.amount) : '', date: t.date ? DateUtil.toVN(t.date) : DateUtil.toVN(DateUtil.today()), accountId: t.accountId || '', toAccountId: t.toAccountId || '', categoryId: t.categoryId || '', debtId: t.debtId || '', principal: t.principal ? Money.num(t.principal) : '', interest: t.interest ? Money.num(t.interest) : '', direction: t.direction || 'in', goalId: t.goalId || '', goalDir: t.goalDir || 'in', payee: t.payee || '', note: t.note || '', tags: (t.tags || []).join(', '), reconciled: !!t.reconciled };
     if (t.type === 'expense' && t.debtId) raw.accountId = 'debt:' + t.debtId;
     return raw;
   },
@@ -2625,6 +3561,7 @@ const Forms = {
         add(F.field('Từ tài khoản', F.select('accountId', accOpts, this.plainAcc(raw.accountId)), { required: true, name: 'accountId' }));
         add(F.field('Sang tài khoản', F.select('toAccountId', accOpts, raw.toAccountId), { required: true, name: 'toAccountId' }));
         add(F.field('Gắn với mục tiêu tiết kiệm', F.select('goalId', [{ value: '', label: 'Không gắn' }].concat(st.goals.filter(g => g.mode === 'transfer' && (g.status !== 'done' || (original && original.goalId === g.id))).map(g => ({ value: g.id, label: (GOAL_ICONS[g.type] || '') + ' ' + g.name }))), raw.goalId), { name: 'goalId', hint: 'Chuyển tiền nội bộ không phải chi tiêu và không làm thay đổi tổng tài sản.' }));
+        add(F.field('Chiều với quỹ mục tiêu', F.select('goalDir', [{ value: 'in', label: 'Nạp vào quỹ' }, { value: 'out', label: 'Rút khỏi quỹ' }], raw.goalDir || 'in'), { name: 'goalDir', hint: 'Chỉ có tác dụng khi đã gắn mục tiêu. "Rút khỏi quỹ" làm giảm tiến độ mục tiêu.' }));
         add(F.field('Nội dung', F.input('payee', raw.payee, { placeholder: 'VD: Nạp ví, gửi tiết kiệm…', maxlength: 120 }), { name: 'payee' }));
         break;
       case 'debt_payment': {
@@ -2674,6 +3611,7 @@ const Forms = {
     if (form.elements.debtId) o.debtId = F.val(form, 'debtId');
     if (form.elements.direction) o.direction = F.val(form, 'direction');
     if (form.elements.goalId) o.goalId = F.val(form, 'goalId');
+    if (form.elements.goalDir) o.goalDir = o.goalId ? F.val(form, 'goalDir') : '';
     o.payee = F.val(form, 'payee'); o.note = F.val(form, 'note'); o.tags = F.val(form, 'tags');
     o.reconciled = form.elements.reconciled ? form.elements.reconciled.checked : false;
     return { obj: o, errs };
@@ -2702,7 +3640,7 @@ const Forms = {
       F.clearErrors(form);
       const { obj, errs } = this.txnCollect(form, type);
       const now = Util.nowISO();
-      const clean = Model.transaction({ ...obj, id: editing ? txn.id : Util.uid('txn'), createdAt: editing ? txn.createdAt : now, updatedAt: now, recurringId: editing ? txn.recurringId : '', recurringDate: editing ? txn.recurringDate : '' });
+      const clean = Model.transaction({ ...obj, id: editing ? txn.id : Util.uid('txn'), createdAt: editing ? txn.createdAt : now, updatedAt: now, recurringId: editing ? txn.recurringId : '', recurringDate: editing ? txn.recurringDate : '', allocationId: editing && obj.goalId === txn.goalId ? txn.allocationId : '', archivedGoalId: editing ? txn.archivedGoalId : '' });
       const verr = Validation.transaction(clean, App.state, { editingId: editing ? txn.id : null, original: txn });
       const all = { ...verr, ...errs };
       if (Object.keys(all).length) { F.showErrors(form, all); return; }
@@ -3074,7 +4012,7 @@ const Forms = {
       const mode = modeSel.value; let contributions = goal ? goal.contributions : [];
       if (!editing && mode === 'manual') { const iv = F.moneyVal(form, 'initial', { allowZero: true, allowEmpty: true }); if (!iv.ok) errs.initial = iv.error; else if (iv.value) contributions = [{ id: Util.uid('gc'), date: sd || DateUtil.today(), amount: iv.value, direction: 'in', note: 'Số dư ban đầu' }]; }
       const rec = Model.goal({ ...(goal || {}), id: goal ? goal.id : Util.uid('goal'), name: F.val(form, 'name'), type: F.val(form, 'type'), target: tg.ok ? tg.value : NaN, startDate: sd, deadline: dl || '', priority: F.val(form, 'priority'), status: goal ? goal.status : 'active', mode, accountId: F.val(form, 'accountId'), contributions, note: F.val(form, 'note'), createdAt: goal ? goal.createdAt : Util.nowISO() });
-      Object.assign(errs, Validation.goal(rec, App.state), errs);
+      Object.assign(errs, Validation.goal(rec, App.state, { checkShared: true }), errs);
       if (Object.keys(errs).length) return F.showErrors(form, errs);
       try { await App.commit(editing ? 'Sửa mục tiêu' : 'Thêm mục tiêu', d => { if (editing) { const i = d.goals.findIndex(x => x.id === rec.id); d.goals[i] = rec; } else d.goals.push(rec); }); Toast.show('Đã lưu mục tiêu', { type: 'success' }); m.close(); }
       catch (er) { fe.textContent = er.message; }
@@ -3152,6 +4090,7 @@ Pages.dashboard = function (view) {
   const due = Recurring.due(st);
   if (due.length) view.append(h('div', { class: 'banner warn' }, Icon('repeat'), h('div', { class: 'b-body' }, h('div', { class: 'b-title', text: `${due.length} giao dịch định kỳ đến hạn chờ xác nhận` }), h('div', { class: 'small', text: due.slice(0, 3).map(d => `${DateUtil.shortVN(d.date)} · ${d.rule.name}`).join(' — ') + (due.length > 3 ? '…' : '') })), h('a', { class: 'btn btn-sm', href: '#/recurring' }, 'Xem & xác nhận')));
 
+  const hero = Pages.disciplineHero ? Pages.disciplineHero(st) : null; if (hero) view.append(hero);
   view.append(C.sectionTitle('Hiện tại', `tính đến ${DateUtil.toVN(cur.asOf)}`));
   view.append(h('div', { class: 'kpi-grid' },
     C.kpi({ label: 'Tài sản ròng', value: C.money(cur.netWorth), sub: 'Tổng tài sản − Tổng nợ', icon: 'shield', featured: true }),
@@ -3586,12 +4525,16 @@ Pages.goals = function (view) {
   const order = { active: 0, paused: 1, done: 2 }, pri = { high: 0, medium: 1, low: 2 };
   const goals = st.goals.slice().sort((a, b) => order[a.status] - order[b.status] || pri[a.priority] - pri[b.priority]);
   const acc = Util.byId(st.accounts);
+  const refs = Discipline.referencedGoals(Discipline.view(st).cfg);
+  const shared = new Map(); for (const g of st.goals) if (g.mode === 'account' && g.status !== 'done') shared.set(g.accountId, (shared.get(g.accountId) || 0) + 1);
+  const dup = st.goals.filter(g => g.mode === 'account' && g.status !== 'done' && shared.get(g.accountId) > 1);
+  if (dup.length) view.append(C.callout('alert', h('div', {}, 'Có mục tiêu cùng theo dõi một tài khoản — số dư bị tính cho cả hai. ', dup.slice(1).map(g => C.btn(`Chuyển "${g.name}" sang theo dõi bằng giao dịch`, async () => { try { await App.commit('Đổi cách theo dõi mục tiêu', d => { const x = d.goals.find(y => y.id === g.id); x.mode = 'transfer'; x.accountId = ''; }); } catch (e) { Toast.show(e.message, { type: 'error' }); } }, { cls: 'btn-sm' }))), 'warn'));
   view.append(h('div', { class: 'goal-grid' }, goals.map(g => {
     const p = Goals.progress(st, g);
     const status = g.status === 'done' ? C.badge('Hoàn thành', 'green') : g.status === 'paused' ? C.badge('Tạm dừng', 'amber') : p.overdue ? C.badge('Quá hạn', 'red') : p.reached ? C.badge('Đã đủ tiền', 'green') : C.badge('Ưu tiên ' + PRIORITIES[g.priority].toLowerCase(), g.priority === 'high' ? 'red' : 'blue');
     const set = async st2 => { try { await App.commit('Cập nhật mục tiêu', d => { d.goals.find(x => x.id === g.id).status = st2; }); Toast.show('Đã cập nhật trạng thái', { type: 'success' }); } catch (e) { Toast.show(e.message, { type: 'error' }); } };
     return h('div', { class: 'card', style: g.status === 'done' ? { opacity: .8 } : null },
-      h('div', { class: 'flex between' }, h('div', { class: 'flex' }, h('div', { class: 'txn-ico', text: GOAL_ICONS[g.type] }), h('div', {}, h('div', { class: 'cell-main', text: g.name }), h('div', { class: 'cell-sub', text: GOAL_TYPES[g.type] }))), status),
+      h('div', { class: 'flex between' }, h('div', { class: 'flex' }, h('div', { class: 'txn-ico', text: GOAL_ICONS[g.type] }), h('div', {}, h('div', { class: 'cell-main', text: g.name }), h('div', { class: 'cell-sub', text: GOAL_TYPES[g.type] + (refs.has(g.id) ? ' · 🔒 trong quy tắc phân bổ' : '') }))), status),
       h('div', { class: 'flex between', style: { marginTop: '14px' } }, h('div', {}, h('div', { style: { fontSize: '20px', fontWeight: 750 } }, C.money(p.saved)), h('div', { class: 'small muted' }, 'trên ', h('span', { class: 'money' }, Money.format(g.target)))), h('div', { style: { fontSize: '22px', fontWeight: 750, color: 'var(--primary)' } }, Util.fmtPct(p.pct, 0))),
       h('div', { style: { margin: '8px 0 10px' } }, C.progress(p.pct, p.reached ? 'green' : '', true)),
       h('dl', { class: 'kv' }, h('dt', {}, 'Còn thiếu'), h('dd', { class: 'money' }, Money.format(p.remaining)), h('dt', {}, 'Hạn hoàn thành'), h('dd', {}, g.deadline ? DateUtil.toVN(g.deadline) + (p.monthsLeft ? ` (còn ~${p.monthsLeft} tháng)` : '') : 'Không đặt'),
@@ -3600,11 +4543,12 @@ Pages.goals = function (view) {
       h('div', { class: 'ac-actions', style: { display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '12px', borderTop: '1px solid var(--border)', paddingTop: '8px' } },
         g.mode === 'manual' && g.status !== 'done' ? C.btn('Góp / rút', () => Forms.openContribution(g), { cls: 'btn-sm btn-primary' }) : null,
         g.mode === 'transfer' && g.status !== 'done' ? C.btn('Chuyển tiền', () => Forms.openTxn({ preset: { type: 'transfer', goalId: g.id } }), { cls: 'btn-sm btn-primary' }) : null,
+        (g.mode === 'transfer' || g.mode === 'account') && p.saved > 0 ? C.btn('Rút khỏi quỹ', () => Pages.goalWithdraw(g), { cls: 'btn-sm' }) : null,
         g.status === 'active' ? C.btn('Tạm dừng', () => set('paused'), { cls: 'btn-sm btn-ghost' }) : null,
         g.status === 'paused' ? C.btn('Tiếp tục', () => set('active'), { cls: 'btn-sm btn-ghost' }) : null,
         g.status !== 'done' ? C.btn('Hoàn thành', () => set('done'), { cls: 'btn-sm btn-ghost', icon: 'check' }) : C.btn('Mở lại', () => set('active'), { cls: 'btn-sm btn-ghost' }),
         C.iconBtn('edit', 'Sửa', () => Forms.openGoal(g)),
-        C.iconBtn('trash', 'Xóa', async () => { if (!(await Modal.confirm({ title: 'Xóa mục tiêu?', message: `Xóa "${g.name}"? Giao dịch chuyển tiền đã gắn (nếu có) vẫn được giữ nguyên.`, confirmText: 'Xóa', danger: true }))) return; try { await App.commit('Xóa mục tiêu', d => { d.goals = d.goals.filter(x => x.id !== g.id); for (const t of d.transactions) if (t.goalId === g.id) t.goalId = ''; }, { undoLabel: 'Đã xóa mục tiêu' }); Toast.show('Đã xóa mục tiêu', { type: 'success', action: { label: 'Hoàn tác', fn: () => App.undo() } }); } catch (e) { Toast.show(e.message, { type: 'error' }); } }, 'danger')));
+        C.iconBtn('trash', 'Xóa', async () => { if (!(await Modal.confirm({ title: 'Xóa mục tiêu?', message: `Xóa "${g.name}"? Giao dịch chuyển tiền đã gắn (nếu có) vẫn được giữ nguyên.`, confirmText: 'Xóa', danger: true }))) return; try { await App.commit('Xóa mục tiêu', d => { d.goals = d.goals.filter(x => x.id !== g.id); for (const t of d.transactions) if (t.goalId === g.id) { t.archivedGoalId = g.id; t.goalId = ''; t.goalDir = ''; } }, { undoLabel: 'Đã xóa mục tiêu' }); Toast.show('Đã xóa mục tiêu', { type: 'success', action: { label: 'Hoàn tác', fn: () => App.undo() } }); } catch (e) { Toast.show(e.message, { type: 'error' }); } }, 'danger')));
   })));
 };
 
@@ -3810,7 +4754,7 @@ Pages.importPreview = function (res, name) {
           const mr = MergeService.merge(d, res.dataset); stats = mr.stats;
           for (const c of COLLECTIONS) d[c] = Util.clone(mr.data[c]); d.tombstones = mr.data.tombstones;
         }
-      }, { keepPrev: true, bypassBlock: true, allowBaseline: true });
+      }, { keepPrev: true, bypassBlock: true, allowBaseline: true, discipline: { reason: 'import' }, noAlloc: true });
       m.close();
       const after = App.state; const summary = COLLECTIONS.filter(c => after[c].length).map(c => `${COLL_LABELS[c]}: ${after[c].length}`).join(', ');
       Modal.alert({ title: 'Nhập dữ liệu thành công', message: (stats ? `Thêm mới ${stats.added}, cập nhật ${stats.updated}, xóa ${stats.deleted} bản ghi.\n` : '') + 'Dữ liệu hiện có — ' + summary });
@@ -3826,7 +4770,7 @@ Pages.restorePrev = async function () {
   if (integ.errors.length) return Modal.alert({ title: 'Bản dự phòng không hợp lệ', message: integ.errors.slice(0, 8).join('\n'), tone: 'danger' });
   const ok = await Modal.confirm({ title: 'Khôi phục bản trước lần nhập?', message: `Bản dự phòng gồm ${ds.transactions.length} giao dịch, ${ds.accounts.length} tài khoản (lưu lúc ${DateUtil.dateTimeVN(prev.meta && prev.meta.updatedAt)}). Dữ liệu hiện tại sẽ trở thành bản dự phòng mới.`, confirmText: 'Khôi phục', danger: true });
   if (!ok) return;
-  try { await App.commit('Khôi phục bản dự phòng', d => { for (const c of COLLECTIONS) d[c] = ds[c]; d.settings = ds.settings; }, { keepPrev: true, bypassBlock: true, allowBaseline: true }); Toast.show('Đã khôi phục bản dự phòng', { type: 'success' }); }
+  try { await App.commit('Khôi phục bản dự phòng', d => { for (const c of COLLECTIONS) d[c] = ds[c]; d.settings = ds.settings; }, { keepPrev: true, bypassBlock: true, allowBaseline: true, discipline: { reason: 'import' }, noAlloc: true }); Toast.show('Đã khôi phục bản dự phòng', { type: 'success' }); }
   catch (e) { Modal.alert({ title: 'Khôi phục thất bại', message: e.message, tone: 'danger' }); }
 };
 Pages.wipeAll = async function () {
@@ -3994,6 +4938,619 @@ Pages.deleteProfile = async function (p, after) {
 };
 
 /* ==========================================================================
+   PAGES 3 — Kỷ luật tài chính (ngày lương, khóa ảo, khóa 72h) & Danh mục chứng khoán
+   ========================================================================== */
+const DiscUI = {
+  goalName(st, id) { const g = st.goals.find(x => x.id === id); return g ? `${GOAL_ICONS[g.type] || ''} ${g.name}` : 'Mục tiêu đã xóa'; },
+  accName(st, id) { const a = st.accounts.find(x => x.id === id); return a ? a.name : '?'; },
+  stepLabel(st, s) {
+    if (s.goalId) return this.goalName(st, s.goalId);
+    const a = st.accounts.find(x => x.id === s.toAccountId);
+    return a ? (a.type === 'investment' ? '📈 Đầu tư định kỳ → ' : '🏦 ') + a.name : '?';
+  },
+  isDca(st, s) { const a = st.accounts.find(x => x.id === s.toAccountId); return !s.goalId && a && a.type === 'investment'; },
+  shareText(s) { return s.fixed ? Money.format(s.fixed) : Util.fmtPct((s.bp || 0) / 100, 2); },
+  chips(codes, selected, onPick) {
+    const wrap = h('div', { class: 'chip-row', role: 'radiogroup' });
+    const draw = cur => wrap.replaceChildren(...codes.map(([k, l]) => h('button', { type: 'button', class: 'chip-btn' + (k === cur ? ' active' : ''), role: 'radio', 'aria-checked': String(k === cur), onclick: () => { draw(k); onPick(k); } }, l)));
+    draw(selected);
+    return wrap;
+  },
+  noteInput(ph = 'Ghi chú (không bắt buộc, tối đa 140 ký tự)') { return h('input', { type: 'text', maxlength: '140', placeholder: ph, class: 'note-input', 'aria-label': 'Ghi chú lý do' }); },
+  /** Toast mềm cho các thông báo "đã giữ nguyên"/"đã tạo yêu cầu" (không phải lỗi). */
+  info(msg) { Toast.show(msg, { type: 'info', timeout: 6500 }); }
+};
+
+/* ---------------------- Hộp thoại khi thao tác nới lỏng cam kết ---------------------- */
+Pages.disciplinePrompt = function (info) {
+  return new Promise(resolve => {
+    const st = App.state; const viol = info.viol || [];
+    let routes = viol.reduce((acc, x) => acc.filter(r => Discipline.routes(x).includes(r)), ['fix', 'withdrawn', 'emg', 'request']);
+    if (viol.length > 1) routes = routes.filter(r => r !== 'request');
+    const emgGoal = viol.length && viol.every(x => { const g = st.goals.find(y => y.id === x.goalId); return g && g.type === 'emergency'; });
+    if (!emgGoal) routes = routes.filter(r => r !== 'emg');
+    let done = false, m;
+    const finish = v => { if (done) return; done = true; m.close(); resolve(v); };
+    const commit = Discipline.commitmentText(st);
+    const body = h('div', { class: 'disc-prompt' },
+      h('ul', { class: 'disc-viol' }, viol.slice(0, 5).map(x => h('li', { text: Discipline.describe(st, x) }))),
+      commit ? h('blockquote', { class: 'commit-quote' }, '“' + commit + '”', h('div', { class: 'tiny muted', text: 'Lời cam kết của bạn khi thiết lập' })) : null);
+    const section = (title, codes, btnText, makeChoice, tone = '') => {
+      let code = codes[0][0]; const note = DiscUI.noteInput();
+      return h('div', { class: 'disc-sec ' + tone }, h('div', { class: 'disc-sec-title', text: title }), DiscUI.chips(codes, code, k => { code = k; }), note,
+        h('button', { class: 'btn ' + (tone === 'primary' ? 'btn-primary' : ''), type: 'button', onclick: () => finish(makeChoice(code, note.value.trim())) }, btnText));
+    };
+    if (routes.includes('fix')) body.append(h('div', { class: 'disc-sec' }, h('div', { class: 'disc-sec-title', text: 'Tôi nhập nhầm, cần sửa lại' }), h('p', { class: 'small muted', text: 'Ghi nhận đúng sự thật luôn được phép. Lần sửa này được đếm trên thẻ Kỷ luật.' }), h('button', { class: 'btn', type: 'button', onclick: () => finish({ reason: 'fix' }) }, 'Tôi nhập nhầm, sửa lại')));
+    if (routes.includes('withdrawn')) body.append(section('Tiền này đã được rút ra thật', EMG_AND_HF(), 'Ghi nhận đã rút', (code, note) => ({ reason: 'withdrawn', code, note })));
+    if (routes.includes('emg')) body.append(section('Khẩn cấp — rút quỹ dự phòng (không phải chờ)', Discipline.EMG_CODES, 'Rút ngay (khẩn cấp)', (code, note) => ({ reason: 'emg', code, note })));
+    if (routes.includes('request')) body.append(section('Muốn chi — tạo yêu cầu chờ 72 giờ', Discipline.HF_CODES, 'Tạo yêu cầu (chờ 72 giờ)', (code, note) => ({ request: true, code, note }), 'primary'));
+    if (!routes.length) body.append(C.callout('info', 'Hãy thực hiện từng thay đổi riêng lẻ để chọn cách xử lý phù hợp.'));
+    m = Modal.open({ title: 'Thao tác này nới lỏng cam kết của bạn', body, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', autofocus: true, onclick: () => finish(null) }, 'Giữ nguyên')], onClose: () => { if (!done) { done = true; resolve(null); } } });
+  });
+};
+function EMG_AND_HF() { return Discipline.EMG_CODES.filter(c => c[0] !== 'other').concat(Discipline.HF_CODES); }
+
+Pages.requestFromBlock = function (info, choice) {
+  const x = info.viol[0]; const eff = Discipline.effectiveAtISO(App.state);
+  let payload;
+  if (x.kind === 'goalWithdraw') payload = { type: 'txn', op: 'add', txn: x.txn };
+  else if (x.kind === 'goalDelete') payload = { type: 'deleteGoal', goalId: x.goalId, name: x.goal ? x.goal.name : '' };
+  else if (x.kind === 'goalLoosen') payload = { type: 'goal', goal: x.newGoal, baseUpdatedAt: x.baseUpdatedAt || '' };
+  return {
+    mutate: d => { const ev = Discipline.newEvent('request', { cls: 'hf', refId: x.goalId || '', amount: x.amount || 0, effectiveAt: eff, payload }, d); d.commitLog.push(ev); if (choice.code || choice.note) Discipline.addNote(d, ev.id, choice.code || '', choice.note || ''); },
+    message: `Đã tạo yêu cầu: ${Discipline.describe(App.state, x)}. Có thể thực hiện từ ${DateUtil.whenVN(eff)} — khi đó bạn cần xác nhận lại một lần nữa. Chưa có thay đổi nào được ghi.`
+  };
+};
+
+/* ---------------------- Hành động trên nhật ký cam kết ---------------------- */
+const DiscActions = {
+  async createRequest(payload, { amount = 0, refId = '', code = '', note = '' } = {}) {
+    const eff = Discipline.effectiveAtISO(App.state);
+    await App.commit('Tạo yêu cầu nới lỏng', d => { const ev = Discipline.newEvent('request', { cls: 'hf', refId, amount, effectiveAt: eff, payload }, d); d.commitLog.push(ev); if (code || note) Discipline.addNote(d, ev.id, code, note); }, { noPrompt: true });
+    Toast.show(`Đã tạo yêu cầu. Hiệu lực từ ${DateUtil.whenVN(eff)} — khi đó cần xác nhận lại. Hủy bất cứ lúc nào chỉ với 1 chạm.`, { type: 'success', timeout: 8000 });
+  },
+  async cancel(r) {
+    try { await App.commit('Hủy yêu cầu', d => d.commitLog.push(Discipline.newEvent('cancel', { refId: r.ev.id, amount: r.ev.amount }, d)), { noPrompt: true }); Toast.show(r.ev.amount > 0 ? `Bạn vừa giữ lại ${Money.format(r.ev.amount)} cho tương lai.` : 'Đã hủy yêu cầu — cam kết giữ nguyên.', { type: 'success' }); }
+    catch (e) { Toast.show(e.message, { type: 'error' }); }
+  },
+  async execute(r) {
+    const v = Discipline.view(App.state);
+    const cur = v.requests.find(x => x.ev.id === r.ev.id);
+    if (!cur || cur.status !== 'ripe') return Toast.show(v.skewBad ? 'Đồng hồ thiết bị lệch quá 10 phút so với Google — hãy bật "Đặt giờ tự động" rồi đồng bộ lại.' : 'Yêu cầu chưa đến hạn hoặc không còn hiệu lực.', { type: 'warn' });
+    const p = r.ev.payload || {};
+    const ok = await Modal.confirm({ title: 'Vẫn muốn thực hiện?', message: `${Pages.requestText(App.state, r)}\n\nBạn đã chờ đủ thời gian. Đây là lần xác nhận cuối cùng.`, confirmText: 'Vẫn muốn thực hiện', cancelText: 'Để sau' });
+    if (!ok) return;
+    try {
+      const now = Util.nowISO(); const today = DateUtil.today();
+      await App.commit('Thực hiện yêu cầu', d => {
+        d.commitLog.push(Discipline.newEvent('confirm', { refId: r.ev.id, amount: r.ev.amount }, d));
+        if (p.type === 'txn' && p.txn) {
+          const id = 'txn_req_' + r.ev.id;
+          if (!d.transactions.some(t => t.id === id)) {
+            const t = Model.transaction({ ...p.txn, id, date: today, createdAt: now, updatedAt: now });
+            const e = Validation.transaction(t, d); if (Object.keys(e).length) throw new AppError('Không thể tạo giao dịch: ' + Validation.first(e));
+            d.transactions.push(t);
+          }
+        } else if (p.type === 'deleteGoal') {
+          d.goals = d.goals.filter(g => g.id !== p.goalId);
+          for (const t of d.transactions) if (t.goalId === p.goalId) { t.archivedGoalId = p.goalId; t.goalId = ''; t.goalDir = ''; }
+        } else if (p.type === 'goal' && p.goal) {
+          const i = d.goals.findIndex(g => g.id === p.goal.id);
+          if (i >= 0 && p.baseUpdatedAt && d.goals[i].updatedAt !== p.baseUpdatedAt) throw new AppError('Mục tiêu đã được sửa sau khi tạo yêu cầu — để không ghi đè thay đổi mới, hãy hủy yêu cầu này và tạo lại.');
+          if (i >= 0) d.goals[i] = Model.goal({ ...p.goal, updatedAt: now });
+        }
+      }, { discipline: { reason: 'request', reqId: r.ev.id }, noPrompt: true, noAlloc: true });
+      Toast.show('Đã thực hiện yêu cầu.', { type: 'success' });
+    } catch (e) { Modal.alert({ title: 'Không thực hiện được', message: e.message, tone: 'danger' }); }
+  },
+  async saveConfig(newCfg, { commitment = null, setup = false } = {}) {
+    const st = App.state; const v = Discipline.view(st);
+    const reasons = setup ? [] : RuleDiff.loosening(v.cfg, newCfg);
+    const cls = setup ? 'setup' : reasons.length ? 'trial' : 'tighten';
+    if (reasons.length && v.enforce) {
+      const choice = await Pages.reasonSheet('Thay đổi này nới lỏng cam kết', reasons, Discipline.HF_CODES, 'Tạo yêu cầu (chờ 72 giờ)');
+      if (!choice) return false;
+      await this.createRequest({ type: 'config', config: newCfg, baseVersion: v.version }, { code: choice.code, note: choice.note });
+      if (commitment !== null && commitment !== Discipline.commitmentText(st)) await App.commit('Lưu lời cam kết', d => Discipline.addNote(d, Discipline.newEvent('audit', {}, d).id, '', commitment, 'commitment'), { noPrompt: true });
+      return true;
+    }
+    await App.commit(setup ? 'Thiết lập kỷ luật' : 'Cập nhật quy tắc', d => {
+      const ev = Discipline.newEvent('set', { cls, payload: { type: 'config', config: newCfg, baseVersion: v.version } }, d); d.commitLog.push(ev);
+      if (setup) d.commitLog.push(Discipline.newEvent('arm', {}, d));
+      if (commitment !== null && commitment !== Discipline.commitmentText(st)) Discipline.addNote(d, ev.id, '', commitment, 'commitment');
+    }, { noPrompt: true });
+    Toast.show(setup ? 'Đã bật kỷ luật — 7 ngày chạy thử bắt đầu từ bây giờ.' : reasons.length ? 'Đã cập nhật (đang chạy thử nên áp dụng ngay).' : 'Đã siết chặt quy tắc — có hiệu lực ngay.', { type: 'success' });
+    return true;
+  },
+  async confirmLine(alcInfo, line, on) {
+    const st = App.state; const inc = alcInfo.income; const s = line.step;
+    try {
+      if (on) {
+        const g = s.goalId ? st.goals.find(x => x.id === s.goalId) : null;
+        const now = Util.nowISO();
+        const t = Model.transaction({ id: line.txnId, type: 'transfer', date: DateUtil.today(), amount: line.amount, accountId: inc.accountId, toAccountId: s.toAccountId, goalId: g && g.mode === 'transfer' ? g.id : '', goalDir: 'in', allocationId: alcInfo.alc.id, payee: 'Trả cho mình trước', note: `Phân bổ ${alcInfo.alc.ruleName} ${DateUtil.toVN(alcInfo.alc.date)}`, createdAt: now, updatedAt: now });
+        const e = Validation.transaction(t, st); if (Object.keys(e).length) throw new AppError('Không ghi được lệnh chuyển: ' + Validation.first(e));
+        await App.commit('Xác nhận đã chuyển', d => { const i = d.transactions.findIndex(x => x.id === t.id); if (i >= 0) d.transactions[i] = { ...d.transactions[i], amount: line.amount, updatedAt: now }; else d.transactions.push(t); }, { silentAlloc: true });
+      } else {
+        await App.commit('Bỏ xác nhận đã chuyển', d => { d.transactions = d.transactions.filter(x => x.id !== line.txnId); }, { silentAlloc: true });
+      }
+      return true;
+    } catch (e) { Toast.show(e.message, { type: 'error' }); return false; }
+  },
+  async releaseLine(alcInfo, line) {
+    const st = App.state; const v = Discipline.view(st);
+    const g = line.step.goalId ? st.goals.find(x => x.id === line.step.goalId) : null;
+    const payload = { type: 'release', alc: alcInfo.alc.id, key: line.key, amount: line.open };
+    if (!v.enforce) {
+      if (!(await Modal.confirm({ title: 'Không chuyển dòng này?', message: `${DiscUI.stepLabel(st, line.step)} · ${Money.format(line.open)} sẽ trở lại "Được phép chi".${v.inTrial ? '\n(Đang chạy thử: áp dụng ngay, được ghi để xem trước.)' : ''}`, confirmText: 'Không chuyển' }))) return;
+      await App.commit('Bỏ qua dòng phân bổ', d => d.commitLog.push(Discipline.newEvent('release', { cls: 'trial', amount: line.open, payload }, d)), { noPrompt: true, silentAlloc: true });
+      return;
+    }
+    const emg = g && g.type === 'emergency';
+    const choice = await Pages.reasonSheet(`Không chuyển ${Money.format(line.open)} vào ${DiscUI.stepLabel(st, line.step)}?`, ['Khoản này sẽ trở lại "Được phép chi".'], emg ? Discipline.EMG_CODES : Discipline.HF_CODES, emg ? 'Bỏ qua ngay (khẩn cấp)' : 'Tạo yêu cầu (chờ 72 giờ)');
+    if (!choice) return;
+    if (emg) await App.commit('Bỏ qua dòng phân bổ (khẩn cấp)', d => { const ev = Discipline.newEvent('release', { cls: 'emg', amount: line.open, payload }, d); d.commitLog.push(ev); if (choice.code || choice.note) Discipline.addNote(d, ev.id, choice.code, choice.note); }, { noPrompt: true, silentAlloc: true });
+    else await this.createRequest(payload, { amount: line.open, refId: alcInfo.alc.id, code: choice.code, note: choice.note });
+  }
+};
+
+/** Bảng chọn lý do dùng chung → Promise<{code, note}|null>. */
+Pages.reasonSheet = function (title, reasons, codes, btnText) {
+  return new Promise(resolve => {
+    let done = false, m, code = codes[0][0];
+    const finish = v => { if (done) return; done = true; m.close(); resolve(v); };
+    const note = DiscUI.noteInput(); const commit = Discipline.commitmentText(App.state);
+    const body = h('div', { class: 'disc-prompt' },
+      reasons.length ? h('ul', { class: 'disc-viol' }, reasons.map(r => h('li', { text: r }))) : null,
+      commit ? h('blockquote', { class: 'commit-quote' }, '“' + commit + '”', h('div', { class: 'tiny muted', text: 'Lời cam kết của bạn khi thiết lập' })) : null,
+      h('div', { class: 'disc-sec-title', text: 'Lý do' }), DiscUI.chips(codes, code, k => { code = k; }), note);
+    m = Modal.open({ title, body, size: 'sm', footer: [h('button', { class: 'btn btn-ghost', type: 'button', autofocus: true, onclick: () => finish(null) }, 'Giữ nguyên'), h('button', { class: 'btn btn-primary', type: 'button', onclick: () => finish({ code, note: note.value.trim() }) }, btnText)], onClose: () => { if (!done) { done = true; resolve(null); } } });
+  });
+};
+
+Pages.requestText = function (st, r) {
+  const p = r.ev.payload || {};
+  if (p.type === 'config') { const reasons = RuleDiff.loosening(Discipline.view(st).cfg, p.config); return 'Đổi quy tắc phân bổ' + (reasons.length ? ': ' + reasons.join(', ') : ''); }
+  if (p.type === 'exit') return 'Tắt chế độ kỷ luật';
+  if (p.type === 'release') { const a = (st.allocations || []).find(x => x.id === p.alc); const s = a && a.steps.find(x => x.key === p.key); return `Không chuyển ${Money.format(p.amount || r.ev.amount)} vào ${s ? DiscUI.stepLabel(st, s) : 'một bậc'}${a ? ' (' + a.ruleName + ' ' + DateUtil.toVN(a.date) + ')' : ''}`; }
+  if (p.type === 'txn' && p.txn) return `Rút ${Money.format(p.txn.amount)} ${p.txn.goalId ? 'khỏi quỹ ' + DiscUI.goalName(st, p.txn.goalId) : 'từ ' + DiscUI.accName(st, p.txn.accountId)} → ${DiscUI.accName(st, p.txn.toAccountId)}`;
+  if (p.type === 'deleteGoal') return `Xóa mục tiêu "${p.name || p.goalId}"`;
+  if (p.type === 'goal' && p.goal) return `Thay đổi mục tiêu "${p.goal.name}" (số tiền ${Money.format(p.goal.target)}, ${GOAL_STATUS[p.goal.status] || ''})`;
+  return 'Yêu cầu nới lỏng';
+};
+
+/* ---------------------- Sheet "Trả cho mình trước" ---------------------- */
+Pages.allocSheet = function (alcId, { direct = false } = {}) {
+  const st0 = App.state; const a0 = (st0.allocations || []).find(x => x.id === alcId); if (!a0) return;
+  let phase = direct || Discipline.allocInfo(st0, a0).lines.some(l => l.status !== 'open') ? 2 : 1;
+  const box = h('div', { class: 'alloc-sheet' });
+  const draw = () => {
+    const st = App.state; const alc = (st.allocations || []).find(x => x.id === alcId); if (!alc) { m.close(); return; }
+    const info = Discipline.allocInfo(st, alc); const isBonus = alc.ruleId === 'bonus';
+    const head = h('div', { class: 'alloc-head' },
+      h('div', { class: 'small muted', text: `${alc.ruleName} · ${DateUtil.toVN(alc.date)} · ${info.income ? DiscUI.accName(st, info.income.accountId) : ''}` }),
+      h('div', { class: 'alloc-total money', text: Money.format(alc.incomeAmount) }));
+    const kids = [head];
+    if (info.orphan) kids.push(C.callout('alert', 'Khoản thu gốc đã bị xóa — phân bổ này không còn giữ tiền.', 'warn'));
+    else if (info.revised) kids.push(C.callout('alert', `Khoản thu đã đổi thành ${Money.format(info.income.amount)}. Mở trang Kỷ luật để cập nhật phân bổ theo số mới.`, 'warn'));
+    if (phase === 1) {
+      if (isBonus) kids.push(h('div', { class: 'alloc-free' }, h('div', { class: 'small', text: 'Phần thưởng của bạn' }), h('div', { class: 'money big', text: Money.format(info.spend) }), h('div', { class: 'small', text: 'tiêu thoải mái, không áy náy' })));
+      kids.push(h('div', { class: 'alloc-flow' }, info.lines.map(l => {
+        const capped = Alloc.share(alc.incomeAmount, l.step) > l.amount;
+        return h('div', { class: 'alloc-row locked' }, h('span', { class: 'nm', text: DiscUI.stepLabel(st, l.step) }), h('span', { class: 'small muted', text: DiscUI.shareText(l.step) + (capped ? ' · chạm trần, phần dư chảy xuống' : '') }), h('span', { class: 'money num', text: Money.format(l.amount) }));
+      }), h('div', { class: 'alloc-row spend' }, h('span', { class: 'nm', text: 'Được phép chi từ khoản này' }), h('span', {}), h('span', { class: 'money num', text: Money.format(info.spend) }))));
+      kids.push(h('button', { class: 'btn btn-primary btn-lg btn-block', type: 'button', onclick: () => { phase = 2; draw(); } }, Icon('lock', 18), `Khóa ${Money.format(info.locked)} cho tương lai`));
+      kids.push(h('p', { class: 'tiny muted center', text: 'Khoản khóa là "khóa ảo": tiền vẫn ở ngân hàng của bạn. Bước tiếp theo: chuyển thật trong app ngân hàng rồi đánh dấu "Đã chuyển".' }));
+    } else {
+      kids.push(h('div', { class: 'small', text: 'Chuyển thật trong app ngân hàng, rồi đánh dấu từng dòng. Có thể xác nhận từng phần.' }));
+      kids.push(h('div', { class: 'xfer-list' }, info.lines.map(l => {
+        const chk = h('input', { type: 'checkbox', checked: l.status === 'done', disabled: l.status === 'released' || info.orphan, 'aria-label': 'Đã chuyển ' + DiscUI.stepLabel(st, l.step) });
+        chk.addEventListener('change', async () => { chk.disabled = true; await DiscActions.confirmLine(Discipline.allocInfo(App.state, (App.state.allocations || []).find(x => x.id === alcId)), l, chk.checked); draw(); });
+        const copy = C.btn('Sao chép số tiền', async () => { try { await navigator.clipboard.writeText(String(l.open || l.amount)); Toast.show('Đã sao chép ' + Money.num(l.open || l.amount), { type: 'success', timeout: 1800 }); } catch (e) { Toast.show(Money.num(l.open || l.amount), { type: 'info' }); } }, { icon: 'copy', cls: 'btn-sm btn-ghost' });
+        const stTxt = { open: 'Chờ chuyển', partial: `Đã chuyển ${Money.format(l.doneAmt)} / ${Money.format(l.amount)}`, done: 'Đã chuyển', released: 'Đã bỏ qua (được duyệt)' }[l.status];
+        return h('div', { class: 'xfer ' + l.status },
+          h('label', { class: 'xfer-main' }, chk, h('span', { class: 'grow' }, h('span', { class: 'cell-main', text: DiscUI.stepLabel(st, l.step) }), h('span', { class: 'cell-sub', text: `→ ${DiscUI.accName(st, l.step.toAccountId)} · ${stTxt}` })), h('span', { class: 'money num', text: Money.format(l.amount) })),
+          l.status === 'open' || l.status === 'partial' ? h('div', { class: 'xfer-actions' }, copy, C.btn('Không chuyển dòng này', () => DiscActions.releaseLine(Discipline.allocInfo(App.state, alc), l).then(draw), { cls: 'btn-sm btn-ghost' })) : null);
+      })));
+      const sp = Discipline.spendable(st);
+      kids.push(h('div', { class: 'alloc-row spend' }, h('span', { class: 'nm', text: 'Được phép chi (toàn bộ, hôm nay)' }), h('span', {}), h('span', { class: 'money num', text: Money.format(sp.value) })));
+    }
+    box.replaceChildren(...kids);
+  };
+  const m = Modal.open({ title: 'Trả cho mình trước', body: box, size: 'md', footer: [h('button', { class: 'btn', type: 'button', onclick: () => m.close() }, 'Đóng')], onClose: () => App.render() });
+  draw();
+};
+
+/* ---------------------- Thẻ "Được phép chi" trên Tổng quan ---------------------- */
+Pages.disciplineHero = function (st) {
+  const v = Discipline.view(st);
+  if (!v.cfg) {
+    if (!st.transactions.some(t => t.type === 'income')) return null;
+    return h('div', { class: 'disc-cta card' }, Icon('lock', 20), h('div', { class: 'grow' }, h('div', { class: 'cell-main', text: 'Tự động "trả cho mình trước" mỗi khi lương về' }), h('div', { class: 'small muted', text: 'Chia lương/thưởng vào mục tiêu theo thứ tự ưu tiên, khóa ảo phần tiết kiệm và cho bạn một con số duy nhất: Được phép chi.' })), h('a', { class: 'btn btn-sm btn-primary', href: '#/discipline' }, 'Thiết lập'));
+  }
+  if (!v.active) return null;
+  const sp = Discipline.spendable(st); const open = Discipline.openLines(st);
+  const ripe = v.requests.filter(r => r.status === 'ripe');
+  const wrap = h('div', { class: 'disc-hero-wrap' });
+  const tone = sp.value < 0 ? 'neg' : '';
+  wrap.append(h('section', { class: 'card disc-hero ' + tone, 'aria-live': 'polite' },
+    h('div', { class: 'flex between' }, h('div', { class: 'kpi-label' }, Icon('wallet', 15), 'Được phép chi'), v.inTrial ? C.badge('Chạy thử đến ' + DateUtil.whenVN(new Date(v.trialEnd).toISOString()), 'amber') : C.badge('Kỷ luật đang bật', 'green')),
+    h('div', { class: 'hero-value money', text: Money.format(sp.value) }),
+    h('div', { class: 'small', text: sp.value > 0 ? `~${Money.format(sp.perDay)}/ngày · còn ${sp.daysLeft} ngày${sp.payday.source === 'recurring' ? ' đến kỳ lương ' + DateUtil.toVN(sp.payday.date) : ' đến hết tháng'}` : 'Đã dùng hết phần được phép chi — các khoản đã khóa vẫn được giữ.' }),
+    h('div', { class: 'hero-break small' },
+      h('span', {}, 'Tiền tự do ', h('b', { class: 'money', text: Money.compact(sp.free) })), ' − ',
+      h('span', { class: 'earmark' }, Icon('lock', 12), ' Khóa ảo chờ chuyển ', h('b', { class: 'money', text: Money.compact(sp.open) })), ' − ',
+      h('span', {}, 'Chi cố định sắp tới ', h('b', { class: 'money', text: Money.compact(sp.fixed) }))),
+    h('div', { class: 'btn-group mt-12' },
+      open.length ? C.btn(`${open.length} lệnh chuyển chờ xác nhận`, () => Pages.allocSheet(open[0].info.alc.id, { direct: true }), { cls: 'btn-sm btn-primary', icon: 'swap' }) : null,
+      h('a', { class: 'btn btn-sm btn-ghost', href: '#/discipline' }, 'Chi tiết kỷ luật'))));
+  const dca = open.filter(o => DiscUI.isDca(st, o.line.step));
+  if (dca.length) wrap.append(h('div', { class: 'banner' }, Icon('trendUp'), h('div', { class: 'b-body' }, h('div', { class: 'b-title', text: `Kỳ đầu tư định kỳ: ${Money.format(Util.sum(dca, o => o.line.open))} → ${DiscUI.accName(st, dca[0].line.step.toAccountId)}` }), h('div', { class: 'small', text: 'DCA hiệu quả nhờ mua đều cả lúc thị trường xấu. Chuyển tiền rồi đánh dấu "Đã chuyển"; ghi khối lượng mua ở trang Danh mục.' })), C.btn('Mở', () => Pages.allocSheet(dca[0].info.alc.id, { direct: true }), { cls: 'btn-sm' })));
+  if (ripe.length) wrap.append(h('div', { class: 'banner warn' }, Icon('clock'), h('div', { class: 'b-body' }, h('div', { class: 'b-title', text: `${ripe.length} yêu cầu nới lỏng đã đến hạn` }), h('div', { class: 'small', text: 'Không tự áp dụng — hãy xem lại khi bình tĩnh rồi quyết định.' })), h('a', { class: 'btn btn-sm', href: '#/discipline' }, 'Xem')));
+  if (v.inTrial && v.trialEnd - v.now < 86400000) wrap.append(h('div', { class: 'banner warn' }, Icon('lock'), h('div', { class: 'b-body' }, h('div', { class: 'b-title', text: 'Khóa sẽ bắt đầu sau chưa đầy 24 giờ' }), h('div', { class: 'small', text: `Từ ${DateUtil.whenVN(new Date(v.trialEnd).toISOString())}, mọi thay đổi nới lỏng phải chờ 72 giờ.` }))));
+  return wrap;
+};
+
+/* ---------------------- Trang Kỷ luật tài chính ---------------------- */
+Pages.discipline = function (view) {
+  const st = App.state; const v = Discipline.view(st);
+  view.append(C.pageHead('Kỷ luật tài chính', 'Khi lương/thưởng về, ứng dụng tự chia tiền vào mục tiêu theo thứ tự ưu tiên ("trả cho mình trước"). Siết chặt có hiệu lực ngay; nới lỏng phải chờ 72 giờ và xác nhận lại. Đây là cam kết tự nguyện với chính bạn — tiền vẫn nằm ở ngân hàng của bạn.', v.cfg ? [C.btn('Chỉnh quy tắc', () => Pages.disciplineConfig(), { icon: 'edit', cls: 'btn-primary' })] : null));
+  if (v.skewBad) view.append(C.callout('alert', 'Đồng hồ thiết bị lệch quá 10 phút so với máy chủ Google. Yêu cầu nới lỏng sẽ chưa "chín" cho tới khi bạn bật "Đặt giờ tự động" và đồng bộ lại.', 'warn'));
+  if (!v.cfg) {
+    const introSteps = [['Đặt thứ tự ưu tiên', 'Quỹ dự phòng → mục tiêu → đầu tư định kỳ. Mục tiêu đầy thì phần dư tự chảy xuống mục tiêu kế.'], ['Lương về là chia ngay', 'Ghi khoản thu Lương/Thưởng là có ngay bảng phân bổ và con số "Được phép chi".'], ['Chuyển thật, đánh dấu', 'Chuyển trong app ngân hàng rồi tích "Đã chuyển" — 1 chạm mỗi dòng.'], ['Nới lỏng phải chờ', 'Giảm %, rút quỹ, tắt kỷ luật: chờ 72 giờ và xác nhận lại. Khẩn cấp từ quỹ dự phòng: 2 chạm.']];
+    const ol = h('ol', { class: 'steps' }, introSteps.map(([t, d], i) => h('li', {}, h('span', { class: 'n' }, String(i + 1)), h('div', { class: 'grow' }, h('div', { class: 'cell-main', text: t }), h('div', { class: 'cell-sub', text: d })))));
+    const go = h('div', { class: 'btn-group mt-12' }, C.btn('Thiết lập (7 ngày chạy thử)', () => Pages.disciplineConfig({ setup: true }), { icon: 'lock', cls: 'btn-primary' }));
+    view.append(C.card(null, h('div', { class: 'disc-intro' }, ol, go)));
+    return;
+  }
+  const grid = h('div', { class: 'grid-12' }); view.append(grid);
+  const commit = Discipline.commitmentText(st);
+  const stateText = !v.active ? 'Đã tắt' : v.inTrial ? `Chạy thử đến ${DateUtil.whenVN(new Date(v.trialEnd).toISOString())} — cứ chỉnh thoải mái, khóa bắt đầu sau mốc này.` : 'Đang khóa: nới lỏng cần chờ 72 giờ.';
+  grid.append(C.card('Trạng thái', h('div', {},
+    h('div', { class: 'flex' }, C.badge(!v.active ? 'Đã tắt' : v.inTrial ? 'Chạy thử' : 'Đang bật', !v.active ? '' : v.inTrial ? 'amber' : 'green'), h('span', { class: 'small', text: stateText })),
+    commit ? h('blockquote', { class: 'commit-quote mt-12' }, '“' + commit + '”') : null,
+    h('div', { class: 'btn-group mt-12' },
+      v.active ? C.btn('Tắt kỷ luật…', () => Pages.disciplineExit(), { cls: 'btn-sm btn-ghost' }) : C.btn('Bật lại', () => DiscActions.saveConfig({ ...v.cfg, enabled: true }), { cls: 'btn-sm btn-primary' }))), { cls: 'span-6' }));
+  const mt = Discipline.metrics(st);
+  grid.append(C.card('Thẻ Kỷ luật', h('div', { class: 'kpi-grid' },
+    C.kpi({ label: 'Kỳ thu nhập xác nhận ≤ 72h', value: mt.onTimePct === null ? '—' : Util.fmtPct(mt.onTimePct, 0), sub: `${mt.allocCount} kỳ trong 6 tháng`, icon: 'check' }),
+    C.kpi({ label: 'Tỷ lệ "trả cho mình trước"', value: mt.savingsPct === null ? '—' : Util.fmtPct(mt.savingsPct), sub: `${Money.compact(mt.saved)} / ${Money.compact(mt.income)} · 6 tháng`, icon: 'coins' }),
+    C.kpi({ label: 'Lối thoát tháng này', value: String(mt.emg + mt.withdrawn), sub: `Khẩn cấp ${mt.emg} · đã rút ${mt.withdrawn} · sửa lỗi ${mt.fix} · chi từ TK mục tiêu ${mt.goalAccOut}`, icon: 'shield', tone: mt.emg + mt.withdrawn > 2 ? 'amber' : '' }),
+    C.kpi({ label: 'Khóa ảo quá 7 ngày', value: String(mt.staleEarmarks), sub: `Yêu cầu tháng này: ${mt.requests} · đã hủy ${mt.cancels}`, icon: 'clock', tone: mt.staleEarmarks ? 'amber' : '' })), { cls: 'span-6' }));
+  // Quy tắc hiện hành
+  grid.append(C.card('Quy tắc phân bổ hiện hành', h('div', {}, (v.cfg.rules || []).map(r => h('div', { class: 'rule-block' },
+    h('div', { class: 'cell-main', text: `${r.name} — kích hoạt bởi: ${(r.categoryIds || []).map(c => (st.categories.find(x => x.id === c) || { name: c }).name).join(', ') || '—'}` }),
+    r.steps.length ? h('ol', { class: 'rule-steps' }, r.steps.map(s => h('li', {}, h('span', { text: DiscUI.stepLabel(st, s) }), h('span', { class: 'small muted', text: ` → ${DiscUI.accName(st, s.toAccountId)}` }), h('b', { class: 'num', text: ' ' + DiscUI.shareText(s) })))) : h('div', { class: 'small muted', text: 'Không có bậc nào — toàn bộ vào "Được phép chi".' })))), { cls: 'span-6', sub: 'Bậc trên nhận trước; mục tiêu đầy thì phần dư chảy xuống bậc kế. Phần còn lại vào "Được phép chi".' }));
+  // Yêu cầu
+  const reqs = v.requests.slice().reverse().slice(0, 30);
+  grid.append(C.card('Yêu cầu nới lỏng', reqs.length ? h('div', { class: 'req-list' }, reqs.map(r => {
+    const note = Discipline.noteFor(st, r.ev.id);
+    const acts = [];
+    if (r.status === 'pending' || r.status === 'ripe') acts.push(C.btn('Hủy yêu cầu', () => DiscActions.cancel(r), { cls: 'btn-sm' }));
+    if (r.status === 'ripe') acts.push(C.btn('Vẫn muốn thực hiện', () => DiscActions.execute(r), { cls: 'btn-sm btn-primary' }));
+    return h('div', { class: 'req ' + r.status }, h('div', { class: 'cell-main', text: Pages.requestText(st, r) }),
+      h('div', { class: 'cell-sub', text: `Tạo ${DateUtil.dateTimeVN(r.ev.at)} · hiệu lực từ ${DateUtil.whenVN(r.ev.effectiveAt)} · ${Discipline.requestStatusText(r)}${note && note.code ? ' · ' + codeLabel(note.code) : ''}` }),
+      acts.length ? h('div', { class: 'btn-group mt-8' }, acts) : null);
+  })) : h('div', { class: 'small muted', text: 'Chưa có yêu cầu nào. Mọi thay đổi nới lỏng sẽ xuất hiện ở đây kèm giờ hiệu lực.' }), { cls: 'span-6' }));
+  // Phân bổ gần đây
+  const allocs = Discipline.allAllocs(st).slice(0, 24);
+  grid.append(C.card('Phân bổ gần đây', allocs.length ? h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' }, h('thead', {}, h('tr', {}, h('th', {}, 'Ngày'), h('th', {}, 'Quy tắc'), h('th', { class: 'num' }, 'Thu nhập'), h('th', { class: 'num' }, 'Đã khóa'), h('th', {}, 'Trạng thái'), h('th', {}, ''))),
+    h('tbody', {}, allocs.map(a => {
+      const doneN = a.lines.filter(l => l.status === 'done' || l.status === 'released').length;
+      const status = a.orphan ? C.badge('Khoản thu đã xóa', 'amber') : a.revised ? C.badge('Cần xem lại', 'amber') : doneN === a.lines.length ? C.badge('Đã chuyển hết', 'green') : C.badge(`${doneN}/${a.lines.length} đã chuyển`, 'blue');
+      const acts = [C.btn('Mở', () => Pages.allocSheet(a.alc.id, { direct: true }), { cls: 'btn-sm btn-ghost' })];
+      if (a.revised) acts.push(C.btn('Cập nhật theo số mới', () => Pages.reviseAlloc(a), { cls: 'btn-sm' }));
+      if (a.orphan) acts.push(C.btn('Xóa phân bổ', () => Pages.deleteOrphanAlloc(a), { cls: 'btn-sm btn-ghost' }));
+      return h('tr', {}, h('td', { dataset: { label: 'Ngày' } }, DateUtil.toVN(a.alc.date)), h('td', { class: 'td-main' }, a.alc.ruleName), h('td', { class: 'num', dataset: { label: 'Thu nhập' } }, C.money(a.alc.incomeAmount)), h('td', { class: 'num', dataset: { label: 'Đã khóa' } }, C.money(a.locked)), h('td', { dataset: { label: 'Trạng thái' } }, status), h('td', { class: 'actions' }, acts));
+    })))) : h('div', { class: 'small muted', text: 'Chưa có. Ghi một khoản thu thuộc danh mục Lương/Thưởng để thấy phân bổ đầu tiên.' }), { cls: 'span-12' }));
+  // Nhật ký
+  const evs = v.events.slice().reverse().filter(e => e.kind !== 'wouldBlock' || v.inTrial).slice(0, 40);
+  const KIND = { set: 'Áp dụng quy tắc', arm: 'Bắt đầu chạy thử', request: 'Tạo yêu cầu', cancel: 'Hủy yêu cầu', confirm: 'Xác nhận yêu cầu', release: 'Bỏ qua dòng phân bổ', override: 'Lối thoát', wouldBlock: 'Chạy thử: lẽ ra cần lý do', income_revised: 'Cập nhật phân bổ theo khoản thu mới', audit: 'Ghi chú' };
+  grid.append(C.card('Nhật ký cam kết', h('div', { class: 'log-list' }, evs.map(e => {
+    const note = Discipline.noteFor(st, e.id);
+    return h('div', { class: 'log-item' }, h('span', { class: 'tiny muted', text: DateUtil.dateTimeVN(e.at) }), h('span', { text: `${KIND[e.kind] || e.kind}${e.cls ? ' · ' + (Discipline.CLS_LABEL[e.cls] || e.cls) : ''}${e.amount ? ' · ' + Money.format(e.amount) : ''}${e.payload && e.payload.note ? ' — ' + e.payload.note : ''}` }),
+      note && note.kind === 'reason' ? h('span', { class: 'log-note' }, `${note.code ? codeLabel(note.code) : ''}${note.text ? ': ' + note.text : ''}`, C.iconBtn('trash', 'Xóa ghi chú', () => Pages.deleteNote(note), 'danger')) : null);
+  })), { cls: 'span-12', sub: 'Chỉ ghi thêm, đồng bộ giữa các thiết bị. Ghi chú lý do tự xóa sau 12 tháng và có thể xóa bất cứ lúc nào; loại lý do, số tiền và thời điểm được giữ để thống kê.' }));
+};
+function codeLabel(code) { const all = Discipline.EMG_CODES.concat(Discipline.HF_CODES); const f = all.find(c => c[0] === code); return f ? f[1] : code; }
+Pages.deleteNote = async function (note) {
+  if (!(await Modal.confirm({ title: 'Xóa ghi chú lý do?', message: 'Ghi chú sẽ bị xóa trên mọi thiết bị đồng bộ. Loại lý do, số tiền và thời điểm vẫn được giữ trong nhật ký.', confirmText: 'Xóa', danger: true }))) return;
+  try { await App.commit('Xóa ghi chú', d => { d.commitNotes = d.commitNotes.filter(n => n.id !== note.id); }, { noPrompt: true }); } catch (e) { Toast.show(e.message, { type: 'error' }); }
+};
+Pages.reviseAlloc = async function (a) {
+  if (!(await Modal.confirm({ title: 'Cập nhật phân bổ theo khoản thu mới?', message: `Khoản thu đổi từ ${Money.format(a.alc.incomeAmount)} thành ${Money.format(a.income.amount)}. Các dòng sẽ được tính lại; giao dịch đã chuyển giữ nguyên.`, confirmText: 'Cập nhật' }))) return;
+  try {
+    await App.commit('Cập nhật phân bổ', d => {
+      const x = d.allocations.find(y => y.id === a.alc.id); const inc = d.transactions.find(t => t.id === x.incomeTxnId);
+      const caps = {}; for (const s of x.steps) caps[s.key] = s.goalId ? Discipline.goalCap(d, s.goalId, x.id) + Util.sum(Discipline.lines(App.state, a.alc).lines.filter(l => l.key === s.key), l => Math.min(l.doneAmt, l.amount)) : null;
+      x.incomeAmount = inc.amount; x.caps = caps; x.updatedAt = Util.nowISO();
+      d.commitLog.push(Discipline.newEvent('income_revised', { refId: x.id, amount: inc.amount }, d));
+    }, { noPrompt: true, silentAlloc: true });
+  } catch (e) { Toast.show(e.message, { type: 'error' }); }
+};
+Pages.deleteOrphanAlloc = async function (a) {
+  try { await App.commit('Xóa phân bổ mồ côi', d => { d.allocations = d.allocations.filter(x => x.id !== a.alc.id); }, { noPrompt: true }); } catch (e) { Toast.show(e.message, { type: 'error' }); }
+};
+Pages.disciplineExit = async function () {
+  const v = Discipline.view(App.state);
+  if (!v.enforce) {
+    if (!(await Modal.confirm({ title: 'Tắt kỷ luật?', message: 'Đang chạy thử nên áp dụng ngay. Bật lại bất cứ lúc nào; thời gian chạy thử không được tính lại.', confirmText: 'Tắt' }))) return;
+    try { await DiscActions.saveConfig({ ...v.cfg, enabled: false }); } catch (e) { Toast.show(e.message, { type: 'error' }); }
+    return;
+  }
+  const choice = await Pages.reasonSheet('Tắt chế độ kỷ luật?', ['Lương/thưởng mới sẽ không được tự phân bổ; khóa ảo hiện có vẫn giữ.'], Discipline.HF_CODES, 'Tạo yêu cầu (chờ 72 giờ)');
+  if (!choice) return;
+  try { await DiscActions.createRequest({ type: 'exit', baseVersion: v.version }, { code: choice.code, note: choice.note }); } catch (e) { Toast.show(e.message, { type: 'error' }); }
+};
+
+/* ---------------------- Thiết lập / chỉnh quy tắc ---------------------- */
+Pages.disciplineConfig = function ({ setup = false } = {}) {
+  const st = App.state; const v = Discipline.view(st);
+  const goals = st.goals.filter(g => g.status === 'active' && (g.mode === 'transfer' || g.mode === 'account'));
+  const accs = st.accounts.filter(a => a.active);
+  if (!accs.length) return Modal.alert({ title: 'Cần tài khoản', message: 'Hãy tạo ít nhất một tài khoản trước.' });
+  const incomeCats = st.categories.filter(c => c.kind === 'income' && c.active);
+  const savingsAcc = (accs.find(a => a.type === 'savings') || accs.find(a => a.type !== 'investment') || accs[0]).id;
+  const pri = { high: 0, medium: 1, low: 2 };
+  const defaults = () => {
+    const sorted = goals.slice().sort((a, b) => (a.type === 'emergency' ? -1 : 0) - (b.type === 'emergency' ? -1 : 0) || pri[a.priority] - pri[b.priority]);
+    const steps = sorted.slice(0, 4).map((g, i) => ({ key: 'k' + i, goalId: g.id, toAccountId: g.mode === 'account' ? g.accountId : savingsAcc, bp: g.type === 'emergency' ? 1500 : 1000, fixed: null }));
+    const inv = accs.find(a => a.type === 'investment'); if (inv) steps.push({ key: 'dca', goalId: '', toAccountId: inv.id, bp: 1000, fixed: null });
+    const tot = Util.sum(steps, s => s.bp) || 1; let used = 0;
+    const bonus = steps.map((s, i) => { const bp = i === steps.length - 1 ? 7000 - used : Math.floor(s.bp * 7000 / tot); used += bp; return { ...s, key: 'b' + i, bp }; }).filter(s => s.bp > 0);
+    return { enabled: true, rules: [{ id: 'salary', name: 'Lương', categoryIds: incomeCats.some(c => c.id === 'cat_inc_salary') ? ['cat_inc_salary'] : [], steps }, { id: 'bonus', name: 'Thưởng', categoryIds: incomeCats.some(c => c.id === 'cat_inc_bonus') ? ['cat_inc_bonus'] : [], steps: bonus }] };
+  };
+  const cfg = Util.clone(v.cfg || defaults());
+  for (const id of ['salary', 'bonus']) if (!cfg.rules.some(r => r.id === id)) cfg.rules.push({ id, name: id === 'salary' ? 'Lương' : 'Thưởng', categoryIds: [], steps: [] });
+  const body = h('div', { class: 'disc-config' });
+  if (!goals.length) body.append(C.callout('info', h('span', {}, 'Mẹo: tạo mục tiêu (VD Quỹ dự phòng) theo dõi bằng "chuyển tiền gắn mục tiêu" hoặc "số dư một tài khoản" để phân bổ vào mục tiêu. ', h('a', { href: '#/goals' }, 'Mở Mục tiêu'))));
+  const targetOpts = [{ group: 'Mục tiêu', options: goals.map(g => ({ value: 'g:' + g.id, label: `${GOAL_ICONS[g.type] || ''} ${g.name}` })) }, { group: 'Tài khoản (VD đầu tư định kỳ)', options: accs.map(a => ({ value: 'a:' + a.id, label: `${ACCOUNT_ICONS[a.type] || ''} ${a.name}` })) }];
+  const ruleBoxes = {};
+  const drawRule = r => {
+    const box = ruleBoxes[r.id];
+    const redraw = () => setTimeout(() => drawRule(r), 0); // hoãn để không vẽ lại giữa sự kiện blur/change
+    const rows = r.steps.map((s, i) => {
+      const tsel = F.select('t', targetOpts, s.goalId ? 'g:' + s.goalId : 'a:' + s.toAccountId, { 'aria-label': 'Đích' });
+      const g = s.goalId ? st.goals.find(x => x.id === s.goalId) : null;
+      const asel = F.select('to', accs.map(a => ({ value: a.id, label: a.name })), s.toAccountId, { 'aria-label': 'Tài khoản nhận', disabled: !s.goalId || (g && g.mode === 'account') });
+      const val = h('input', { type: 'text', value: s.fixed ? Money.num(s.fixed) : String((s.bp || 0) / 100).replace('.', ',') + '%', 'aria-label': 'Tỷ lệ hoặc số tiền', class: 'share-input', placeholder: '15% hoặc 5tr' });
+      tsel.addEventListener('change', () => { const [k, id] = tsel.value.split(':'); if (k === 'g') { const gg = st.goals.find(x => x.id === id); s.goalId = id; s.toAccountId = gg.mode === 'account' ? gg.accountId : (s.toAccountId || savingsAcc); } else { s.goalId = ''; s.toAccountId = id; } redraw(); });
+      asel.addEventListener('change', () => { s.toAccountId = asel.value; });
+      val.addEventListener('change', () => { const t = val.value.trim(); if (/%$/.test(t)) { const p = parseFloat(t.replace('%', '').replace(',', '.')); s.bp = Number.isFinite(p) ? Math.round(p * 100) : 0; s.fixed = null; } else { const mm = Money.parse(t); if (mm.ok) { s.fixed = mm.value; s.bp = null; } } redraw(); });
+      const mv = (d) => { const j = i + d; if (j < 0 || j >= r.steps.length) return; [r.steps[i], r.steps[j]] = [r.steps[j], r.steps[i]]; redraw(); };
+      return h('div', { class: 'step-row' }, h('span', { class: 'step-n', text: String(i + 1) }), tsel, asel, val,
+        h('span', { class: 'step-btns' }, C.iconBtn('left', 'Lên', () => mv(-1)), C.iconBtn('right', 'Xuống', () => mv(1)), C.iconBtn('trash', 'Bỏ bậc', () => { r.steps.splice(i, 1); redraw(); }, 'danger')));
+    });
+    const cats = h('div', { class: 'chip-row' }, incomeCats.map(c => { const on = r.categoryIds.includes(c.id); return h('button', { type: 'button', class: 'chip-btn' + (on ? ' active' : ''), 'aria-pressed': String(on), onclick: () => { r.categoryIds = on ? r.categoryIds.filter(x => x !== c.id) : r.categoryIds.concat(c.id); redraw(); } }, (c.icon || '') + ' ' + c.name); }));
+    const err = Alloc.validateSteps(r.steps);
+    const sample = Ledger.sortedTxns(st).filter(t => t.type === 'income' && r.categoryIds.includes(t.categoryId)).slice(-1)[0];
+    let preview = null;
+    if (!err && r.steps.length) {
+      const amt = sample ? sample.amount : (r.id === 'bonus' ? 30000000 : 50000000);
+      const caps = {}; for (const s of r.steps) caps[s.key] = s.goalId ? Discipline.goalCap(st, s.goalId, null) : null;
+      const p = Alloc.plan(amt, r.steps, caps);
+      preview = h('div', { class: 'preview small' }, h('div', { class: 'muted', text: `Xem trước với ${sample ? 'khoản ' + r.name.toLowerCase() + ' gần nhất' : 'ví dụ'} ${Money.format(amt)}:` }), p.lines.map(l => h('div', { class: 'flex between' }, h('span', { text: DiscUI.stepLabel(st, r.steps.find(s => s.key === l.key)) }), h('b', { class: 'money', text: Money.format(l.amount) }))), h('div', { class: 'flex between' }, h('span', { text: 'Được phép chi' }), h('b', { class: 'money', text: Money.format(p.spend) })));
+    }
+    box.replaceChildren(h('div', { class: 'disc-sec-title', text: `Quy tắc ${r.name}` }), h('div', { class: 'small muted', text: 'Kích hoạt khi ghi khoản thu thuộc danh mục:' }), cats,
+      h('div', { class: 'steps-list' }, rows.length ? rows : h('div', { class: 'small muted', text: 'Chưa có bậc nào.' })),
+      C.btn('Thêm bậc', () => { r.steps.push({ key: 'k' + Date.now().toString(36), goalId: goals[0] ? goals[0].id : '', toAccountId: goals[0] ? (goals[0].mode === 'account' ? goals[0].accountId : savingsAcc) : savingsAcc, bp: 1000, fixed: null }); redraw(); }, { icon: 'plus', cls: 'btn-sm' }),
+      err && r.steps.length ? h('div', { class: 'field-error', text: err }) : null, preview);
+  };
+  for (const r of cfg.rules) { ruleBoxes[r.id] = h('div', { class: 'rule-edit' }); body.append(ruleBoxes[r.id]); drawRule(r); }
+  const commitInp = h('textarea', { rows: 2, maxlength: '120', placeholder: 'VD: Quỹ này để cả nhà yên tâm 6 tháng nếu mất việc', value: Discipline.commitmentText(st) });
+  body.append(F.field('Lời cam kết với chính mình (hiện lại khi bạn muốn nới lỏng; chỉ hiện trong ứng dụng)', commitInp, { full: true }));
+  if (setup) body.append(C.callout('info', '7 ngày đầu là chạy thử: chỉnh thoải mái, ứng dụng chỉ ghi lại những gì lẽ ra cần chờ. Sau đó mọi thay đổi nới lỏng phải chờ 72 giờ.'));
+  else if (v.enforce) body.append(C.callout('lock', 'Tăng tỷ lệ, thêm bậc, thêm danh mục: áp dụng ngay. Giảm, bỏ bậc, đổi thứ tự, bớt danh mục: tạo yêu cầu chờ 72 giờ.'));
+  const fe = F.formError(); body.append(fe);
+  let m;
+  const save = async () => {
+    fe.textContent = '';
+    for (const r of cfg.rules) { const e = Alloc.validateSteps(r.steps); if (e) { fe.textContent = `${r.name}: ${e}`; return; } }
+    const clean = Model.discConfig(cfg);
+    try { const ok = await DiscActions.saveConfig(clean, { commitment: commitInp.value.trim().slice(0, 120), setup: setup || !v.cfg }); if (ok) m.close(); }
+    catch (e) { fe.textContent = e.message; }
+  };
+  m = Modal.open({ title: setup || !v.cfg ? 'Thiết lập kỷ luật tài chính' : 'Chỉnh quy tắc phân bổ', body, size: 'lg', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'button', onclick: save }, setup || !v.cfg ? 'Bắt đầu chạy thử 7 ngày' : 'Lưu')] });
+};
+
+/* ---------------------- Rút khỏi quỹ mục tiêu ---------------------- */
+Pages.goalWithdraw = function (goal, presetAmount = null) {
+  const st = App.state; const v = Discipline.view(st); const prog = Goals.progress(st, goal);
+  const accs = st.accounts.filter(a => a.active);
+  let from = goal.mode === 'account' ? goal.accountId : null;
+  if (!from) { const cnt = new Map(); for (const t of st.transactions) if (t.type === 'transfer' && t.goalId === goal.id && (t.goalDir || 'in') === 'in') cnt.set(t.toAccountId, (cnt.get(t.toAccountId) || 0) + 1); from = Array.from(cnt).sort((a, b) => b[1] - a[1]).map(x => x[0])[0] || (accs[0] || {}).id; }
+  const form = h('form', { novalidate: true, id: 'gw-form' }); const fe = F.formError();
+  const fromSel = F.select('from', accs.map(a => ({ value: a.id, label: a.name })), from, { disabled: goal.mode === 'account' });
+  const toSel = F.select('to', accs.filter(a => a.id !== from).map(a => ({ value: a.id, label: a.name })), (accs.find(a => a.id !== from && LIQUID_TYPES.includes(a.type)) || {}).id);
+  form.append(h('div', { class: 'form-grid' }, F.field('Số tiền rút', F.money('amount', presetAmount), { required: true, name: 'amount', hint: `Quỹ hiện có ${Money.format(prog.saved)}` }), F.field('Từ tài khoản', fromSel, { name: 'from' }), F.field('Về tài khoản', toSel, { name: 'to' })));
+  const emgFund = st.goals.find(g => g.type === 'emergency' && g.status === 'active' && g.id !== goal.id);
+  const emgSaved = emgFund ? Goals.progress(st, emgFund).saved : 0;
+  const isEmg = goal.type === 'emergency';
+  let mode = isEmg ? 'emg' : 'hf'; let code = (isEmg ? Discipline.EMG_CODES : Discipline.HF_CODES)[0][0];
+  const note = DiscUI.noteInput(); const commit = Discipline.commitmentText(st);
+  const sec = h('div');
+  const drawSec = () => {
+    if (!v.enforce) { sec.replaceChildren(C.callout('info', v.inTrial ? 'Đang chạy thử: rút được ngay, ứng dụng ghi lại để bạn xem trước.' : 'Chưa bật kỷ luật — rút ngay.')); return; }
+    const kids = [commit ? h('blockquote', { class: 'commit-quote' }, '“' + commit + '”') : null];
+    if (!isEmg) kids.push(h('div', { class: 'segmented mt-8' }, [['hf', 'Muốn chi (chờ 72 giờ)'], ['emg', 'Khẩn cấp']].map(([k, l]) => h('button', { type: 'button', class: 'seg-btn' + (mode === k ? ' active' : ''), onclick: () => { mode = k; code = (k === 'emg' ? Discipline.EMG_CODES : Discipline.HF_CODES)[0][0]; drawSec(); } }, l))));
+    if (mode === 'emg' && !isEmg && emgFund && emgSaved > 0) kids.push(C.callout('shield', h('span', {}, `Quỹ dự phòng còn ${Money.format(emgSaved)}. Khẩn cấp hãy rút từ quỹ dự phòng trước. `, h('a', { href: '#', onclick: e => { e.preventDefault(); m.close(); Pages.goalWithdraw(emgFund); } }, 'Rút từ Quỹ dự phòng')), 'warn'));
+    kids.push(h('div', { class: 'disc-sec-title mt-8', text: 'Lý do' }), DiscUI.chips(mode === 'emg' ? Discipline.EMG_CODES : Discipline.HF_CODES, code, k => { code = k; }), note);
+    sec.replaceChildren(...kids);
+  };
+  drawSec(); form.append(sec, fe);
+  let m;
+  const submit = async e => {
+    if (e) e.preventDefault(); fe.textContent = ''; F.clearErrors(form);
+    const a = F.moneyVal(form, 'amount'); if (!a.ok) return F.showErrors(form, { amount: a.error });
+    if (a.value > prog.saved) return F.showErrors(form, { amount: `Vượt số đang có trong quỹ (${Money.format(prog.saved)}).` });
+    const fromId = fromSel.value, toId = toSel.value; if (!toId || toId === fromId) return F.showErrors(form, { to: 'Chọn tài khoản nhận khác tài khoản nguồn.' });
+    if (mode === 'emg' && !isEmg && v.enforce && emgFund && emgSaved >= a.value) return (fe.textContent = 'Quỹ dự phòng đủ để trang trải — hãy rút từ Quỹ dự phòng.');
+    const now = Util.nowISO();
+    const txn = Model.transaction({ id: Util.uid('txn'), type: 'transfer', date: DateUtil.today(), amount: a.value, accountId: fromId, toAccountId: toId, goalId: goal.mode === 'transfer' ? goal.id : '', goalDir: goal.mode === 'transfer' ? 'out' : '', payee: 'Rút quỹ ' + goal.name, createdAt: now, updatedAt: now });
+    const ve = Validation.transaction(txn, App.state); if (Object.keys(ve).length) return (fe.textContent = Validation.first(ve));
+    try {
+      if (v.enforce && mode === 'hf') { await DiscActions.createRequest({ type: 'txn', op: 'add', txn }, { amount: a.value, refId: goal.id, code, note: note.value.trim() }); m.close(); App.render(); return; }
+      await App.commit('Rút khỏi quỹ', d => {
+        d.transactions.push(txn);
+        if (v.enforce && goal.mode === 'account') { const ev = Discipline.newEvent('override', { cls: 'emg', refId: txn.id, amount: a.value }, d); d.commitLog.push(ev); if (code || note.value.trim()) Discipline.addNote(d, ev.id, code, note.value.trim()); }
+      }, { discipline: v.enforce ? { reason: 'emg', code, note: note.value.trim() } : null, noPrompt: true });
+      Toast.show(`Đã rút ${Money.format(a.value)} khỏi quỹ ${goal.name}.`, { type: 'success' }); m.close();
+    } catch (err) { fe.textContent = err.message; }
+  };
+  form.addEventListener('submit', submit);
+  m = Modal.open({ title: `Rút khỏi quỹ "${goal.name}"`, body: form, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Giữ nguyên'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'gw-form' }, 'Tiếp tục')] });
+};
+
+/* ====================== DANH MỤC CHỨNG KHOÁN ====================== */
+Pages.portfolio = function (view) {
+  const st = App.state; const rows = Holdings.rows(st); const total = Holdings.total(st);
+  const invAccs = st.accounts.filter(a => a.type === 'investment' && a.active);
+  const on = PriceService.enabled();
+  view.append(C.pageHead('Danh mục chứng khoán', 'Nhập mã + khối lượng để biết giá trị hiện tại; giá trị được cộng vào Tài sản ròng. Lấy giá tự động là tùy chọn và TẮT sẵn — chỉ danh sách mã được gửi tới nguồn giá.',
+    [C.btn('Dán / thêm danh mục', () => Pages.holdingPaste(), { icon: 'plus', cls: 'btn-primary' }), on ? C.btn('Cập nhật giá', () => Pages.refreshPrices(true), { icon: 'sync' }) : C.btn('Bật cập nhật giá…', () => Pages.priceConsent(), { icon: 'cloud' })]));
+  if (!invAccs.length) view.append(C.callout('info', h('span', {}, 'Danh mục cần gắn với một tài khoản loại "Tài khoản đầu tư" (tài khoản chứng khoán của bạn). ', h('a', { href: '#', onclick: e => { e.preventDefault(); Forms.openAccount(); } }, 'Tạo tài khoản'))));
+  if (PriceService.needsReconsent()) view.append(C.callout('alert', h('span', {}, 'Nội dung về nguồn giá đã thay đổi — cần bạn đồng ý lại trước khi lấy giá. ', h('a', { href: '#', onclick: e => { e.preventDefault(); Pages.priceConsent(); } }, 'Xem & đồng ý')), 'warn'));
+  if (rows.length && st.assets.some(a => a.group === 'securities' && Ledger.assetValue(a, DateUtil.today()) > 0)) view.append(C.callout('alert', 'Bạn có tài sản nhập tay nhóm "Chứng khoán / đầu tư". Nếu đó chính là danh mục này, hãy xóa hoặc đổi tài sản đó để tài sản ròng không bị tính trùng.', 'warn'));
+  const cost = Util.sum(rows.filter(r => r.cost !== null && r.price), r => r.cost); const pnl = Util.sum(rows.filter(r => r.pnl !== null), r => r.pnl);
+  const fetched = rows.map(r => r.quote && r.quote.fetchedAt).filter(Boolean).sort().slice(-1)[0];
+  view.append(h('div', { class: 'kpi-grid' },
+    C.kpi({ label: 'Giá trị danh mục', value: C.money(total), sub: `${rows.filter(r => r.holding.qty > 0).length} mã · đã cộng vào tài sản ròng`, icon: 'layers', featured: true }),
+    C.kpi({ label: 'Lãi/lỗ so với giá vốn', value: cost ? C.money(pnl, { sign: true, tone: 'auto' }) : '—', sub: cost ? `Giá vốn ${Money.compact(cost)} · chưa gồm phí, thuế` : 'Nhập giá vốn để theo dõi', icon: 'trendUp' }),
+    C.kpi({ label: 'Nguồn giá', value: on ? 'Đang bật' : 'Tắt', sub: on ? (fetched ? 'Lần lấy gần nhất ' + DateUtil.dateTimeVN(fetched) : 'Chưa lấy giá') : 'Đang dùng giá nhập tay / giá vốn', icon: on ? 'cloud' : 'cloudOff' })));
+  if (!rows.length) { view.append(C.card(null, C.empty('layers', 'Chưa có mã nào', 'Dán từ app công ty chứng khoán: mỗi dòng "MÃ KHỐI_LƯỢNG GIÁ_VỐN", VD: FPT 1000 95.5', [C.btn('Dán / thêm danh mục', () => Pages.holdingPaste(), { icon: 'plus', cls: 'btn-primary' })]))); return; }
+  const drift = Portfolio.drift(rows.map(r => ({ key: r.holding.id, value: r.value, targetPct: r.holding.targetPct })));
+  const dmap = new Map(drift.map(d => [d.key, d])); const anyTarget = drift.some(d => d.target !== null);
+  const allFresh = rows.every(r => r.fresh === 'fresh' || r.fresh === 'manual' || r.fresh === 'cost' || r.holding.qty === 0);
+  const freshTxt = r => r.priceSource === 'manual' ? 'nhập tay' : r.priceSource === 'cost' ? 'giá vốn (chưa có giá)' : r.priceSource === 'none' ? 'chưa có giá' : PriceService.label(r.quote);
+  view.append(C.card('Danh mục', h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' },
+    h('thead', {}, h('tr', {}, h('th', {}, 'Mã'), h('th', { class: 'num' }, 'Khối lượng'), h('th', { class: 'num' }, 'Giá'), h('th', { class: 'num' }, 'Giá trị'), h('th', { class: 'num' }, 'Lãi/lỗ'), anyTarget ? h('th', { class: 'num' }, 'Tỷ trọng / mục tiêu') : null, h('th', {}, ''))),
+    h('tbody', {}, rows.map(r => {
+      const d = dmap.get(r.holding.id);
+      return h('tr', {}, h('td', { class: 'td-main' }, h('div', { class: 'cell-main', text: r.holding.symbol }), h('div', { class: 'cell-sub', text: r.account ? r.account.name : '?' }), r.rightsSuspect ? h('div', {}, C.badge('Nghi sự kiện quyền — kiểm tra khối lượng', 'amber'), ' ', h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => { PriceService.clearRightsFlag(r.holding.symbol); App.render(); } }, 'Đã kiểm tra')) : null),
+        h('td', { class: 'num', dataset: { label: 'Khối lượng' } }, Money.num(r.holding.qty)),
+        h('td', { class: 'num', dataset: { label: 'Giá' } }, r.price ? Money.num(r.price) : '—', h('div', { class: 'tiny ' + (r.fresh === 'stale' ? 'warn-text' : 'muted'), text: freshTxt(r) })),
+        h('td', { class: 'num', dataset: { label: 'Giá trị' } }, C.money(r.value)),
+        h('td', { class: 'num', dataset: { label: 'Lãi/lỗ' } }, r.pnl === null ? '—' : C.money(r.pnl, { sign: true, tone: 'auto' })),
+        anyTarget ? h('td', { class: 'num', dataset: { label: 'Tỷ trọng' } }, `${Util.fmtPct(d.actual, 1)}${d.target !== null ? ' / ' + Util.fmtPct(d.target, 1) : ''}`, d.flag && allFresh ? h('div', { class: 'tiny warn-text', text: `lệch ${d.diff > 0 ? '+' : ''}${d.diff.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} điểm %` }) : null) : null,
+        h('td', { class: 'actions' }, C.iconBtn('plus', 'Ghi lệnh mua', () => Pages.holdingBuy(r.holding)), C.iconBtn('edit', 'Sửa', () => Pages.holdingEdit(r.holding)), C.iconBtn('trash', 'Xóa', () => Pages.holdingDelete(r.holding), 'danger')));
+    })))), { sub: 'Giá chỉ mang tính tham khảo, từ nguồn công khai không chính thức (có thể trễ/sai). Không phải khuyến nghị đầu tư.' }));
+  if (anyTarget) {
+    const flagged = drift.filter(d => d.flag);
+    view.append(C.card('Tỷ trọng', h('div', { class: 'small' }, !allFresh ? 'Có giá cũ — chưa đánh giá độ lệch. Hãy cập nhật giá.' : flagged.length ? `${flagged.length} mã đang lệch so với tỷ trọng bạn đặt (ngưỡng 5/25: 5 điểm % hoặc 25% của tỷ trọng mục tiêu). Cân nhắc dồn các kỳ đầu tư định kỳ tới vào phần đang thiếu tỷ trọng thay vì bán.` : 'Tỷ trọng đang nằm trong dải cho phép so với mục tiêu bạn đặt.'), { sub: 'Đây là so sánh với chính tỷ trọng bạn tự đặt — không phải lời khuyên mua/bán.' }));
+  }
+  if (on && rows.some(r => r.fresh === 'stale' || r.fresh === 'none')) lateRender(() => Pages.refreshPrices(false));
+};
+Pages.refreshPrices = async function (force) {
+  if (!PriceService.enabled()) return Pages.priceConsent();
+  try {
+    const r = await PriceService.refresh(Holdings.symbols(App.state), { force });
+    if (force || r.updated.length) App.render();
+    if (r.missing.length) Toast.show(`Không tìm thấy giá cho: ${r.missing.join(', ')} — kiểm tra lại mã hoặc nhập giá tay.`, { type: 'warn', timeout: 7000 });
+    else if (force && r.errors.length && !r.updated.length) Toast.show('Không lấy được giá (' + r.errors[0] + '). Đang dùng giá gần nhất/nhập tay.', { type: 'warn' });
+    else if (force) Toast.show(r.updated.length ? `Đã cập nhật giá ${r.updated.length} mã.` : 'Giá đang mới nhất.', { type: 'success' });
+  } catch (e) { Toast.show(e.message, { type: 'error' }); }
+};
+Pages.priceConsent = function () {
+  const full = h('div', { class: 'consent-full small', hidden: true },
+    h('p', { text: 'Khi bật, ứng dụng gửi tới VPS (bgapidatafeed.vps.com.vn) và VNDirect (dchart-api.vndirect.com.vn) danh sách mã chứng khoán cần lấy giá. Không gửi khối lượng, giá vốn, giá trị danh mục, email hay bất kỳ dữ liệu tài chính nào khác.' }),
+    h('p', { text: 'Như mọi kết nối internet, các máy chủ này cũng nhận được địa chỉ IP của bạn và địa chỉ trang ứng dụng. Việc xử lý dữ liệu đó tuân theo chính sách của VPS và VNDirect; FinPilot không có thỏa thuận nào với các công ty này.' }),
+    h('p', { text: 'Đây là các nguồn dữ liệu không chính thức, công khai: giá có thể trễ, sai hoặc ngừng cung cấp bất cứ lúc nào. Giá chỉ mang tính tham khảo, không phải dữ liệu giao dịch chính thức và không phải khuyến nghị đầu tư.' }),
+    h('p', {}, 'Áp dụng riêng cho hồ sơ này trên thiết bị này. Tắt bất cứ lúc nào trong trang Danh mục. ', h('a', { href: 'privacy.html#4a', target: '_blank', rel: 'noopener' }, 'Chính sách quyền riêng tư — mục 4a')));
+  const body = h('div', { class: 'consent' },
+    h('ul', { class: 'small' }, h('li', { text: 'Ứng dụng gửi danh sách mã (không gồm khối lượng, giá vốn) tới máy chủ VPS và VNDirect.' }), h('li', { text: 'Các máy chủ này thấy địa chỉ IP của bạn và địa chỉ trang ứng dụng.' }), h('li', { text: 'Nguồn không chính thức — giá có thể trễ hoặc sai; không phải khuyến nghị đầu tư.' })),
+    h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: e => { full.hidden = !full.hidden; e.currentTarget.textContent = full.hidden ? 'Xem đầy đủ (mục 4a)' : 'Thu gọn'; } }, 'Xem đầy đủ (mục 4a)'), full);
+  let m;
+  m = Modal.open({ title: 'Bật cập nhật giá chứng khoán?', body, size: 'md', footer: [
+    h('button', { class: 'btn', type: 'button', onclick: () => { m.close(); } }, 'Để sau, nhập giá tay'),
+    PriceService.enabled() ? h('button', { class: 'btn btn-danger', type: 'button', onclick: () => { PriceService.disable(); m.close(); App.render(); Toast.show('Đã tắt cập nhật giá — không còn kết nối tới nguồn giá.', { type: 'success' }); } }, 'Tắt cập nhật giá') : null,
+    !PriceService.enabled() ? h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { PriceService.enable(); m.close(); App.render(); Pages.refreshPrices(true); } }, 'Bật cho hồ sơ này') : null] });
+};
+Pages.holdingPaste = function () {
+  const st = App.state; const invAccs = st.accounts.filter(a => a.type === 'investment' && a.active);
+  if (!invAccs.length) return Modal.alert({ title: 'Cần tài khoản đầu tư', message: 'Hãy tạo một tài khoản loại "Tài khoản đầu tư" (tài khoản chứng khoán) trước.' });
+  const ta = h('textarea', { rows: 6, placeholder: 'FPT 1000 95.5\nHPG 2000 27,35\nE1VFVN30 500', 'aria-label': 'Danh mục dán vào' });
+  const acc = F.select('acc', invAccs.map(a => ({ value: a.id, label: a.name })), invAccs[0].id);
+  const prev = h('div', { class: 'small mt-8' });
+  const parse = () => {
+    const r = Portfolio.parseLines(ta.value);
+    prev.replaceChildren(r.items.length ? h('div', {}, `${r.items.length} mã hợp lệ: `, r.items.map(i => `${i.symbol} ${Money.num(i.qty)}${i.avgCost ? ' @' + Money.num(i.avgCost) : ''}`).join(' · ')) : null, r.errors.length ? h('div', { class: 'warn-text' }, r.errors.map(e => `Dòng ${e.line}: ${e.msg} ("${e.text}")`).join('\n')) : null);
+    return r;
+  };
+  ta.addEventListener('input', parse);
+  const body = h('div', {}, F.field('Mỗi dòng: MÃ KHỐI_LƯỢNG [GIÁ_VỐN]', ta, { full: true, hint: 'Giá vốn: 95.5 hoặc 95 = nghìn đồng (95.500 đ); 95500 = đồng. Mã đã có trong tài khoản sẽ được cập nhật khối lượng.' }), F.field('Tài khoản chứng khoán', acc), prev);
+  let m;
+  const save = async () => {
+    const r = parse(); if (!r.items.length) return;
+    const now = Util.nowISO(); const aId = acc.value;
+    try {
+      await App.commit('Cập nhật danh mục', d => {
+        for (const it of r.items) {
+          const id = Holdings.id(aId, it.symbol); const i = d.holdings.findIndex(x => x.id === id);
+          const base = i >= 0 ? d.holdings[i] : { id, accountId: aId, symbol: it.symbol, createdAt: now };
+          const rec = Model.holding({ ...base, qty: it.qty, avgCost: it.avgCost !== null ? it.avgCost : base.avgCost, updatedAt: now });
+          const e = Validation.holding(rec, d); if (Object.keys(e).length) throw new AppError(`${it.symbol}: ${Validation.first(e)}`);
+          if (i >= 0) d.holdings[i] = rec; else d.holdings.push(rec);
+        }
+      });
+      m.close(); Toast.show(`Đã lưu ${r.items.length} mã.`, { type: 'success' });
+      if (PriceService.enabled()) Pages.refreshPrices(false);
+    } catch (e) { Toast.show(e.message, { type: 'error' }); }
+  };
+  m = Modal.open({ title: 'Dán / thêm danh mục', body, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'button', onclick: save }, 'Lưu danh mục')] });
+};
+Pages.holdingEdit = function (x) {
+  const form = h('form', { novalidate: true, id: 'hold-form' }); const fe = F.formError();
+  form.append(h('div', { class: 'form-grid' },
+    F.field('Mã', F.input('symbol', x.symbol, { disabled: true }), { name: 'symbol' }),
+    F.field('Khối lượng', F.input('qty', Money.num(x.qty), { inputmode: 'numeric' }), { name: 'qty', required: true }),
+    F.field('Giá vốn bình quân (đ/cp)', F.money('avgCost', x.avgCost), { name: 'avgCost' }),
+    F.field('Giá nhập tay (đ/cp)', F.money('manualPrice', x.manualPrice), { name: 'manualPrice', hint: 'Dùng khi tắt lấy giá hoặc nguồn giá lỗi.' }),
+    F.field('Tỷ trọng mục tiêu (%)', F.input('targetPct', x.targetPct === null ? '' : String(x.targetPct).replace('.', ','), { inputmode: 'decimal', placeholder: 'VD: 30' }), { name: 'targetPct', hint: 'Tùy chọn — để so với tỷ trọng thực tế.' })), fe);
+  let m;
+  form.addEventListener('submit', async e => {
+    e.preventDefault(); F.clearErrors(form); const errs = {};
+    const qty = Portfolio.parseQty(F.val(form, 'qty')); if (!Number.isSafeInteger(qty)) errs.qty = 'Khối lượng phải là số nguyên.';
+    const ac = F.moneyVal(form, 'avgCost', { allowEmpty: true }); if (!ac.ok) errs.avgCost = ac.error;
+    const mp = F.moneyVal(form, 'manualPrice', { allowEmpty: true }); if (!mp.ok) errs.manualPrice = mp.error;
+    const tRaw = F.val(form, 'targetPct').trim(); const tp = tRaw === '' ? null : Number(tRaw.replace(',', '.')); if (tp !== null && !(Number.isFinite(tp) && tp >= 0 && tp <= 100)) errs.targetPct = 'Từ 0 đến 100.';
+    if (Object.keys(errs).length) return F.showErrors(form, errs);
+    const now = Util.nowISO();
+    const rec = Model.holding({ ...x, qty, avgCost: ac.value, manualPrice: mp.value, manualPriceAt: mp.value && mp.value !== x.manualPrice ? now : x.manualPriceAt, targetPct: tp, updatedAt: now });
+    try { await App.commit('Sửa danh mục', d => { const i = d.holdings.findIndex(y => y.id === x.id); if (i < 0) throw new AppError('Mã không còn tồn tại.'); d.holdings[i] = rec; }); m.close(); }
+    catch (err) { fe.textContent = err.message; }
+  });
+  m = Modal.open({ title: 'Sửa ' + x.symbol, body: form, size: 'sm', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'hold-form' }, 'Lưu')] });
+};
+Pages.holdingBuy = function (x) {
+  const q = PriceService.quote(x.symbol);
+  const form = h('form', { novalidate: true, id: 'buy-form' }); const fe = F.formError();
+  form.append(h('div', { class: 'form-grid' },
+    F.field('Khối lượng khớp thêm', F.input('qty', '', { inputmode: 'numeric', placeholder: 'VD: 200' }), { name: 'qty', required: true, hint: 'Lệnh mua từ kỳ đầu tư định kỳ hoặc mua thêm.' }),
+    F.field('Giá khớp (đ/cp)', F.money('price', q ? q.price : null), { name: 'price', required: true }),
+    h('div', { class: 'field full' }, F.check('deduct', true, 'Trừ tiền mua khỏi số dư tài khoản chứng khoán'), h('div', { class: 'field-hint', text: 'Giữ chọn để tiền và cổ phiếu không bị tính hai lần trong tài sản ròng. Bỏ chọn chỉ khi bạn không theo dõi tiền mặt trong tài khoản này.' }))), fe);
+  let m;
+  form.addEventListener('submit', async e => {
+    e.preventDefault(); F.clearErrors(form);
+    const add = Portfolio.parseQty(F.val(form, 'qty')); const pr = F.moneyVal(form, 'price');
+    if (!Number.isSafeInteger(add) || add <= 0) return F.showErrors(form, { qty: 'Khối lượng phải là số nguyên dương.' });
+    if (!pr.ok) return F.showErrors(form, { price: pr.error });
+    const nq = x.qty + add; const avg = x.avgCost ? Math.round((x.avgCost * x.qty + pr.value * add) / nq) : pr.value;
+    const deduct = form.elements.deduct && form.elements.deduct.checked; const cost = add * pr.value; const now = Util.nowISO();
+    if (!Number.isSafeInteger(cost) || cost > MAX_AMOUNT) return F.showErrors(form, { qty: 'Giá trị lệnh quá lớn.' });
+    try { await App.commit('Ghi lệnh mua', d => {
+      const i = d.holdings.findIndex(y => y.id === x.id); d.holdings[i] = Model.holding({ ...d.holdings[i], qty: nq, avgCost: avg, updatedAt: now });
+      if (deduct) { const t = Model.transaction({ id: Util.uid('txn'), type: 'adjustment', direction: 'out', date: DateUtil.today(), amount: cost, accountId: x.accountId, payee: `Mua ${x.symbol} × ${Money.num(add)} @ ${Money.num(pr.value)}`, note: 'Tiền chuyển thành cổ phiếu (không phải chi tiêu)', tags: ['chứng khoán'], createdAt: now, updatedAt: now }); const e = Validation.transaction(t, d); if (Object.keys(e).length) throw new AppError(Validation.first(e)); d.transactions.push(t); }
+    }); m.close(); Toast.show(`${x.symbol}: +${Money.num(add)} cp · giá vốn bình quân ${Money.num(avg)} đ`, { type: 'success' }); }
+    catch (err) { fe.textContent = err.message; }
+  });
+  m = Modal.open({ title: 'Ghi lệnh mua ' + x.symbol, body: form, size: 'sm', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'buy-form' }, 'Ghi')] });
+};
+Pages.holdingDelete = async function (x) {
+  if (!(await Modal.confirm({ title: `Xóa ${x.symbol} khỏi danh mục?`, message: 'Giá trị sẽ không còn được cộng vào tài sản ròng.', confirmText: 'Xóa', danger: true }))) return;
+  try { await App.commit('Xóa mã', d => { d.holdings = d.holdings.filter(y => y.id !== x.id); }, { undoLabel: 'Đã xóa mã' }); Toast.show('Đã xóa ' + x.symbol, { type: 'success', action: { label: 'Hoàn tác', fn: () => App.undo() } }); } catch (e) { Toast.show(e.message, { type: 'error' }); }
+};
+
+/* ==========================================================================
    APP — khởi tạo, điều hướng, ghi dữ liệu (commit), hoàn tác, đồng bộ
    ========================================================================== */
 const ROUTES = {
@@ -4004,6 +5561,8 @@ const ROUTES = {
   reports: { title: 'Báo cáo & phân tích', icon: 'chart', period: true },
   assets: { title: 'Tài sản & nợ', icon: 'building' },
   goals: { title: 'Mục tiêu tài chính', icon: 'target' },
+  discipline: { title: 'Kỷ luật tài chính', icon: 'lock' },
+  portfolio: { title: 'Danh mục chứng khoán', icon: 'layers' },
   recurring: { title: 'Giao dịch định kỳ', icon: 'repeat' },
   data: { title: 'Sao lưu & dữ liệu', icon: 'database' },
   settings: { title: 'Cài đặt', icon: 'settings' }
@@ -4095,16 +5654,32 @@ const App = {
 
   /* ---------- Ghi dữ liệu: nguyên tử, kiểm tra toàn vẹn, chỉ báo "Đã lưu" khi ghi thành công ---------- */
   commit(label, mutate, opts = {}) {
-    const run = this.busy.then(() => this._commit(label, mutate, opts));
+    const run = this.busy.then(() => this._commit(label, mutate, opts)).catch(async e => {
+      // Thao tác nới lỏng cam kết: hỏi lý do (hoặc tạo yêu cầu 72h) rồi thực hiện lại — vẫn trong cùng hàng đợi ghi.
+      if (!(e && e.code === 'DISCIPLINE') || opts.noPrompt || typeof Pages === 'undefined' || !Pages.disciplinePrompt) throw e;
+      const choice = await Pages.disciplinePrompt(e.info);
+      if (!choice) throw new AppError('Đã giữ nguyên — chưa ghi thay đổi nào.');
+      if (choice.request) {
+        const r = Pages.requestFromBlock(e.info, choice);
+        await this._commit('Tạo yêu cầu nới lỏng', r.mutate, { noPrompt: true });
+        throw new AppError(r.message);
+      }
+      return this._commit(label, mutate, { ...opts, discipline: choice });
+    });
     this.busy = run.catch(() => {});
-    return run;
+    return run.then(res => {
+      if (res && res.warned) Toast.show('Đã ghi nhận: tiền rời tài khoản tích lũy. Lần này được đếm trên thẻ Kỷ luật.', { type: 'warn', timeout: 6000 });
+      if (res && res.allocs && res.allocs.length && !opts.silentAlloc && typeof Pages !== 'undefined' && Pages.allocSheet) setTimeout(() => Pages.allocSheet(res.allocs[res.allocs.length - 1]), 60);
+      return res;
+    });
   },
-  async _commit(label, mutate, { undoLabel = null, keepPrev = false, bypassBlock = false, allowBaseline = false, fromSync = false, resetTombstones = false } = {}) {
+  async _commit(label, mutate, { undoLabel = null, keepPrev = false, bypassBlock = false, allowBaseline = false, fromSync = false, resetTombstones = false, discipline = null, noAlloc = false, resetLog = false } = {}) {
     if (this.writeBlocked && !bypassBlock) throw new AppError(this.writeBlocked);
     const before = this.state;
     const draft = Util.clone(before);
     mutate(draft);
     clearMemo(draft);
+    const disc = fromSync ? { created: [] } : Discipline.beforeSave(before, draft, { discipline, noAlloc, resetLog });
     Snapshots.upsertToday(draft);
     if (!fromSync) Changes.stamp(before, draft);
     if (resetTombstones) draft.tombstones = [];
@@ -4144,14 +5719,14 @@ const App = {
     else if (!fromSync) this.undoEntry = null;
     this.render();
     if (!fromSync && durable) SyncService.schedule(2500);
-    return { durable };
+    return { durable, allocs: disc.created, warned: disc.warned || 0 };
   },
   async undo() {
     const u = this.undoEntry;
     if (!u || u.revision !== this.state.meta.revision) { Toast.show('Không thể hoàn tác: dữ liệu đã thay đổi sau thao tác đó.', { type: 'warn' }); return; }
     this.undoEntry = null;
     try {
-      await this.commit('Hoàn tác', d => { for (const c of COLLECTIONS) d[c] = Util.clone(u.before[c]); d.settings = Util.clone(u.before.settings); });
+      await this.commit('Hoàn tác', d => { for (const c of COLLECTIONS) d[c] = Util.clone(u.before[c]); d.settings = Util.clone(u.before.settings); }, { discipline: { reason: 'fix' }, noAlloc: true });
       Toast.show('Đã hoàn tác', { type: 'success' });
     } catch (e) { Toast.show('Hoàn tác thất bại: ' + e.message, { type: 'error' }); }
   },
@@ -4168,6 +5743,8 @@ const App = {
         for (const c of COLLECTIONS) d[c] = Util.clone(m.data[c]);
         d.tombstones = Util.clone(m.data.tombstones); d.settings = Model.settings(Util.clone(m.data.settings));
       }, { fromSync: true });
+      const odd = Discipline.audit(this.state);
+      if (odd) this.banner('disc-audit', 'warn', 'Phát hiện mốc giờ bất thường trong nhật ký cam kết', `${odd} sự kiện mang thời gian ở tương lai — có thể một thiết bị đang để sai đồng hồ. Hãy bật "Đặt giờ tự động" trên các thiết bị.`);
     }
     const post = MergeService.merge(pick(this.state), remote);
     return { localChanged, remoteNeedsUpdate: post.remoteChanged, stats: pre.stats };
@@ -4175,9 +5752,11 @@ const App = {
   async wipe(propagate) {
     await this.commit('Xóa toàn bộ dữ liệu', d => {
       const fresh = Defaults.state();
+      const ep = Discipline.epoch(d);
       for (const c of COLLECTIONS) d[c] = fresh[c];
       d.settings = fresh.settings;
-    }, { bypassBlock: true, allowBaseline: true, keepPrev: true, resetTombstones: !propagate });
+      d.settings.disciplineEpoch = propagate ? ep + 1 : ep;
+    }, { bypassBlock: true, allowBaseline: true, keepPrev: true, resetTombstones: !propagate, resetLog: true, noAlloc: true });
     this.undoEntry = null;
     this.navigate('dashboard');
   },
@@ -4320,7 +5899,7 @@ window.FinPilot = Object.freeze({
   totals: (from, to) => Ledger.totals(App.state, from, to),
   current: () => { const c = Ledger.current(App.state); return { cash: c.cash, totalAssets: c.totalAssets, liabilities: c.liabilities, netWorth: c.netWorth, balances: Object.fromEntries(c.balances), debts: Object.fromEntries(c.debtBalances) }; },
   integrity: () => Validation.integrity(App.state),
-  _internal: { App, Ledger, Validation, MergeService, ImportExport, Recurring, DateUtil, Money, SyncService, StorageService }
+  _internal: { App, Ledger, Validation, MergeService, ImportExport, Recurring, DateUtil, Money, SyncService, StorageService, Discipline, TrustedClock, CommitLog, Alloc, Model, Goals, Holdings: typeof Holdings !== 'undefined' ? Holdings : null, PriceService: typeof PriceService !== 'undefined' ? PriceService : null, Pages }
 });
 
 installTouchIcon();

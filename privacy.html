@@ -6,24 +6,32 @@ h1{font-size:26px;line-height:1.25;margin:0 0 4px}h2{font-size:18px;margin:28px 
 ul{padding-left:20px}li{margin:4px 0}nav{display:flex;gap:16px;margin-bottom:16px;font-size:14px;flex-wrap:wrap}
 </style></head>
 <body><main><nav><a href="./">← Mở ứng dụng FinPilot</a><a href="privacy.html">Chính sách quyền riêng tư</a><a href="terms.html">Điều khoản sử dụng</a></nav><div class="card">
-<h1>Chính sách quyền riêng tư</h1><p class="muted">Ứng dụng FinPilot Offline · Cập nhật ngày 17/10/2026</p>
+<h1>Chính sách quyền riêng tư</h1><p class="muted">Ứng dụng FinPilot Offline · Cập nhật ngày 17/10/2026 · phiên bản 1.2 (kỷ luật tài chính &amp; danh mục chứng khoán)</p>
 <p>FinPilot Offline là ứng dụng quản lý tài chính cá nhân chạy hoàn toàn trong trình duyệt của bạn. Ứng dụng <b>không có máy chủ</b>, không có hệ thống tài khoản riêng và không thu thập dữ liệu của người dùng.</p>
 <h2>1. Dữ liệu bạn nhập được lưu ở đâu</h2>
 <ul><li>Dữ liệu tài chính (tài khoản, giao dịch, ngân sách, tài sản, khoản nợ, mục tiêu…) được lưu trong bộ nhớ của trình duyệt trên thiết bị bạn đang dùng (IndexedDB/localStorage).</li>
 <li>Nếu bạn bật đồng bộ, một bản sao dữ liệu được lưu trong <b>thư mục ẩn dành riêng cho ứng dụng (appDataFolder)</b> trên Google Drive của chính bạn, để dùng chung giữa các thiết bị của bạn.</li>
+<li>Từ phiên bản 1.2, dữ liệu bạn nhập còn có thể gồm: danh mục chứng khoán (mã, khối lượng, giá vốn), quy tắc phân bổ thu nhập, các khoản "đã dành riêng" (khóa ảo), nhật ký cam kết (yêu cầu thay đổi quy tắc, rút quỹ) và lý do bạn chọn khi rút trước hạn. Các dữ liệu này được lưu và đồng bộ giống mọi dữ liệu khác ở trên. Ghi chú lý do tự động bị xóa sau 12 tháng và có thể xóa bất cứ lúc nào.</li>
 <li>Người phát hành ứng dụng <b>không có quyền truy cập</b> vào dữ liệu trong trình duyệt hay Google Drive của bạn.</li></ul>
 <h2>2. Dữ liệu người dùng Google mà ứng dụng truy cập</h2>
 <ul><li>Phạm vi quyền duy nhất: <code>https://www.googleapis.com/auth/drive.appdata</code> — xem, tạo và xóa dữ liệu cấu hình riêng của FinPilot trong Google Drive của bạn. Ứng dụng <b>không</b> đọc được bất kỳ tệp, thư mục, ảnh hay tài liệu nào khác trong Drive.</li>
 <li>Địa chỉ email tài khoản Google được đọc để gắn hồ sơ dữ liệu với đúng tài khoản, tránh trộn dữ liệu giữa nhiều người dùng chung một thiết bị. Email chỉ được lưu trong trình duyệt của bạn.</li>
 <li>Mã truy cập (access token) do Google cấp chỉ được lưu trong trình duyệt của bạn, có hiệu lực khoảng 1 giờ và chỉ được gửi tới máy chủ Google API.</li></ul>
 <h2>3. Cách ứng dụng sử dụng dữ liệu</h2>
-<p>Dữ liệu chỉ được dùng để hiển thị, tính toán báo cáo và đồng bộ giữa các thiết bị của chính bạn. Ứng dụng không bán, không chia sẻ, không chuyển giao dữ liệu cho bên thứ ba, không dùng cho quảng cáo, không dùng để huấn luyện mô hình AI và không có công cụ theo dõi/phân tích hành vi.</p>
+<p>Dữ liệu chỉ được dùng để hiển thị, tính toán báo cáo và đồng bộ giữa các thiết bị của chính bạn. Ứng dụng không bán dữ liệu, không dùng cho quảng cáo, không dùng để huấn luyện mô hình AI và không có công cụ theo dõi/phân tích hành vi. Ngoài Google, ngoại lệ duy nhất là tính năng <b>Cập nhật giá chứng khoán</b> (mục 4a): tính năng này tắt mặc định, chỉ hoạt động khi bạn tự bật cho hồ sơ của mình trên từng thiết bị, và chỉ gửi danh sách mã chứng khoán.</p>
 <p>Việc FinPilot sử dụng và chuyển giao thông tin nhận được từ Google API tuân thủ <a href="https://developers.google.com/terms/api-services-user-data-policy">Chính sách dữ liệu người dùng của Google API Services</a>, bao gồm các yêu cầu về Sử dụng giới hạn (Limited Use).</p>
 <h2>4. Kết nối mạng</h2>
-<p>Mã nguồn ứng dụng được tải từ GitHub Pages. Ngoài ra, ứng dụng chỉ kết nối mạng tới Google (đăng nhập và Google Drive API) khi bạn chủ động bật đồng bộ.</p>
+<p>Mã nguồn ứng dụng được tải từ GitHub Pages. Ứng dụng chỉ kết nối mạng tới: (1) Google (đăng nhập và Google Drive API), khi bạn bật đồng bộ; (2) máy chủ dữ liệu giá của Công ty Chứng khoán VPS (<code>bgapidatafeed.vps.com.vn</code>) và VNDirect (<code>dchart-api.vndirect.com.vn</code>), chỉ khi bạn bật "Cập nhật giá chứng khoán". Trang ứng dụng khai báo chính sách bảo mật nội dung (CSP) chặn mọi kết nối mạng khác.</p>
+<h2 id="4a">4a. Cập nhật giá chứng khoán</h2>
+<p>Khi bật, ứng dụng gửi tới VPS/VNDirect <b>danh sách mã chứng khoán</b> cần lấy giá. <b>Không gửi</b> khối lượng, giá vốn, giá trị danh mục, email hay bất kỳ dữ liệu tài chính nào khác. Như mọi kết nối internet, các máy chủ này cũng nhận được địa chỉ IP của bạn và địa chỉ trang ứng dụng. Việc xử lý dữ liệu đó tuân theo chính sách của VPS và VNDirect; FinPilot không có thỏa thuận nào với các công ty này.</p>
+<p>Đây là các nguồn dữ liệu <b>không chính thức, công khai</b>: giá có thể trễ, sai hoặc ngừng cung cấp bất cứ lúc nào. Giá chỉ mang tính tham khảo, không phải dữ liệu giao dịch chính thức, và không phải khuyến nghị đầu tư. Lựa chọn bật/tắt được lưu riêng cho từng hồ sơ trên từng thiết bị (không đồng bộ). Bạn có thể tắt tính năng này và nhập giá thủ công trong trang <i>Danh mục chứng khoán</i>. Khi nội dung mục này thay đổi, ứng dụng sẽ hỏi lại sự đồng ý của bạn.</p>
+<h2 id="4b">4b. Tệp lịch (.ics)</h2>
+<p>Phiên bản hiện tại chưa tạo tệp lịch. Khi có, tệp sẽ được tạo ngay trên thiết bị và mặc định chỉ chứa tiêu đề nhắc việc chung chung, không có số tiền hay tên mục tiêu.</p>
 <h2>5. Lưu giữ và xóa dữ liệu</h2>
 <ul><li>Xóa dữ liệu trên thiết bị: <i>Sao lưu &amp; dữ liệu → Xóa toàn bộ dữ liệu</i>, hoặc xóa dữ liệu trang web trong cài đặt trình duyệt.</li>
 <li>Xóa bản đồng bộ trên Google Drive: <i>Sao lưu &amp; dữ liệu → Xóa bản trên Drive</i>.</li>
+<li>Bộ nhớ đệm giá chứng khoán chỉ nằm trên thiết bị và bị xóa cùng dữ liệu cục bộ. Tắt "Cập nhật giá chứng khoán" sẽ dừng ngay mọi kết nối tới VPS/VNDirect.</li>
+<li>Ghi chú lý do rút trước hạn tự xóa sau 12 tháng; xóa thủ công bất cứ lúc nào ở trang <i>Kỷ luật tài chính → Nhật ký cam kết</i>.</li>
 <li>Thu hồi quyền truy cập Google của ứng dụng bất kỳ lúc nào tại <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li></ul>
 <h2>6. Bảo mật</h2>
 <p>Dữ liệu lưu cục bộ trong trình duyệt <b>không được mã hóa</b> bởi ứng dụng; người có quyền truy cập thiết bị hoặc hồ sơ trình duyệt của bạn có thể xem được. Hãy bảo vệ thiết bị bằng mật khẩu/khóa màn hình và chỉ dùng chung máy với người tin cậy.</p>
