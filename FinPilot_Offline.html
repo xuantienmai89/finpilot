@@ -473,6 +473,11 @@ body.privacy .money:hover{filter:none}
   .step-row .step-btns{grid-column:3;justify-content:flex-end}
   .disc-cta{flex-wrap:wrap}
 }
+/* Định giá của bạn (v1.3) */
+.section-label{font-weight:600;font-size:.9rem;margin-top:6px;padding-top:10px;border-top:1px solid var(--border)}
+.val-cell{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:0}
+.val-cell .tiny{white-space:normal;text-align:right;max-width:260px}
+@media (max-width:720px){.val-cell{align-items:flex-end}.val-cell .tiny{max-width:none}}
 
 </style>
 </head>
@@ -512,7 +517,7 @@ body.privacy .money:hover{filter:none}
    FinPilot Offline — CORE: hằng số, tiện ích, tiền tệ, ngày tháng, DOM helpers
    ========================================================================== */
 const APP_NAME = 'FinPilot Offline';
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const SCHEMA_VERSION = 2;
 const MAX_AMOUNT = 100000000000000; // 100 nghìn tỷ đồng / một khoản
 const TZ = 'Asia/Ho_Chi_Minh';
@@ -1262,7 +1267,10 @@ const Model = {
     r = Util.isObj(r) ? r : {};
     const opt = v => (Number.isSafeInteger(v) && v > 0 ? v : null);
     const tp = typeof r.targetPct === 'number' && Number.isFinite(r.targetPct) && r.targetPct >= 0 && r.targetPct <= 100 ? Math.round(r.targetPct * 10) / 10 : null;
-    return { id: this.s(r.id, 120), accountId: this.s(r.accountId, 80), symbol: this.s(r.symbol, 10).toUpperCase(), qty: r.qty, avgCost: opt(r.avgCost), targetPct: tp, manualPrice: opt(r.manualPrice), manualPriceAt: this.ts(r.manualPriceAt), note: this.s(r.note, 200), createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
+    return { id: this.s(r.id, 120), accountId: this.s(r.accountId, 80), symbol: this.s(r.symbol, 10).toUpperCase(), qty: r.qty, avgCost: opt(r.avgCost), targetPct: tp, manualPrice: opt(r.manualPrice), manualPriceAt: this.ts(r.manualPriceAt), note: this.s(r.note, 200),
+      fairValue: opt(r.fairValue), buyBelow: opt(r.buyBelow), valMethod: Portfolio.VAL_METHODS[r.valMethod] ? r.valMethod : '', valDate: DateUtil.isISO(r.valDate) ? r.valDate : '',
+      valLink: typeof r.valLink === 'string' && /^https:\/\/[^\s"'<>]+$/i.test(r.valLink.trim()) ? r.valLink.trim().slice(0, 300) : '', valNote: this.s(r.valNote, 300),
+      createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
   },
   settings(r) {
     const d = Defaults.settings(); r = Util.isObj(r) ? r : {};
@@ -1485,6 +1493,16 @@ const Validation = {
     if (!a) e.accountId = 'Chọn tài khoản chứng khoán.';
     else if (a.type !== 'investment') e.accountId = 'Danh mục phải gắn với tài khoản loại "Tài khoản đầu tư".';
     if (x.id && x.accountId && x.symbol && x.id !== `hld_${x.accountId}_${x.symbol}`) e.symbol = 'Mã định danh danh mục không khớp.';
+    const big = v => v !== null && v !== undefined && !(Number.isSafeInteger(v) && v > 0 && v <= 1e9);
+    if (big(x.fairValue)) e.fairValue = 'Giá trị hợp lý phải là số dương (đ/cp).';
+    if (big(x.buyBelow)) e.buyBelow = 'Vùng mua phải là số dương (đ/cp).';
+    // Quy tắc nhập liệu định giá chỉ áp khi người dùng nhập (strict) — không chặn nhập/đồng bộ dữ liệu cũ hoặc lệch đồng hồ.
+    if (o.strict) {
+      if (!e.buyBelow && x.buyBelow && !x.fairValue) e.buyBelow = 'Nhập giá trị hợp lý trước khi đặt vùng mua.';
+      else if (!e.buyBelow && x.buyBelow && x.fairValue && x.buyBelow > x.fairValue) e.buyBelow = 'Vùng mua phải ≤ giá trị hợp lý.';
+      if (x.fairValue && !DateUtil.isISO(x.valDate)) e.valDate = 'Cần ngày định giá để biết định giá còn mới hay đã cũ.';
+      else if (x.valDate && x.valDate > DateUtil.today()) e.valDate = 'Ngày định giá không được ở tương lai.';
+    }
     return e;
   },
   snapshot(s) {
@@ -2347,6 +2365,70 @@ const Portfolio = {
     const band = this.BANDS[market] || this.BANDS.HOSE;
     return ref < prevClose * (1 - band) - 1;
   },
+  /* ---------- Định giá của chính người dùng (FinPilot không tự định giá, không khuyến nghị) ---------- */
+  VAL_METHODS: { pe: 'P/E', pb: 'P/B', ddm: 'Chiết khấu cổ tức (DDM)', dcf: 'Chiết khấu dòng tiền (DCF)', sotp: 'Tổng các phần (SOTP/RNAV)', bank: 'Ngân hàng kết hợp (P/B-ROE · P/E · DDM)', blend: 'Kết hợp nhiều phương pháp', other: 'Khác' },
+  VAL_MAX_AGE: 180,
+  /** Hạn công bố BCTC quý gần nhất đã qua tính tới `today`: cuối quý + 45 ngày (hạn BCTC hợp nhất). */
+  latestReportDue(today) {
+    if (!DateUtil.isISO(today)) return '';
+    const [y] = DateUtil.ymd(today); let best = '';
+    for (const yy of [y - 1, y]) for (const [m, d] of [[3, 31], [6, 30], [9, 30], [12, 31]]) {
+      const due = DateUtil.addDays(DateUtil.make(yy, m, d), 45);
+      if (due <= today && due > best) best = due;
+    }
+    return best;
+  },
+  /** Tóm tắt định giá: biên an toàn = (giá trị hợp lý − giá) / giá trị hợp lý. null khi chưa nhập. */
+  valuation(h, price, today) {
+    if (!h || !Number.isSafeInteger(h.fairValue) || h.fairValue <= 0) return null;
+    const fair = h.fairValue; const buy = Number.isSafeInteger(h.buyBelow) && h.buyBelow > 0 ? h.buyBelow : null;
+    const p = Number.isSafeInteger(price) && price > 0 ? price : null;
+    const mos = p === null ? null : (fair - p) / fair;
+    const zone = p === null ? 'none' : buy !== null && p <= buy ? 'buy' : p <= fair ? 'below' : 'above';
+    const okDate = DateUtil.isISO(h.valDate) && DateUtil.isISO(today) && h.valDate <= today;
+    const ageDays = okDate ? DateUtil.diffDays(h.valDate, today) : null;
+    const due = this.latestReportDue(today);
+    const newerReport = okDate && !!due && h.valDate < due;
+    const stale = !okDate || ageDays > this.VAL_MAX_AGE || newerReport;
+    const reason = !okDate ? 'chưa có ngày định giá' : ageDays > this.VAL_MAX_AGE ? `đã ${ageDays} ngày (quá ${this.VAL_MAX_AGE})` : newerReport ? `có BCTC quý mới từ ${DateUtil.toVN(due)}` : '';
+    return { fair, buyBelow: buy, price: p, mos, zone, ageDays, stale, reason, method: this.VAL_METHODS[h.valMethod] ? h.valMethod : '' };
+  },
+  /** Tổng hợp: giá trị thị trường và giá trị theo định giá của bạn (chỉ các mã đã nhập định giá và có giá). */
+  valuationTotals(items) {
+    let market = 0, fair = 0, n = 0, stale = 0;
+    for (const it of items || []) {
+      const v = it && it.val; if (!v || v.price === null || !Number.isSafeInteger(it.qty) || it.qty <= 0) continue;
+      market += it.qty * v.price; fair += it.qty * v.fair; n++; if (v.stale) stale++;
+    }
+    return { n, stale, market, fair, ratio: fair > 0 ? market / fair : null };
+  },
+  /** Dán định giá: mỗi dòng "MÃ GIÁ_TRỊ_HỢP_LÝ [VÙNG_MUA] [YYYY-MM-DD|DD/MM/YYYY] [PHƯƠNG_PHÁP] [https://…]". */
+  parseValLines(text, today) {
+    const items = [], errors = [];
+    const toISO = s => { let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s); if (m && DateUtil.isISO(s)) return s; m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s); if (m) { const iso = DateUtil.make(+m[3], +m[2], +m[1]); return DateUtil.isISO(iso) ? iso : null; } return null; };
+    String(text || '').split(/\r?\n/).forEach((ln, i) => {
+      const raw = ln.trim(); if (!raw || raw.startsWith('#')) return;
+      const tok = raw.split(/[\s;|\t]+/).filter(Boolean);
+      const err = msg => errors.push({ line: i + 1, text: raw, msg });
+      const sym = (tok[0] || '').toUpperCase();
+      if (!this.SYM_RE.test(sym)) return err('Mã chứng khoán không hợp lệ');
+      const fair = this.parsePrice(tok[1]);
+      if (!Number.isSafeInteger(fair) || fair <= 0) return err('Giá trị hợp lý không hợp lệ');
+      const it = { symbol: sym, fairValue: fair, buyBelow: null, valDate: today, valMethod: '', valLink: '', line: i + 1 };
+      for (const t of tok.slice(2)) {
+        const iso = toISO(t);
+        if (iso) { if (iso > today) return err('Ngày định giá ở tương lai'); it.valDate = iso; continue; }
+        if (/^https:\/\/\S+$/i.test(t)) { it.valLink = t.slice(0, 300); continue; }
+        if (this.VAL_METHODS[t.toLowerCase()]) { it.valMethod = t.toLowerCase(); continue; }
+        const p = this.parsePrice(t);
+        if (Number.isSafeInteger(p) && p > 0 && it.buyBelow === null) { it.buyBelow = p; continue; }
+        return err(`Không hiểu "${t}"`);
+      }
+      if (it.buyBelow !== null && it.buyBelow > it.fairValue) return err('Vùng mua phải ≤ giá trị hợp lý');
+      items.push(it);
+    });
+    return { items, errors };
+  },
   /** Lệch tỷ trọng theo quy tắc 5/25: ngưỡng = min(5 điểm %, 25% của tỷ trọng mục tiêu). */
   drift(rows) {
     const total = rows.reduce((s, r) => s + (r.value > 0 ? r.value : 0), 0);
@@ -2815,20 +2897,23 @@ const PriceService = (() => {
 const Holdings = {
   id(accountId, sym) { return `hld_${accountId}_${sym}`; },
   rows(st) {
-    return memo(st, 'hold:' + PriceService.version, () => {
-      const acc = Util.byId(st.accounts);
+    return memo(st, 'hold:' + PriceService.version + ':' + DateUtil.today(), () => {
+      const acc = Util.byId(st.accounts); const today = DateUtil.today();
       const rows = (st.holdings || []).map(x => {
         const q = PriceService.quote(x.symbol);
         const pr = Portfolio.priceFor(x, q);
         const value = pr.price ? Portfolio.value(x.qty, pr.price) : 0;
         const cost = x.avgCost ? Portfolio.value(x.qty, x.avgCost) : null;
-        return { holding: x, account: acc.get(x.accountId) || null, quote: q, price: pr.price, priceSource: pr.source, value, cost, pnl: cost !== null && pr.price ? value - cost : null, fresh: pr.source === 'quote' || pr.source === 'VPS' || pr.source === 'VNDirect' ? PriceService.freshness(q) : pr.source, rightsSuspect: !!(q && q.rightsSuspect) };
+        return { holding: x, account: acc.get(x.accountId) || null, quote: q, price: pr.price, priceSource: pr.source, value, cost, pnl: cost !== null && pr.price ? value - cost : null, fresh: pr.source === 'quote' || pr.source === 'VPS' || pr.source === 'VNDirect' ? PriceService.freshness(q) : pr.source, rightsSuspect: !!(q && q.rightsSuspect),
+          // biên an toàn chỉ tính trên giá thị trường/giá nhập tay — không bao giờ trên giá vốn
+          val: Portfolio.valuation(x, pr.source === 'cost' || pr.source === 'none' ? null : pr.price, today) };
       });
       rows.sort((a, b) => b.value - a.value || (a.holding.symbol < b.holding.symbol ? -1 : 1));
       return rows;
     });
   },
   total(st) { return Util.sum(this.rows(st), r => r.value); },
+  valTotals(st) { return Portfolio.valuationTotals(this.rows(st).map(r => ({ qty: r.holding.qty, val: r.val }))); },
   symbols(st) { return Array.from(new Set((st.holdings || []).filter(x => x.qty > 0).map(x => x.symbol))); }
 };
 
@@ -5407,23 +5492,25 @@ Pages.portfolio = function (view) {
   const invAccs = st.accounts.filter(a => a.type === 'investment' && a.active);
   const on = PriceService.enabled();
   view.append(C.pageHead('Danh mục chứng khoán', 'Nhập mã + khối lượng để biết giá trị hiện tại; giá trị được cộng vào Tài sản ròng. Lấy giá tự động là tùy chọn và TẮT sẵn — chỉ danh sách mã được gửi tới nguồn giá.',
-    [C.btn('Dán / thêm danh mục', () => Pages.holdingPaste(), { icon: 'plus', cls: 'btn-primary' }), on ? C.btn('Cập nhật giá', () => Pages.refreshPrices(true), { icon: 'sync' }) : C.btn('Bật cập nhật giá…', () => Pages.priceConsent(), { icon: 'cloud' })]));
+    [C.btn('Dán / thêm danh mục', () => Pages.holdingPaste(), { icon: 'plus', cls: 'btn-primary' }), rows.length ? C.btn('Dán định giá', () => Pages.valuationPaste(), { icon: 'edit' }) : null, on ? C.btn('Cập nhật giá', () => Pages.refreshPrices(true), { icon: 'sync' }) : C.btn('Bật cập nhật giá…', () => Pages.priceConsent(), { icon: 'cloud' })].filter(Boolean)));
   if (!invAccs.length) view.append(C.callout('info', h('span', {}, 'Danh mục cần gắn với một tài khoản loại "Tài khoản đầu tư" (tài khoản chứng khoán của bạn). ', h('a', { href: '#', onclick: e => { e.preventDefault(); Forms.openAccount(); } }, 'Tạo tài khoản'))));
   if (PriceService.needsReconsent()) view.append(C.callout('alert', h('span', {}, 'Nội dung về nguồn giá đã thay đổi — cần bạn đồng ý lại trước khi lấy giá. ', h('a', { href: '#', onclick: e => { e.preventDefault(); Pages.priceConsent(); } }, 'Xem & đồng ý')), 'warn'));
   if (rows.length && st.assets.some(a => a.group === 'securities' && Ledger.assetValue(a, DateUtil.today()) > 0)) view.append(C.callout('alert', 'Bạn có tài sản nhập tay nhóm "Chứng khoán / đầu tư". Nếu đó chính là danh mục này, hãy xóa hoặc đổi tài sản đó để tài sản ròng không bị tính trùng.', 'warn'));
+  const vt = Holdings.valTotals(st); const anyVal = rows.some(r => r.holding.fairValue);
   const cost = Util.sum(rows.filter(r => r.cost !== null && r.price), r => r.cost); const pnl = Util.sum(rows.filter(r => r.pnl !== null), r => r.pnl);
   const fetched = rows.map(r => r.quote && r.quote.fetchedAt).filter(Boolean).sort().slice(-1)[0];
   view.append(h('div', { class: 'kpi-grid' },
     C.kpi({ label: 'Giá trị danh mục', value: C.money(total), sub: `${rows.filter(r => r.holding.qty > 0).length} mã · đã cộng vào tài sản ròng`, icon: 'layers', featured: true }),
     C.kpi({ label: 'Lãi/lỗ so với giá vốn', value: cost ? C.money(pnl, { sign: true, tone: 'auto' }) : '—', sub: cost ? `Giá vốn ${Money.compact(cost)} · chưa gồm phí, thuế` : 'Nhập giá vốn để theo dõi', icon: 'trendUp' }),
-    C.kpi({ label: 'Nguồn giá', value: on ? 'Đang bật' : 'Tắt', sub: on ? (fetched ? 'Lần lấy gần nhất ' + DateUtil.dateTimeVN(fetched) : 'Chưa lấy giá') : 'Đang dùng giá nhập tay / giá vốn', icon: on ? 'cloud' : 'cloudOff' })));
+    C.kpi({ label: 'Nguồn giá', value: on ? 'Đang bật' : 'Tắt', sub: on ? (fetched ? 'Lần lấy gần nhất ' + DateUtil.dateTimeVN(fetched) : 'Chưa lấy giá') : 'Đang dùng giá nhập tay / giá vốn', icon: on ? 'cloud' : 'cloudOff' }),
+    vt.n ? C.kpi({ label: 'So với định giá của bạn', value: `${Util.fmtPct(vt.ratio * 100, 0)} giá trị hợp lý`, sub: `${vt.n} mã · thị trường ${Money.compact(vt.market)} / định giá ${Money.compact(vt.fair)}${vt.stale ? ` · ${vt.stale} định giá cần cập nhật` : ''}`, icon: 'target' }) : null));
   if (!rows.length) { view.append(C.card(null, C.empty('layers', 'Chưa có mã nào', 'Dán từ app công ty chứng khoán: mỗi dòng "MÃ KHỐI_LƯỢNG GIÁ_VỐN", VD: FPT 1000 95.5', [C.btn('Dán / thêm danh mục', () => Pages.holdingPaste(), { icon: 'plus', cls: 'btn-primary' })]))); return; }
   const drift = Portfolio.drift(rows.map(r => ({ key: r.holding.id, value: r.value, targetPct: r.holding.targetPct })));
   const dmap = new Map(drift.map(d => [d.key, d])); const anyTarget = drift.some(d => d.target !== null);
   const allFresh = rows.every(r => r.fresh === 'fresh' || r.fresh === 'manual' || r.fresh === 'cost' || r.holding.qty === 0);
   const freshTxt = r => r.priceSource === 'manual' ? 'nhập tay' : r.priceSource === 'cost' ? 'giá vốn (chưa có giá)' : r.priceSource === 'none' ? 'chưa có giá' : PriceService.label(r.quote);
   view.append(C.card('Danh mục', h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' },
-    h('thead', {}, h('tr', {}, h('th', {}, 'Mã'), h('th', { class: 'num' }, 'Khối lượng'), h('th', { class: 'num' }, 'Giá'), h('th', { class: 'num' }, 'Giá trị'), h('th', { class: 'num' }, 'Lãi/lỗ'), anyTarget ? h('th', { class: 'num' }, 'Tỷ trọng / mục tiêu') : null, h('th', {}, ''))),
+    h('thead', {}, h('tr', {}, h('th', {}, 'Mã'), h('th', { class: 'num' }, 'Khối lượng'), h('th', { class: 'num' }, 'Giá'), h('th', { class: 'num' }, 'Giá trị'), h('th', { class: 'num' }, 'Lãi/lỗ'), anyTarget ? h('th', { class: 'num' }, 'Tỷ trọng / mục tiêu') : null, anyVal ? h('th', { class: 'num' }, 'Định giá của bạn') : null, h('th', {}, ''))),
     h('tbody', {}, rows.map(r => {
       const d = dmap.get(r.holding.id);
       return h('tr', {}, h('td', { class: 'td-main' }, h('div', { class: 'cell-main', text: r.holding.symbol }), h('div', { class: 'cell-sub', text: r.account ? r.account.name : '?' }), r.rightsSuspect ? h('div', {}, C.badge('Nghi sự kiện quyền — kiểm tra khối lượng', 'amber'), ' ', h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => { PriceService.clearRightsFlag(r.holding.symbol); App.render(); } }, 'Đã kiểm tra')) : null),
@@ -5432,13 +5519,62 @@ Pages.portfolio = function (view) {
         h('td', { class: 'num', dataset: { label: 'Giá trị' } }, C.money(r.value)),
         h('td', { class: 'num', dataset: { label: 'Lãi/lỗ' } }, r.pnl === null ? '—' : C.money(r.pnl, { sign: true, tone: 'auto' })),
         anyTarget ? h('td', { class: 'num', dataset: { label: 'Tỷ trọng' } }, `${Util.fmtPct(d.actual, 1)}${d.target !== null ? ' / ' + Util.fmtPct(d.target, 1) : ''}`, d.flag && allFresh ? h('div', { class: 'tiny warn-text', text: `lệch ${d.diff > 0 ? '+' : ''}${d.diff.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} điểm %` }) : null) : null,
+        anyVal ? h('td', { class: 'num', dataset: { label: 'Định giá của bạn' } }, Pages.valCell(r)) : null,
         h('td', { class: 'actions' }, C.iconBtn('plus', 'Ghi lệnh mua', () => Pages.holdingBuy(r.holding)), C.iconBtn('edit', 'Sửa', () => Pages.holdingEdit(r.holding)), C.iconBtn('trash', 'Xóa', () => Pages.holdingDelete(r.holding), 'danger')));
-    })))), { sub: 'Giá chỉ mang tính tham khảo, từ nguồn công khai không chính thức (có thể trễ/sai). Không phải khuyến nghị đầu tư.' }));
+    })))), { sub: 'Giá chỉ mang tính tham khảo, từ nguồn công khai không chính thức (có thể trễ/sai). Không phải khuyến nghị đầu tư.' + (anyVal ? ' Cột "Định giá của bạn" là số do chính bạn nhập — FinPilot không tự định giá và không khuyến nghị mua/bán.' : '') }));
   if (anyTarget) {
     const flagged = drift.filter(d => d.flag);
     view.append(C.card('Tỷ trọng', h('div', { class: 'small' }, !allFresh ? 'Có giá cũ — chưa đánh giá độ lệch. Hãy cập nhật giá.' : flagged.length ? `${flagged.length} mã đang lệch so với tỷ trọng bạn đặt (ngưỡng 5/25: 5 điểm % hoặc 25% của tỷ trọng mục tiêu). Cân nhắc dồn các kỳ đầu tư định kỳ tới vào phần đang thiếu tỷ trọng thay vì bán.` : 'Tỷ trọng đang nằm trong dải cho phép so với mục tiêu bạn đặt.'), { sub: 'Đây là so sánh với chính tỷ trọng bạn tự đặt — không phải lời khuyên mua/bán.' }));
   }
   if (on && rows.some(r => r.fresh === 'stale' || r.fresh === 'none')) lateRender(() => Pages.refreshPrices(false));
+};
+/** Ô "Định giá của bạn": giá trị hợp lý · biên an toàn · vùng · độ mới. Chỉ mô tả, không khuyến nghị. */
+Pages.valCell = function (r) {
+  const v = r.val;
+  if (!v) return h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => Pages.holdingEdit(r.holding) }, 'Thêm');
+  const pct = x => Util.fmtPct(Math.abs(x) * 100, 1);
+  const line = v.price === null ? 'Chưa có giá thị trường để so' : v.mos >= 0 ? `Biên an toàn ${pct(v.mos)}` : `Giá cao hơn định giá ${pct(v.price / v.fair - 1)}`;
+  const zone = { buy: C.badge('≤ vùng mua bạn đặt', 'green'), below: C.badge('Dưới giá trị hợp lý', 'blue'), above: C.badge('Trên giá trị hợp lý', 'amber') }[v.zone] || null;
+  const x = r.holding;
+  return h('div', { class: 'val-cell' },
+    h('div', { class: 'cell-main', text: Money.num(v.fair) }),
+    h('div', { class: 'tiny muted', text: line + (v.buyBelow ? ` · vùng mua ≤ ${Money.num(v.buyBelow)}` : '') }),
+    zone ? h('div', {}, zone) : null,
+    h('div', { class: 'tiny ' + (v.stale ? 'warn-text' : 'muted') }, (v.method ? Portfolio.VAL_METHODS[v.method] + ' · ' : '') + (x.valDate ? DateUtil.toVN(x.valDate) : 'chưa có ngày') + (v.stale ? ` — ${v.reason}, nên định giá lại` : ''),
+      x.valLink ? h('span', {}, ' · ', h('a', { href: x.valLink, target: '_blank', rel: 'noopener noreferrer' }, 'báo cáo')) : null));
+};
+Pages.valuationPaste = function () {
+  const st = App.state; const today = DateUtil.today();
+  const ta = h('textarea', { rows: 6, placeholder: 'ACB 22900 18300 17/10/2026 bank\nTMP 43.1 36.5 09/10/2026 sotp\nTBC 26100 20900 17/10/2026 blend', 'aria-label': 'Định giá dán vào' });
+  const prev = h('div', { class: 'small mt-8' });
+  const syms = new Set((st.holdings || []).map(x => x.symbol));
+  const parse = () => {
+    const r = Portfolio.parseValLines(ta.value, today);
+    const miss = r.items.filter(i => !syms.has(i.symbol)).map(i => i.symbol);
+    prev.replaceChildren(r.items.length ? h('div', {}, `${r.items.length} dòng hợp lệ: `, r.items.map(i => `${i.symbol} ${Money.num(i.fairValue)}${i.buyBelow ? ' (mua ≤ ' + Money.num(i.buyBelow) + ')' : ''} · ${DateUtil.toVN(i.valDate)}`).join(' · ')) : null,
+      miss.length ? h('div', { class: 'warn-text' }, `Chưa có trong danh mục, sẽ bỏ qua: ${miss.join(', ')}`) : null,
+      r.errors.length ? h('div', { class: 'warn-text' }, r.errors.map(e => `Dòng ${e.line}: ${e.msg} ("${e.text}")`).join('\n')) : null);
+    return r;
+  };
+  ta.addEventListener('input', parse);
+  const body = h('div', {}, F.field('Mỗi dòng: MÃ GIÁ_TRỊ_HỢP_LÝ [VÙNG_MUA] [NGÀY] [PHƯƠNG_PHÁP] [LIÊN_KẾT]', ta, { full: true, hint: 'Giá: 22900 hoặc 22.9 (nghìn đồng). Ngày: DD/MM/YYYY, bỏ trống = hôm nay. Phương pháp: pe, pb, ddm, dcf, sotp, bank, blend, other. Liên kết bắt đầu bằng https://. Áp dụng cho mã đó ở mọi tài khoản.' }), prev);
+  let m;
+  const save = async () => {
+    const r = parse(); const ok = r.items.filter(i => syms.has(i.symbol)); if (!ok.length) return;
+    const now = Util.nowISO(); let n = 0;
+    try {
+      await App.commit('Cập nhật định giá', d => {
+        for (const it of ok) d.holdings.forEach((x, i) => {
+          if (x.symbol !== it.symbol) return;
+          const rec = Model.holding({ ...x, fairValue: it.fairValue, buyBelow: it.buyBelow, valDate: it.valDate, valMethod: it.valMethod || x.valMethod, valLink: it.valLink || x.valLink, updatedAt: now });
+          const e = Validation.holding(rec, d, { strict: true }); if (Object.keys(e).length) throw new AppError(`${it.symbol}: ${Validation.first(e)}`);
+          d.holdings[i] = rec; n++;
+        });
+      });
+      m.close(); Toast.show(`Đã lưu định giá cho ${n} dòng danh mục.`, { type: 'success' });
+    } catch (e) { Toast.show(e.message, { type: 'error' }); }
+  };
+  m = Modal.open({ title: 'Dán định giá của bạn', body, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'button', onclick: save }, 'Lưu định giá')] });
 };
 Pages.refreshPrices = async function (force) {
   if (!PriceService.enabled()) return Pages.priceConsent();
@@ -5505,21 +5641,35 @@ Pages.holdingEdit = function (x) {
     F.field('Khối lượng', F.input('qty', Money.num(x.qty), { inputmode: 'numeric' }), { name: 'qty', required: true }),
     F.field('Giá vốn bình quân (đ/cp)', F.money('avgCost', x.avgCost), { name: 'avgCost' }),
     F.field('Giá nhập tay (đ/cp)', F.money('manualPrice', x.manualPrice), { name: 'manualPrice', hint: 'Dùng khi tắt lấy giá hoặc nguồn giá lỗi.' }),
-    F.field('Tỷ trọng mục tiêu (%)', F.input('targetPct', x.targetPct === null ? '' : String(x.targetPct).replace('.', ','), { inputmode: 'decimal', placeholder: 'VD: 30' }), { name: 'targetPct', hint: 'Tùy chọn — để so với tỷ trọng thực tế.' })), fe);
+    F.field('Tỷ trọng mục tiêu (%)', F.input('targetPct', x.targetPct === null ? '' : String(x.targetPct).replace('.', ','), { inputmode: 'decimal', placeholder: 'VD: 30' }), { name: 'targetPct', hint: 'Tùy chọn — để so với tỷ trọng thực tế.' }),
+    h('div', { class: 'field full' }, h('div', { class: 'section-label', text: 'Định giá của bạn (tùy chọn)' }), h('div', { class: 'field-hint', text: 'Số bạn tự định giá (VD từ báo cáo phân tích của bạn). FinPilot chỉ so với giá thị trường để hiện biên an toàn — không tự định giá, không khuyến nghị.' })),
+    F.field('Giá trị hợp lý (đ/cp)', F.money('fairValue', x.fairValue), { name: 'fairValue' }),
+    F.field('Vùng mua của bạn (≤ đ/cp)', F.money('buyBelow', x.buyBelow), { name: 'buyBelow', hint: 'VD: giá trị hợp lý × 80% nếu bạn đòi biên an toàn 20%.' }),
+    F.field('Phương pháp', F.select('valMethod', [{ value: '', label: '— Chọn —' }].concat(Object.entries(Portfolio.VAL_METHODS).map(([value, label]) => ({ value, label }))), x.valMethod || ''), { name: 'valMethod' }),
+    F.field('Ngày định giá', F.date('valDate', x.valDate || (x.fairValue ? '' : DateUtil.today())), { name: 'valDate', hint: 'Báo "nên định giá lại" khi quá 180 ngày hoặc đã có BCTC quý mới.' }),
+    F.field('Liên kết báo cáo (https://…)', F.input('valLink', x.valLink, { inputmode: 'url', placeholder: 'https://' }), { name: 'valLink', full: true }),
+    F.field('Ghi chú định giá', F.textarea('valNote', x.valNote, { maxlength: 300 }), { name: 'valNote', full: true })), fe);
   let m;
   form.addEventListener('submit', async e => {
     e.preventDefault(); F.clearErrors(form); const errs = {};
     const qty = Portfolio.parseQty(F.val(form, 'qty')); if (!Number.isSafeInteger(qty)) errs.qty = 'Khối lượng phải là số nguyên.';
     const ac = F.moneyVal(form, 'avgCost', { allowEmpty: true }); if (!ac.ok) errs.avgCost = ac.error;
     const mp = F.moneyVal(form, 'manualPrice', { allowEmpty: true }); if (!mp.ok) errs.manualPrice = mp.error;
+    const fv = F.moneyVal(form, 'fairValue', { allowEmpty: true }); if (!fv.ok) errs.fairValue = fv.error;
+    const bb = F.moneyVal(form, 'buyBelow', { allowEmpty: true }); if (!bb.ok) errs.buyBelow = bb.error;
+    const vdRaw = F.val(form, 'valDate').trim(); const vd = vdRaw ? F.dateVal(form, 'valDate') : ''; if (vdRaw && !vd) errs.valDate = 'Ngày không hợp lệ. Nhập theo dạng DD/MM/YYYY.';
+    const vl = F.val(form, 'valLink').trim(); if (vl && !/^https:\/\/[^\s"'<>]+$/i.test(vl)) errs.valLink = 'Chỉ nhận liên kết bắt đầu bằng https://';
     const tRaw = F.val(form, 'targetPct').trim(); const tp = tRaw === '' ? null : Number(tRaw.replace(',', '.')); if (tp !== null && !(Number.isFinite(tp) && tp >= 0 && tp <= 100)) errs.targetPct = 'Từ 0 đến 100.';
     if (Object.keys(errs).length) return F.showErrors(form, errs);
     const now = Util.nowISO();
-    const rec = Model.holding({ ...x, qty, avgCost: ac.value, manualPrice: mp.value, manualPriceAt: mp.value && mp.value !== x.manualPrice ? now : x.manualPriceAt, targetPct: tp, updatedAt: now });
+    const rec = Model.holding({ ...x, qty, avgCost: ac.value, manualPrice: mp.value, manualPriceAt: mp.value && mp.value !== x.manualPrice ? now : x.manualPriceAt, targetPct: tp,
+      fairValue: fv.value, buyBelow: fv.value ? bb.value : null, valMethod: F.val(form, 'valMethod'), valDate: fv.value ? vd || '' : '', valLink: vl, valNote: F.val(form, 'valNote'), updatedAt: now });
+    const ve = Validation.holding(rec, App.state, { strict: true }); const vk = ['fairValue', 'buyBelow', 'valDate'].filter(k => ve[k]);
+    if (vk.length) return F.showErrors(form, Object.fromEntries(vk.map(k => [k, ve[k]])));
     try { await App.commit('Sửa danh mục', d => { const i = d.holdings.findIndex(y => y.id === x.id); if (i < 0) throw new AppError('Mã không còn tồn tại.'); d.holdings[i] = rec; }); m.close(); }
     catch (err) { fe.textContent = err.message; }
   });
-  m = Modal.open({ title: 'Sửa ' + x.symbol, body: form, size: 'sm', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'hold-form' }, 'Lưu')] });
+  m = Modal.open({ title: 'Sửa ' + x.symbol, body: form, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'hold-form' }, 'Lưu')] });
 };
 Pages.holdingBuy = function (x) {
   const q = PriceService.quote(x.symbol);
@@ -5899,7 +6049,7 @@ window.FinPilot = Object.freeze({
   totals: (from, to) => Ledger.totals(App.state, from, to),
   current: () => { const c = Ledger.current(App.state); return { cash: c.cash, totalAssets: c.totalAssets, liabilities: c.liabilities, netWorth: c.netWorth, balances: Object.fromEntries(c.balances), debts: Object.fromEntries(c.debtBalances) }; },
   integrity: () => Validation.integrity(App.state),
-  _internal: { App, Ledger, Validation, MergeService, ImportExport, Recurring, DateUtil, Money, SyncService, StorageService, Discipline, TrustedClock, CommitLog, Alloc, Model, Goals, Holdings: typeof Holdings !== 'undefined' ? Holdings : null, PriceService: typeof PriceService !== 'undefined' ? PriceService : null, Pages }
+  _internal: { App, Ledger, Validation, MergeService, ImportExport, Recurring, DateUtil, Money, SyncService, StorageService, Discipline, TrustedClock, CommitLog, Alloc, Model, Goals, Holdings: typeof Holdings !== 'undefined' ? Holdings : null, PriceService: typeof PriceService !== 'undefined' ? PriceService : null, Pages, Portfolio }
 });
 
 installTouchIcon();
