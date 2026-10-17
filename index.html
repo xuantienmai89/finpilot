@@ -5551,9 +5551,9 @@ Pages.valuationPaste = function () {
   const parse = () => {
     const r = Portfolio.parseValLines(ta.value, today);
     const miss = r.items.filter(i => !syms.has(i.symbol)).map(i => i.symbol);
-    prev.replaceChildren(r.items.length ? h('div', {}, `${r.items.length} dòng hợp lệ: `, r.items.map(i => `${i.symbol} ${Money.num(i.fairValue)}${i.buyBelow ? ' (mua ≤ ' + Money.num(i.buyBelow) + ')' : ''} · ${DateUtil.toVN(i.valDate)}`).join(' · ')) : null,
+    prev.replaceChildren(...[r.items.length ? h('div', {}, `${r.items.length} dòng hợp lệ: `, r.items.map(i => `${i.symbol} ${Money.num(i.fairValue)}${i.buyBelow ? ' (mua ≤ ' + Money.num(i.buyBelow) + ')' : ''} · ${DateUtil.toVN(i.valDate)}`).join(' · ')) : null,
       miss.length ? h('div', { class: 'warn-text' }, `Chưa có trong danh mục, sẽ bỏ qua: ${miss.join(', ')}`) : null,
-      r.errors.length ? h('div', { class: 'warn-text' }, r.errors.map(e => `Dòng ${e.line}: ${e.msg} ("${e.text}")`).join('\n')) : null);
+      r.errors.length ? h('div', { class: 'warn-text' }, r.errors.map(e => `Dòng ${e.line}: ${e.msg} ("${e.text}")`).join('\n')) : null].filter(Boolean));
     return r;
   };
   ta.addEventListener('input', parse);
@@ -5609,7 +5609,7 @@ Pages.holdingPaste = function () {
   const prev = h('div', { class: 'small mt-8' });
   const parse = () => {
     const r = Portfolio.parseLines(ta.value);
-    prev.replaceChildren(r.items.length ? h('div', {}, `${r.items.length} mã hợp lệ: `, r.items.map(i => `${i.symbol} ${Money.num(i.qty)}${i.avgCost ? ' @' + Money.num(i.avgCost) : ''}`).join(' · ')) : null, r.errors.length ? h('div', { class: 'warn-text' }, r.errors.map(e => `Dòng ${e.line}: ${e.msg} ("${e.text}")`).join('\n')) : null);
+    prev.replaceChildren(...[r.items.length ? h('div', {}, `${r.items.length} mã hợp lệ: `, r.items.map(i => `${i.symbol} ${Money.num(i.qty)}${i.avgCost ? ' @' + Money.num(i.avgCost) : ''}`).join(' · ')) : null, r.errors.length ? h('div', { class: 'warn-text' }, r.errors.map(e => `Dòng ${e.line}: ${e.msg} ("${e.text}")`).join('\n')) : null].filter(Boolean));
     return r;
   };
   ta.addEventListener('input', parse);
