@@ -531,11 +531,14 @@ body.privacy .money:hover{filter:none}
    FinPilot Offline — CORE: hằng số, tiện ích, tiền tệ, ngày tháng, DOM helpers
    ========================================================================== */
 const APP_NAME = 'FinPilot Offline';
-const APP_VERSION = '1.4.0';
-const SCHEMA_VERSION = 3; // v3 (FinPilot 1.4): lớp tài sản trên tài khoản/tài sản/mã, cờ thu nhập thụ động, loại lãi suất nợ, nhóm ngoại tệ, kế hoạch lớp
+const APP_VERSION = '1.5.0';
+const SCHEMA_VERSION = 4; // v4 (1.5): ngân sách "Tất cả chi tiêu" (categoryId __all__). v3 v3 (FinPilot 1.4): lớp tài sản trên tài khoản/tài sản/mã, cờ thu nhập thụ động, loại lãi suất nợ, nhóm ngoại tệ, kế hoạch lớp
 const MAX_AMOUNT = 100000000000000; // 100 nghìn tỷ đồng / một khoản
 const TZ = 'Asia/Ho_Chi_Minh';
 const INTEREST_CAT_ID = 'cat_exp_interest';
+/** Ngân sách tổng: hạn mức cho TẤT CẢ chi tiêu trong tháng (mọi danh mục). */
+const BUDGET_ALL = '__all__';
+const BUDGET_ALL_LABEL = 'Tất cả chi tiêu';
 const TOMBSTONE_TTL_DAYS = 400;
 
 const TXN_TYPES = {
@@ -1437,11 +1440,11 @@ const Validation = {
   budget(b, st, o = {}) {
     const e = {}; const ctx = o.ctx || this.ctx(st);
     if (!DateUtil.isMonthKey(b.month)) e.month = 'Tháng áp dụng không hợp lệ.';
-    const c = ctx.cat.get(b.categoryId);
+    const c = b.categoryId === BUDGET_ALL ? { kind: 'expense' } : ctx.cat.get(b.categoryId);
     if (!c) e.categoryId = 'Vui lòng chọn danh mục chi tiêu.';
     else if (c.kind !== 'expense') e.categoryId = 'Ngân sách chỉ áp dụng cho danh mục chi tiêu.';
     if (!this.amt(b.limit)) e.limit = 'Hạn mức phải là số nguyên dương.';
-    if (!o.skipUnique && !e.month && !e.categoryId && st.budgets.some(x => x.id !== b.id && x.month === b.month && x.categoryId === b.categoryId)) e.categoryId = 'Danh mục này đã có ngân sách trong tháng.';
+    if (!o.skipUnique && !e.month && !e.categoryId && st.budgets.some(x => x.id !== b.id && x.month === b.month && x.categoryId === b.categoryId)) e.categoryId = b.categoryId === BUDGET_ALL ? 'Tháng này đã có ngân sách "Tất cả chi tiêu".' : 'Danh mục này đã có ngân sách trong tháng.';
     return e;
   },
   asset(a, o = {}) {
@@ -1772,7 +1775,8 @@ const Budget = {
     return memo(st, 'bud:' + month, () => {
       const spent = Ledger.byCategory(st, 'expense', DateUtil.monthStart(month), DateUtil.monthEnd(month));
       const cats = Util.byId(st.categories);
-      const rows = st.budgets.filter(b => b.month === month).map(b => {
+      const allB = st.budgets.find(b => b.month === month && b.categoryId === BUDGET_ALL) || null;
+      const rows = st.budgets.filter(b => b.month === month && b.categoryId !== BUDGET_ALL).map(b => {
         const s = (spent.get(b.categoryId) || { amount: 0 }).amount;
         const pct = b.limit > 0 ? s / b.limit * 100 : null;
         return { budget: b, cat: cats.get(b.categoryId), limit: b.limit, spent: s, remaining: b.limit - s, pct, status: this.status(pct) };
@@ -1782,7 +1786,14 @@ const Budget = {
       for (const [cid, v] of spent) if (!budgeted.has(cid)) unbudgeted.push({ cat: cats.get(cid), categoryId: cid, spent: v.amount, count: v.count });
       unbudgeted.sort((a, b) => b.spent - a.spent);
       const limit = Util.sum(rows, r => r.limit), used = Util.sum(rows, r => r.spent);
-      return { month, rows, unbudgeted, limit, spent: used, remaining: limit - used, pct: limit > 0 ? used / limit * 100 : null, overCount: rows.filter(r => r.status === 'over').length };
+      // Ngân sách "Tất cả chi tiêu": đã chi = mọi khoản chi trong tháng, kể cả danh mục không có ngân sách riêng.
+      let totalSpent = 0; for (const v of spent.values()) totalSpent += v.amount;
+      const mk = (lim, s) => { const p = lim > 0 ? s / lim * 100 : null; return { limit: lim, spent: s, remaining: lim - s, pct: p, status: this.status(p) }; };
+      const all = allB ? { budget: allB, ...mk(allB.limit, totalSpent) } : null;
+      const catPart = rows.length ? mk(limit, used) : null;
+      // Số "đầu bảng" dùng ở Tổng quan / Báo cáo: ưu tiên ngân sách tổng nếu có.
+      const headline = all ? { ...mk(all.limit, totalSpent), scope: 'all' } : catPart ? { ...catPart, scope: 'categories' } : null;
+      return { month, rows, unbudgeted, all, headline, totalSpent, limit, spent: used, remaining: limit - used, pct: limit > 0 ? used / limit * 100 : null, overCount: rows.filter(r => r.status === 'over').length, allOver: !!(all && all.status === 'over') };
     });
   }
 };
@@ -1943,6 +1954,7 @@ const Insights = {
     const today = DateUtil.today();
     const bm = DateUtil.monthKey(p.to < today ? p.to : (p.from > today ? p.from : today));
     const bu = Budget.usage(st, bm);
+    if (bu.all && (bu.all.status === 'over' || bu.all.status === 'full' || bu.all.status === 'warn')) out.push({ level: bu.all.status === 'over' ? 'bad' : 'warn', icon: 'alert', title: bu.all.status === 'over' ? `Tổng chi tiêu vượt hạn mức tháng (${Util.fmtPct(bu.all.pct, 0)})` : `Tổng chi tiêu đã dùng ${Util.fmtPct(bu.all.pct, 0)} hạn mức tháng`, text: `${Money.format(bu.all.spent)} / ${Money.format(bu.all.limit)} cho tất cả chi tiêu.`, basis: DateUtil.monthLabel(bm) });
     const over = bu.rows.filter(r => r.status === 'over');
     if (over.length) out.push({ level: 'bad', icon: 'alert', title: `${over.length} ngân sách vượt hạn mức`, text: over.slice(0, 3).map(r => `${r.cat ? r.cat.name : '?'} (${Util.fmtPct(r.pct, 0)})`).join(', ') + (over.length > 3 ? '…' : ''), basis: DateUtil.monthLabel(bm) });
     else if (bu.rows.length) { const warn = bu.rows.filter(r => r.status === 'warn' || r.status === 'full'); if (warn.length) out.push({ level: 'warn', icon: 'pie', title: `${warn.length} ngân sách sắp chạm hạn mức`, text: warn.slice(0, 3).map(r => `${r.cat ? r.cat.name : '?'} (${Util.fmtPct(r.pct, 0)})`).join(', '), basis: DateUtil.monthLabel(bm) }); }
@@ -4125,12 +4137,15 @@ const Forms = {
     const st = App.state; const editing = !!budget;
     const used = new Set(st.budgets.filter(b => b.month === month && (!budget || b.id !== budget.id)).map(b => b.categoryId));
     const opts = st.categories.filter(c => c.kind === 'expense' && (c.active || (budget && budget.categoryId === c.id)) && !used.has(c.id)).map(c => ({ value: c.id, label: (c.icon ? c.icon + ' ' : '') + c.name }));
-    if (!opts.length) return Toast.show('Tất cả danh mục chi tiêu đã có ngân sách trong tháng này.', { type: 'info' });
+    if (!used.has(BUDGET_ALL)) opts.unshift({ value: BUDGET_ALL, label: '🧾 ' + BUDGET_ALL_LABEL + ' (tổng cả tháng)' });
+    if (!opts.length) return Toast.show('Tháng này đã có ngân sách tổng và ngân sách cho mọi danh mục chi tiêu.', { type: 'info' });
+    const bu0 = Budget.usage(st, month);
     const form = h('form', { novalidate: true, id: 'bud-form' }); const fe = F.formError();
     form.append(h('div', { class: 'form-grid' },
       F.field('Tháng áp dụng', F.input('month_label', DateUtil.monthLabel(month), { disabled: true }), { name: 'month' }),
       F.field('Danh mục chi tiêu', F.select('categoryId', opts, budget ? budget.categoryId : (presetCat && opts.some(o => o.value === presetCat) ? presetCat : opts[0].value), { disabled: editing }), { required: true, name: 'categoryId' }),
-      F.field('Hạn mức', F.money('limit', budget ? budget.limit : null, { autofocus: true }), { required: true, name: 'limit', full: true })), fe);
+      F.field('Hạn mức', F.money('limit', budget ? budget.limit : null, { autofocus: true }), { required: true, name: 'limit', full: true, hint: 'Chọn "Tất cả chi tiêu" để đặt một hạn mức cho tổng chi cả tháng (mọi danh mục). Có thể dùng cùng lúc với hạn mức từng danh mục.' }),
+      h('div', { class: 'field full small muted', text: `Tháng này đã chi ${Money.format(bu0.totalSpent)} (tất cả danh mục)${bu0.rows.length ? ` · hạn mức các danh mục riêng: ${Money.format(bu0.limit)}` : ''}.` })), fe);
     let m;
     form.addEventListener('submit', async e => {
       e.preventDefault(); F.clearErrors(form);
@@ -4408,7 +4423,7 @@ Pages.dashboard = function (view) {
     C.kpi({ label: 'Chi tiêu', value: C.money(tot.expense, { tone: 'neg' }), sub: `${tot.expenseCount} khoản chi (gồm lãi vay)`, icon: 'trendDown' }),
     C.kpi({ label: 'Dòng tiền ròng', value: C.money(tot.net, { sign: true, tone: 'auto' }), sub: 'Thu nhập − Chi tiêu (không gồm chuyển khoản, gốc vay)', icon: 'swap' }),
     C.kpi({ label: 'Tỷ lệ tiết kiệm', value: tot.savingsRate === null ? '—' : Util.fmtPct(tot.savingsRate), sub: tot.savingsRate === null ? 'Chưa có thu nhập trong kỳ' : `Mục tiêu ${st.settings.savingsRateTarget}%`, icon: 'coins', tone: tot.savingsRate === null ? '' : tot.savingsRate >= st.settings.savingsRateTarget ? 'green' : tot.savingsRate < 0 ? 'red' : 'amber' }),
-    C.kpi({ label: 'Chi tiêu so với ngân sách', value: bu.rows.length ? Util.fmtPct(bu.pct, 0) : '—', sub: bu.rows.length ? `${Money.compact(bu.spent)} / ${Money.compact(bu.limit)} · ${DateUtil.monthLabel(bm)}` : `Chưa lập ngân sách ${DateUtil.monthLabel(bm)}`, icon: 'pie', tone: !bu.rows.length ? '' : bu.pct > 100 ? 'red' : bu.pct >= 80 ? 'amber' : 'green', extra: bu.rows.length ? h('div', { class: 'kpi-bar' }, C.progress(bu.pct, bu.pct > 100 ? 'red' : bu.pct >= 80 ? 'amber' : 'green')) : null }),
+    C.kpi({ label: 'Chi tiêu so với ngân sách', value: bu.headline ? Util.fmtPct(bu.headline.pct, 0) : '—', sub: bu.headline ? `${Money.compact(bu.headline.spent)} / ${Money.compact(bu.headline.limit)}${bu.headline.scope === 'all' ? ' (tất cả chi tiêu)' : ''} · ${DateUtil.monthLabel(bm)}` : `Chưa lập ngân sách ${DateUtil.monthLabel(bm)}`, icon: 'pie', tone: !bu.headline ? '' : bu.headline.pct > 100 ? 'red' : bu.headline.pct >= 80 ? 'amber' : 'green', extra: bu.headline ? h('div', { class: 'kpi-bar' }, C.progress(bu.headline.pct, bu.headline.pct > 100 ? 'red' : bu.headline.pct >= 80 ? 'amber' : 'green')) : null }),
     C.kpi({ label: 'Quỹ dự phòng', value: rw ? `${rw.months.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tháng` : '—', sub: rw ? `Thanh khoản ${Money.compact(rw.liquid)} / chi TB ${Money.compact(rw.avg)}/tháng` : 'Cần ít nhất 1 tháng trọn vẹn có chi tiêu', icon: 'shield', tone: !rw ? '' : rw.months >= st.settings.emergencyTargetMonths ? 'green' : rw.months >= 3 ? 'amber' : 'red' })));
 
   const grid = h('div', { class: 'grid-12', style: { marginTop: '16px' } });
@@ -4607,13 +4622,28 @@ Pages.budgets = function (view) {
     st.settings.defaultBudgets.length ? C.btn('Áp dụng mặc định', () => Pages.copyBudgets(month, 'default'), { icon: 'repeat' }) : null,
     C.btn('Thêm ngân sách', () => Forms.openBudget(month), { icon: 'plus', cls: 'btn-primary' })]));
   view.append(h('div', { class: 'flex between flex-wrap mb-12' }, nav));
-  view.append(h('div', { class: 'kpi-grid mb-12' },
+  const isCur = month === DateUtil.monthKey(DateUtil.today());
+  const daysLeft = isCur ? DateUtil.diffDays(DateUtil.today(), DateUtil.monthEnd(month)) + 1 : 0;
+  if (bu.all) {
+    const A = bu.all; const s = Budget.STATUS[A.status];
+    const perDay = isCur && A.remaining > 0 ? Math.floor(A.remaining / daysLeft) : null;
+    view.append(h('div', { class: 'kpi-grid mb-12' },
+      C.kpi({ label: 'Hạn mức tất cả chi tiêu', value: C.money(A.limit), icon: 'pie', featured: true, sub: bu.rows.length ? `Các danh mục riêng: ${Money.compact(bu.limit)} (${bu.rows.length} danh mục)` : 'Chưa đặt hạn mức riêng cho danh mục nào' }),
+      C.kpi({ label: 'Đã chi cả tháng', value: C.money(A.spent, { tone: 'neg' }), icon: 'trendDown', sub: `Đã dùng ${Util.fmtPct(A.pct, 0)} · mọi danh mục`, extra: h('div', { class: 'kpi-bar' }, C.progress(A.pct, s.tone)) }),
+      C.kpi({ label: A.remaining >= 0 ? 'Còn được chi' : 'Vượt hạn mức', value: C.money(Math.abs(A.remaining)), tone: A.remaining >= 0 ? 'green' : 'red', icon: 'coins', sub: perDay !== null ? `Còn ${daysLeft} ngày · bình quân ${Money.compact(perDay)}/ngày` : s.label }),
+      C.kpi({ label: 'Danh mục vượt', value: String(bu.overCount), tone: bu.overCount ? 'red' : 'green', icon: 'alert', sub: bu.rows.length ? 'Vượt 100% hạn mức riêng' : '—' })));
+    if (bu.rows.length && bu.limit > A.limit) view.append(h('div', { class: 'mb-12' }, C.callout('info', `Tổng hạn mức các danh mục (${Money.format(bu.limit)}) lớn hơn hạn mức tất cả chi tiêu (${Money.format(A.limit)}) — tiêu hết các danh mục sẽ vượt hạn mức tổng.`)));
+    view.append(h('div', { class: 'mb-12' }, C.card(null, h('div', { class: 'flex between flex-wrap', style: { gap: '12px' } },
+      h('div', { class: 'grow', style: { minWidth: '220px' } }, h('div', { class: 'cell-main' }, '🧾 ' + BUDGET_ALL_LABEL, ' ', C.badge(s.label, s.tone)), h('div', { class: 'small muted' }, `${Money.format(A.spent)} / ${Money.format(A.limit)} · gồm cả danh mục chưa có hạn mức riêng`), h('div', { class: 'mt-8' }, C.progress(A.pct, s.tone, true))),
+      h('div', { class: 'btn-group' }, C.btn('Sửa', () => Forms.openBudget(month, A.budget), { icon: 'edit', cls: 'btn-sm btn-ghost' }), C.iconBtn('trash', 'Xóa ngân sách tất cả chi tiêu', async () => { if (!(await Modal.confirm({ title: 'Xóa ngân sách tổng?', message: `${BUDGET_ALL_LABEL} — ${DateUtil.monthLabel(month)}`, confirmText: 'Xóa', danger: true }))) return; try { await App.commit('Xóa ngân sách', d => { d.budgets = d.budgets.filter(x => x.id !== A.budget.id); }, { undoLabel: 'Đã xóa ngân sách' }); Toast.show('Đã xóa ngân sách tổng', { type: 'success', action: { label: 'Hoàn tác', fn: () => App.undo() } }); } catch (e) { Toast.show(e.message, { type: 'error' }); } }, 'danger'))))));
+  } else view.append(h('div', { class: 'kpi-grid mb-12' },
     C.kpi({ label: 'Tổng hạn mức', value: C.money(bu.limit), icon: 'pie', sub: `${bu.rows.length} danh mục` }),
     C.kpi({ label: 'Đã chi (danh mục có ngân sách)', value: C.money(bu.spent, { tone: 'neg' }), icon: 'trendDown', sub: bu.pct === null ? '—' : `Đã dùng ${Util.fmtPct(bu.pct, 0)}` }),
     C.kpi({ label: bu.remaining >= 0 ? 'Còn lại' : 'Vượt hạn mức', value: C.money(Math.abs(bu.remaining)), tone: bu.remaining >= 0 ? 'green' : 'red', icon: 'coins' }),
     C.kpi({ label: 'Danh mục vượt', value: String(bu.overCount), tone: bu.overCount ? 'red' : 'green', icon: 'alert', sub: 'Vượt 100% hạn mức' })));
-  if (!bu.rows.length) {
-    view.append(C.card(null, C.empty('pie', `Chưa có ngân sách cho ${DateUtil.monthLabel(month).toLowerCase()}`, 'Thêm hạn mức cho từng danh mục chi tiêu, sao chép từ tháng trước hoặc áp dụng ngân sách mặc định (thiết lập trong Cài đặt).', [C.btn('Thêm ngân sách', () => Forms.openBudget(month), { cls: 'btn-primary', icon: 'plus' }), C.btn('Sao chép tháng trước', () => Pages.copyBudgets(month, 'prev'), { icon: 'copy' })])));
+  if (!bu.rows.length && bu.all) { /* chỉ có ngân sách tổng — thẻ phía trên đã đủ */ }
+  else if (!bu.rows.length) {
+    view.append(C.card(null, C.empty('pie', `Chưa có ngân sách cho ${DateUtil.monthLabel(month).toLowerCase()}`, 'Đặt một hạn mức cho TẤT CẢ chi tiêu trong tháng, hoặc hạn mức cho từng danh mục; cũng có thể sao chép từ tháng trước hoặc áp dụng ngân sách mặc định (thiết lập trong Cài đặt).', [C.btn('Thêm ngân sách', () => Forms.openBudget(month), { cls: 'btn-primary', icon: 'plus' }), C.btn('Sao chép tháng trước', () => Pages.copyBudgets(month, 'prev'), { icon: 'copy' })])));
   } else {
     const table = h('table', { class: 'table responsive' },
       h('thead', {}, h('tr', {}, h('th', {}, 'Danh mục'), h('th', { class: 'num' }, 'Hạn mức'), h('th', { class: 'num' }, 'Đã chi'), h('th', { class: 'num' }, 'Còn lại'), h('th', { style: { width: '22%' } }, 'Tỷ lệ sử dụng'), h('th', {}, 'Trạng thái'), h('th', {}, ''))),
@@ -4630,7 +4660,7 @@ Pages.budgets = function (view) {
     view.append(h('div', { class: 'grid-12' }, C.card('Bảng ngân sách', h('div', { class: 'table-wrap' }, table), { cls: 'span-7', sub: 'Cảnh báo ở mốc 80%, 100% và khi vượt hạn mức' }), C.card('So sánh hạn mức và thực chi', chart, { cls: 'span-5' })));
     lateRender(() => Charts.safe(chart, () => Charts.bars(chart, { labels: bu.rows.map(r => r.cat ? r.cat.name.slice(0, 10) : '?'), tipLabels: bu.rows.map(r => r.cat ? r.cat.name : '?'), series: [{ name: 'Hạn mức', color: 'var(--primary)', values: bu.rows.map(r => r.limit) }, { name: 'Thực chi', color: 'var(--red)', values: bu.rows.map(r => r.spent) }] })));
   }
-  if (bu.unbudgeted.length) view.append(h('div', { style: { marginTop: '16px' } }, C.card('Chi tiêu chưa có ngân sách', h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' }, h('thead', {}, h('tr', {}, h('th', {}, 'Danh mục'), h('th', { class: 'num' }, 'Đã chi'), h('th', { class: 'num' }, 'Số khoản'), h('th', {}, ''))), h('tbody', {}, bu.unbudgeted.map(u => h('tr', {}, h('td', { class: 'td-main' }, C.catChip(u.cat)), h('td', { class: 'num', dataset: { label: 'Đã chi' } }, C.money(u.spent)), h('td', { class: 'num', dataset: { label: 'Số khoản' } }, String(u.count)), h('td', { class: 'actions' }, u.cat && u.cat.active ? C.btn('Đặt hạn mức', () => Forms.openBudget(month, null, u.categoryId), { cls: 'btn-sm btn-ghost' }) : null)))))), { sub: DateUtil.monthLabel(month) })));
+  if (bu.unbudgeted.length) view.append(h('div', { style: { marginTop: '16px' } }, C.card(bu.all ? 'Danh mục chưa có hạn mức riêng' : 'Chi tiêu chưa có ngân sách', h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' }, h('thead', {}, h('tr', {}, h('th', {}, 'Danh mục'), h('th', { class: 'num' }, 'Đã chi'), h('th', { class: 'num' }, 'Số khoản'), h('th', {}, ''))), h('tbody', {}, bu.unbudgeted.map(u => h('tr', {}, h('td', { class: 'td-main' }, C.catChip(u.cat)), h('td', { class: 'num', dataset: { label: 'Đã chi' } }, C.money(u.spent)), h('td', { class: 'num', dataset: { label: 'Số khoản' } }, String(u.count)), h('td', { class: 'actions' }, u.cat && u.cat.active ? C.btn('Đặt hạn mức', () => Forms.openBudget(month, null, u.categoryId), { cls: 'btn-sm btn-ghost' }) : null)))))), { sub: DateUtil.monthLabel(month) })));
 };
 Pages.copyBudgets = async function (month, source) {
   const st = App.state;
@@ -4638,7 +4668,7 @@ Pages.copyBudgets = async function (month, source) {
   if (!src.length) return Toast.show(source === 'prev' ? 'Tháng trước chưa có ngân sách.' : 'Chưa thiết lập ngân sách mặc định.', { type: 'warn' });
   const exists = new Set(st.budgets.filter(b => b.month === month).map(b => b.categoryId));
   const cats = Util.byId(st.categories);
-  const add = src.filter(b => !exists.has(b.categoryId) && cats.get(b.categoryId) && cats.get(b.categoryId).active && cats.get(b.categoryId).kind === 'expense');
+  const add = src.filter(b => !exists.has(b.categoryId) && (b.categoryId === BUDGET_ALL || (cats.get(b.categoryId) && cats.get(b.categoryId).active && cats.get(b.categoryId).kind === 'expense')));
   if (!add.length) return Toast.show('Các danh mục đã có ngân sách trong tháng này — không có gì để thêm.', { type: 'info' });
   try { await App.commit('Sao chép ngân sách', d => { for (const b of add) d.budgets.push({ id: Budget.id(month, b.categoryId), month, categoryId: b.categoryId, limit: b.limit, updatedAt: '' }); }, { undoLabel: 'Đã sao chép ngân sách' }); Toast.show(`Đã thêm ${add.length} ngân sách (bỏ qua ${src.length - add.length} danh mục đã có).`, { type: 'success', action: { label: 'Hoàn tác', fn: () => App.undo() } }); } catch (e) { Toast.show(e.message, { type: 'error' }); }
 };
@@ -4703,7 +4733,7 @@ const Reports = {
   },
   budget(box, st, p) {
     const months = DateUtil.monthsInRange(p.from, p.to).slice(-36);
-    const rows = months.map(k => Budget.usage(st, k)).filter(u => u.rows.length);
+    const rows = months.map(k => Budget.usage(st, k)).filter(u => u.headline).map(u => ({ ...u, limit: u.headline.limit, spent: u.headline.spent, remaining: u.headline.remaining, pct: u.headline.pct }));
     if (!rows.length) { box.append(C.card(null, C.empty('pie', 'Không có ngân sách trong kỳ', 'Lập ngân sách ở mục Ngân sách.'))); return; }
     box.append(C.card('Ngân sách theo tháng', h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' }, h('thead', {}, h('tr', {}, h('th', {}, 'Tháng'), h('th', { class: 'num' }, 'Hạn mức'), h('th', { class: 'num' }, 'Thực chi'), h('th', { class: 'num' }, 'Còn lại'), h('th', { class: 'num' }, 'Sử dụng'), h('th', {}, 'Danh mục vượt'))),
       h('tbody', {}, rows.map(u => h('tr', {}, h('td', { class: 'td-main' }, DateUtil.monthLabel(u.month)), h('td', { class: 'num', dataset: { label: 'Hạn mức' } }, C.money(u.limit)), h('td', { class: 'num', dataset: { label: 'Thực chi' } }, C.money(u.spent)), h('td', { class: 'num', dataset: { label: 'Còn lại' } }, C.money(u.remaining, { tone: u.remaining < 0 ? 'neg' : '' })), h('td', { class: 'num', dataset: { label: 'Sử dụng' } }, Util.fmtPct(u.pct, 0)), h('td', { dataset: { label: 'Vượt' } }, u.rows.filter(r => r.status === 'over').map(r => C.badge(r.cat ? r.cat.name : '?', 'red')))))))), { sub: 'Chỉ tính các danh mục có ngân sách; thực chi lấy cả tháng' }), note('Mỗi tháng là một ngân sách độc lập; ngân sách không tự chuyển sang tháng khác.'));
@@ -5123,16 +5153,16 @@ Pages.settings = function (view) {
   const expCats = st.categories.filter(c => c.kind === 'expense' && c.active);
   const defMap = new Map(s.defaultBudgets.map(b => [b.categoryId, b.limit]));
   const dbForm = h('form', { novalidate: true });
-  const dbRows = expCats.map(c => h('div', { class: 'flex', style: { marginBottom: '8px' } }, h('div', { class: 'grow' }, C.catChip(c)), h('div', { style: { width: '170px' } }, F.money('db_' + c.id, defMap.get(c.id) || null, { placeholder: 'Không đặt' }))));
+  const dbRows = [h('div', { class: 'flex', style: { marginBottom: '8px' } }, h('div', { class: 'grow' }, h('b', {}, '🧾 ' + BUDGET_ALL_LABEL), h('div', { class: 'tiny muted', text: 'Hạn mức tổng cả tháng' })), h('div', { style: { width: '170px' } }, F.money('db_' + BUDGET_ALL, defMap.get(BUDGET_ALL) || null, { placeholder: 'Không đặt' })))].concat(expCats.map(c => h('div', { class: 'flex', style: { marginBottom: '8px' } }, h('div', { class: 'grow' }, C.catChip(c)), h('div', { style: { width: '170px' } }, F.money('db_' + c.id, defMap.get(c.id) || null, { placeholder: 'Không đặt' })))));
   dbForm.append(...dbRows, h('div', { class: 'btn-group mt-12' }, h('button', { class: 'btn btn-primary', type: 'submit' }, 'Lưu ngân sách mặc định')));
   dbForm.addEventListener('submit', e => {
     e.preventDefault(); const list = []; const errs = [];
-    for (const c of expCats) { const r = Money.parse(dbForm.elements['db_' + c.id].value, { allowEmpty: true }); if (!r.ok) errs.push(`${c.name}: ${r.error}`); else if (r.value) list.push({ categoryId: c.id, limit: r.value }); }
+    for (const c of [{ id: BUDGET_ALL, name: BUDGET_ALL_LABEL }].concat(expCats)) { const r = Money.parse(dbForm.elements['db_' + c.id].value, { allowEmpty: true }); if (!r.ok) errs.push(`${c.name}: ${r.error}`); else if (r.value) list.push({ categoryId: c.id, limit: r.value }); }
     if (errs.length) return Modal.alert({ title: 'Có giá trị không hợp lệ', message: errs.join('\n'), tone: 'warn' });
-    const keep = s.defaultBudgets.filter(b => !expCats.some(c => c.id === b.categoryId));
+    const keep = s.defaultBudgets.filter(b => b.categoryId !== BUDGET_ALL && !expCats.some(c => c.id === b.categoryId));
     save('Ngân sách mặc định', x => { x.defaultBudgets = keep.concat(list); });
   });
-  grid.append(C.card('Ngân sách mặc định', dbForm, { cls: 'span-6', sub: `Tổng: ${Money.format(Util.sum(s.defaultBudgets, b => b.limit))}/tháng · áp dụng bằng nút "Áp dụng mặc định" ở trang Ngân sách (không tự áp vào tháng nào)` }));
+  grid.append(C.card('Ngân sách mặc định', dbForm, { cls: 'span-6', sub: `${defMap.get(BUDGET_ALL) ? `Tất cả chi tiêu: ${Money.format(defMap.get(BUDGET_ALL))}/tháng · ` : ''}Tổng các danh mục: ${Money.format(Util.sum(s.defaultBudgets.filter(b => b.categoryId !== BUDGET_ALL), b => b.limit))}/tháng · áp dụng bằng nút "Áp dụng mặc định" ở trang Ngân sách (không tự áp vào tháng nào)` }));
 
   // Danh mục
   const catList = kind => h('div', { class: 'table-wrap' }, h('table', { class: 'table' }, h('tbody', {}, st.categories.filter(c => c.kind === kind).map(c => {
@@ -6423,7 +6453,7 @@ const App = {
     const due = this.state ? Recurring.due(this.state).length : 0;
     const navRec = document.querySelector('#nav [data-route=recurring]');
     if (navRec) { const old = navRec.querySelector('.nav-badge'); if (old) old.remove(); if (due) navRec.append(h('span', { class: 'nav-badge warn', text: String(due) })); }
-    const over = this.state ? Budget.usage(this.state, DateUtil.monthKey(DateUtil.today())).overCount : 0;
+    const bux = this.state ? Budget.usage(this.state, DateUtil.monthKey(DateUtil.today())) : null; const over = bux ? bux.overCount + (bux.allOver ? 1 : 0) : 0;
     const navB = document.querySelector('#nav [data-route=budgets]');
     if (navB) { const old = navB.querySelector('.nav-badge'); if (old) old.remove(); if (over) navB.append(h('span', { class: 'nav-badge', text: String(over) })); }
     this.renderSidebarFoot();
