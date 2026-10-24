@@ -478,6 +478,20 @@ body.privacy .money:hover{filter:none}
 .val-cell{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:0}
 .val-cell .tiny{white-space:normal;text-align:right;max-width:260px}
 @media (max-width:720px){.val-cell{align-items:flex-end}.val-cell .tiny{max-width:none}}
+/* Quỹ & lớp tài sản (v1.4) */
+:root{--l-reserve:#8fa6d4;--l-defensive:#2f4f8f;--l-income:#2f8a5e;--l-growth:#b8811d;--l-risk:#b5442f;--l-use:#8b7fa8;--l-none:#a3abb8}
+:root[data-theme="dark"]{--l-reserve:#9db3e6;--l-defensive:#6f8fd6;--l-income:#4cc08a;--l-growth:#e2ab45;--l-risk:#ee7a63;--l-use:#b2a6d0;--l-none:#7d8696}
+.rule-list{display:flex;flex-direction:column}
+.rule-row{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)}
+.rule-row:last-child{border-bottom:none}
+.rule-row .badge{flex:0 0 auto;min-width:104px;text-align:center}
+.rule-text{min-width:0}
+.badge-row{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.chip-btn .dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}
+.layer-select{min-height:36px;max-width:220px;font-size:13px}
+@media (max-width:720px){.rule-row .badge{min-width:0}.layer-select{max-width:100%;width:100%}}
+.btn.btn-touch{min-height:36px}
+.stack-16{display:flex;flex-direction:column;gap:16px}.stack-16>*{margin:0}
 
 </style>
 </head>
@@ -517,8 +531,8 @@ body.privacy .money:hover{filter:none}
    FinPilot Offline — CORE: hằng số, tiện ích, tiền tệ, ngày tháng, DOM helpers
    ========================================================================== */
 const APP_NAME = 'FinPilot Offline';
-const APP_VERSION = '1.3.0';
-const SCHEMA_VERSION = 2;
+const APP_VERSION = '1.4.0';
+const SCHEMA_VERSION = 3; // v3 (FinPilot 1.4): lớp tài sản trên tài khoản/tài sản/mã, cờ thu nhập thụ động, loại lãi suất nợ, nhóm ngoại tệ, kế hoạch lớp
 const MAX_AMOUNT = 100000000000000; // 100 nghìn tỷ đồng / một khoản
 const TZ = 'Asia/Ho_Chi_Minh';
 const INTEREST_CAT_ID = 'cat_exp_interest';
@@ -535,7 +549,7 @@ const TXN_TYPES = {
 const ACCOUNT_TYPES = { cash: 'Tiền mặt', bank: 'Ngân hàng', ewallet: 'Ví điện tử', savings: 'Tiền gửi tiết kiệm', investment: 'Tài khoản đầu tư', other: 'Khác' };
 const ACCOUNT_ICONS = { cash: '💵', bank: '🏦', ewallet: '📱', savings: '🐖', investment: '📈', other: '💼' };
 const LIQUID_TYPES = ['cash', 'bank', 'ewallet', 'savings'];
-const ASSET_GROUPS = { realestate: 'Bất động sản', vehicle: 'Phương tiện', gold: 'Vàng', securities: 'Chứng khoán / đầu tư', other: 'Tài sản khác' };
+const ASSET_GROUPS = { realestate: 'Bất động sản', vehicle: 'Phương tiện', gold: 'Vàng', foreign: 'Ngoại tệ (USD…)', securities: 'Chứng khoán / đầu tư', other: 'Tài sản khác' };
 const DEBT_TYPES = { bank: 'Vay ngân hàng', personal: 'Vay cá nhân', credit_card: 'Thẻ tín dụng', other: 'Nợ khác' };
 const GOAL_TYPES = { emergency: 'Quỹ dự phòng', house: 'Mua nhà', car: 'Mua xe', travel: 'Du lịch', education: 'Giáo dục', invest: 'Đầu tư', other: 'Mục tiêu khác' };
 const GOAL_ICONS = { emergency: '🛟', house: '🏠', car: '🚗', travel: '✈️', education: '🎓', invest: '📈', other: '⭐' };
@@ -1111,13 +1125,14 @@ function sliceRange(arr, from, to) { return arr.slice(lowerBound(arr, from), upp
 const Defaults = {
   categories() {
     const now = Util.nowISO();
-    const C = (id, name, kind, color, icon, system = false) => ({ id, name, kind, color, icon, active: true, system, updatedAt: '' });
+    const C = (id, name, kind, color, icon, system = false) => ({ id, name, kind, color, icon, active: true, system, passive: kind === 'income' && (id === 'cat_inc_invest' || id === 'cat_inc_dividend'), updatedAt: '' });
     void now;
     return [
       C('cat_inc_salary', 'Lương', 'income', '#0b8f63', '💼'),
       C('cat_inc_bonus', 'Thưởng', 'income', '#16a34a', '🎁'),
       C('cat_inc_business', 'Kinh doanh', 'income', '#0d9488', '🏪'),
       C('cat_inc_invest', 'Lãi đầu tư', 'income', '#0891b2', '📈'),
+      C('cat_inc_dividend', 'Cổ tức', 'income', '#0e7490', '💰'),
       C('cat_inc_other', 'Thu nhập khác', 'income', '#65a30d', '➕'),
       C('cat_exp_food', 'Ăn uống', 'expense', '#f97316', '🍜'),
       C('cat_exp_housing', 'Nhà ở', 'expense', '#8b5cf6', '🏠'),
@@ -1132,8 +1147,10 @@ const Defaults = {
       C('cat_exp_other', 'Chi khác', 'expense', '#64748b', '📦')
     ];
   },
+  /** Kế hoạch lớp tài sản: mọi ngưỡng để trống — FinPilot không đặt sẵn tỷ trọng cho bạn. */
+  layerPlan() { return { targets: {}, band: 5, reserveMonths: null, fxGoldMin: null, fxGoldMax: null, noFloatingDebt: false, includeUse: false }; },
   settings() {
-    return { currencySymbol: '₫', defaultAccountId: '', pageSize: 25, savingsRateTarget: 20, emergencyTargetMonths: 6, compactCharts: true, showInsights: true, defaultBudgets: [], disciplineEpoch: 0, updatedAt: '' };
+    return { currencySymbol: '₫', defaultAccountId: '', pageSize: 25, savingsRateTarget: 20, emergencyTargetMonths: 6, compactCharts: true, showInsights: true, defaultBudgets: [], disciplineEpoch: 0, layerPlan: Defaults.layerPlan(), updatedAt: '' };
   },
   state() {
     return {
@@ -1157,11 +1174,11 @@ const Model = {
   },
   category(r) {
     r = Util.isObj(r) ? r : {};
-    return { id: this.s(r.id, 80), name: this.s(r.name, 40), kind: r.kind, color: /^#[0-9a-f]{6}$/i.test(r.color) ? r.color : '#64748b', icon: this.s(r.icon, 8), active: r.active !== false, system: r.id === INTEREST_CAT_ID, updatedAt: this.ts(r.updatedAt) };
+    return { id: this.s(r.id, 80), name: this.s(r.name, 40), kind: r.kind, color: /^#[0-9a-f]{6}$/i.test(r.color) ? r.color : '#64748b', icon: this.s(r.icon, 8), active: r.active !== false, system: r.id === INTEREST_CAT_ID, passive: r.kind === 'income' && (r.passive === true || (r.passive === undefined && (r.id === 'cat_inc_invest' || r.id === 'cat_inc_dividend'))), updatedAt: this.ts(r.updatedAt) };
   },
   account(r) {
     r = Util.isObj(r) ? r : {};
-    return { id: this.s(r.id, 80), name: this.s(r.name, 80), type: r.type, openingBalance: r.openingBalance, startDate: r.startDate, description: this.s(r.description, 300), active: r.active !== false, createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
+    return { id: this.s(r.id, 80), name: this.s(r.name, 80), type: r.type, openingBalance: r.openingBalance, startDate: r.startDate, description: this.s(r.description, 300), active: r.active !== false, layer: Layers.valid(r.layer) ? r.layer : '', createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
   },
   transaction(r) {
     r = Util.isObj(r) ? r : {};
@@ -1191,12 +1208,12 @@ const Model = {
     r = Util.isObj(r) ? r : {};
     const hist = Array.isArray(r.history) ? r.history.filter(Util.isObj).map(x => ({ date: x.date, value: x.value, note: this.s(x.note, 200) })) : [];
     hist.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-    return { id: this.s(r.id, 80), name: this.s(r.name, 80), group: r.group, purchaseValue: (r.purchaseValue === null || r.purchaseValue === undefined || r.purchaseValue === '') ? null : r.purchaseValue, purchaseDate: this.optDate(r.purchaseDate), note: this.s(r.note, 300), history: hist, createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
+    return { id: this.s(r.id, 80), name: this.s(r.name, 80), group: r.group, purchaseValue: (r.purchaseValue === null || r.purchaseValue === undefined || r.purchaseValue === '') ? null : r.purchaseValue, purchaseDate: this.optDate(r.purchaseDate), note: this.s(r.note, 300), history: hist, layer: Layers.valid(r.layer) ? r.layer : '', createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
   },
   debt(r) {
     r = Util.isObj(r) ? r : {};
     const adj = Array.isArray(r.adjustments) ? r.adjustments.filter(Util.isObj).map(x => ({ id: this.s(x.id, 80), date: x.date, direction: x.direction, amount: x.amount, note: this.s(x.note, 200) })) : [];
-    return { id: this.s(r.id, 80), name: this.s(r.name, 80), type: r.type, initialBalance: r.initialBalance, interestRate: (r.interestRate === null || r.interestRate === undefined || r.interestRate === '') ? null : r.interestRate, startDate: r.startDate, dueDate: this.optDate(r.dueDate), termMonths: (r.termMonths === null || r.termMonths === undefined || r.termMonths === '') ? null : r.termMonths, note: this.s(r.note, 300), active: r.active !== false, adjustments: adj, createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
+    return { id: this.s(r.id, 80), name: this.s(r.name, 80), type: r.type, initialBalance: r.initialBalance, interestRate: (r.interestRate === null || r.interestRate === undefined || r.interestRate === '') ? null : r.interestRate, startDate: r.startDate, dueDate: this.optDate(r.dueDate), termMonths: (r.termMonths === null || r.termMonths === undefined || r.termMonths === '') ? null : r.termMonths, note: this.s(r.note, 300), active: r.active !== false, rateType: r.rateType === 'fixed' || r.rateType === 'floating' ? r.rateType : '', adjustments: adj, createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
   },
   goal(r) {
     r = Util.isObj(r) ? r : {};
@@ -1269,8 +1286,19 @@ const Model = {
     const tp = typeof r.targetPct === 'number' && Number.isFinite(r.targetPct) && r.targetPct >= 0 && r.targetPct <= 100 ? Math.round(r.targetPct * 10) / 10 : null;
     return { id: this.s(r.id, 120), accountId: this.s(r.accountId, 80), symbol: this.s(r.symbol, 10).toUpperCase(), qty: r.qty, avgCost: opt(r.avgCost), targetPct: tp, manualPrice: opt(r.manualPrice), manualPriceAt: this.ts(r.manualPriceAt), note: this.s(r.note, 200),
       fairValue: opt(r.fairValue), buyBelow: opt(r.buyBelow), valMethod: Portfolio.VAL_METHODS[r.valMethod] ? r.valMethod : '', valDate: DateUtil.isISO(r.valDate) ? r.valDate : '',
-      valLink: typeof r.valLink === 'string' && /^https:\/\/[^\s"'<>]+$/i.test(r.valLink.trim()) ? r.valLink.trim().slice(0, 300) : '', valNote: this.s(r.valNote, 300),
+      layer: Layers.valid(r.layer) ? r.layer : '', valLink: typeof r.valLink === 'string' && /^https:\/\/[^\s"'<>]+$/i.test(r.valLink.trim()) ? r.valLink.trim().slice(0, 300) : '', valNote: this.s(r.valNote, 300),
       createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
+  },
+  layerPlan(p) {
+    const out = Defaults.layerPlan(); if (!Util.isObj(p)) return out;
+    const pc = v => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 100 ? Math.round(v * 10) / 10 : null);
+    if (Util.isObj(p.targets)) for (const k of Layers.KEYS) { const v = pc(p.targets[k]); if (v !== null) out.targets[k] = v; }
+    const b = pc(p.band); if (b !== null && b > 0 && b <= 50) out.band = b;
+    if (typeof p.reserveMonths === 'number' && Number.isFinite(p.reserveMonths) && p.reserveMonths > 0 && p.reserveMonths <= 60) out.reserveMonths = Math.round(p.reserveMonths * 10) / 10;
+    out.fxGoldMin = pc(p.fxGoldMin); out.fxGoldMax = pc(p.fxGoldMax);
+    if (out.fxGoldMin !== null && out.fxGoldMax !== null && out.fxGoldMin > out.fxGoldMax) { out.fxGoldMin = null; out.fxGoldMax = null; }
+    out.noFloatingDebt = p.noFloatingDebt === true; out.includeUse = p.includeUse === true;
+    return out;
   },
   settings(r) {
     const d = Defaults.settings(); r = Util.isObj(r) ? r : {};
@@ -1284,6 +1312,7 @@ const Model = {
     if (typeof r.showInsights === 'boolean') out.showInsights = r.showInsights;
     if (Array.isArray(r.defaultBudgets)) out.defaultBudgets = r.defaultBudgets.filter(Util.isObj).map(x => ({ categoryId: this.s(x.categoryId, 80), limit: x.limit })).filter(x => Validation.amt(x.limit));
     if (Number.isInteger(r.disciplineEpoch) && r.disciplineEpoch >= 0) out.disciplineEpoch = r.disciplineEpoch;
+    out.layerPlan = this.layerPlan(r.layerPlan);
     out.updatedAt = this.ts(r.updatedAt);
     return out;
   },
@@ -2444,6 +2473,137 @@ const Portfolio = {
 };
 
 /* ==========================================================================
+   LỚP TÀI SẢN ("các quỹ") — thuần, không DOM/không đồng hồ.
+   Nguyên tắc: mỗi đồng tiền nằm ở đúng MỘT lớp, gán tại nơi giữ tiền thật
+   (tài khoản · tài sản nhập tay · từng mã cổ phiếu). Mục tiêu chỉ là nhãn,
+   không bao giờ cộng vào lớp. Bất biến: Σ lớp + Chưa phân lớp = Tổng tài sản.
+   ========================================================================== */
+const Layers = {
+  KEYS: ['reserve', 'defensive', 'income', 'growth', 'risk', 'use'],
+  LABELS: { reserve: 'Quỹ dự phòng', defensive: 'Phòng thủ', income: 'Thu nhập cố định', growth: 'Tăng trưởng', risk: 'Rủi ro', use: 'Tài sản sử dụng', none: 'Chưa phân lớp' },
+  HINTS: {
+    reserve: 'Tiền để dành cho việc bất ngờ — rút được ngay.',
+    defensive: 'Giữ giá trị: tiền gửi không kỳ hạn, vàng, ngoại tệ, tiền mặt chờ đầu tư.',
+    income: 'Sinh lãi đều: tiết kiệm có kỳ hạn, trái phiếu.',
+    growth: 'Kỳ vọng tăng giá dài hạn: cổ phiếu, chứng chỉ quỹ.',
+    risk: 'Có thể mất phần lớn: crypto, cho vay cá nhân, đầu cơ.',
+    use: 'Tài sản để dùng: nhà đang ở, xe. Tính vào tổng tài sản nhưng mặc định không tính tỷ trọng.',
+    none: 'Chưa gán lớp — tỷ trọng các lớp khác sẽ thiếu chính xác cho tới khi bạn gán.'
+  },
+  /** Ngưỡng "số cũ" theo nhóm tài sản (ngày). */
+  STALE_DAYS: { gold: 7, foreign: 7, securities: 30, realestate: 90, vehicle: 90, other: 90 },
+  valid(k) { return this.KEYS.includes(k); },
+  /** Lớp mặc định theo loại (dùng khi người dùng chưa tự gán). ctx.reserveAccounts: Set id tài khoản gắn mục tiêu quỹ dự phòng. */
+  defaultFor(kind, rec, ctx = {}) {
+    if (kind === 'account') {
+      if (ctx.reserveAccounts && ctx.reserveAccounts.has(rec.id)) return 'reserve';
+      return { savings: 'income', cash: 'defensive', bank: 'defensive', ewallet: 'defensive', investment: 'defensive' }[rec.type] || 'none';
+    }
+    if (kind === 'asset') return { gold: 'defensive', foreign: 'defensive', realestate: 'use', vehicle: 'use', securities: 'growth' }[rec.group] || 'none';
+    if (kind === 'holding') return 'growth';
+    return 'none';
+  },
+  resolve(kind, rec, ctx) {
+    if (rec && this.valid(rec.layer)) return { layer: rec.layer, explicit: true };
+    return { layer: this.defaultFor(kind, rec || {}, ctx), explicit: false };
+  },
+  /**
+   * Gom các khoản theo lớp. items: [{ key, kind, name, layer, explicit, value(int), stale(bool), staleNote, valuedAt, fxGold(bool) }]
+   * opts.includeUse: tính cả "Tài sản sử dụng" vào nền tỷ trọng.
+   */
+  aggregate(items, opts = {}) {
+    const includeUse = !!opts.includeUse;
+    const by = {}; for (const k of this.KEYS.concat('none')) by[k] = { key: k, value: 0, positive: 0, n: 0, stale: 0, items: [], oldest: '' };
+    let gross = 0, positiveTotal = 0, assignedFresh = 0, assignedVal = 0, explicitVal = 0, fxGold = 0;
+    const negatives = [];
+    for (const it of items || []) {
+      const k = this.valid(it.layer) ? it.layer : 'none';
+      const v = Number.isSafeInteger(it.value) ? it.value : 0;
+      const b = by[k]; b.value += v; b.n++; b.items.push(it);
+      const inBase = includeUse || k !== 'use'; // độ tin cậy đo trên đúng phần tài sản dùng để tính tỷ trọng
+      if (v > 0) b.positive += v;
+      if (v > 0 && inBase) positiveTotal += v;
+      if (v < 0) negatives.push(it);
+      if (it.stale) b.stale++;
+      if (it.valuedAt && (!b.oldest || it.valuedAt < b.oldest)) b.oldest = it.valuedAt;
+      gross += v;
+      if (v > 0 && inBase && k !== 'none') { assignedVal += v; if (!it.stale) assignedFresh += v; if (it.explicit) explicitVal += v; }
+      if (v > 0 && it.fxGold) fxGold += v;
+    }
+    for (const k in by) by[k].items.sort((a, b) => b.value - a.value);
+    // Nền tỷ trọng: tài sản dương, bỏ "Tài sản sử dụng" nếu không chọn tính.
+    const base = this.KEYS.concat('none').filter(k => includeUse || k !== 'use').reduce((s, k) => s + Math.max(0, by[k].value), 0);
+    const weights = {}; for (const k in by) weights[k] = base > 0 && (includeUse || k !== 'use') ? Math.max(0, by[k].value) / base : null;
+    const pct = x => (positiveTotal > 0 ? x / positiveTotal : null);
+    return {
+      gross, base, includeUse, by, weights, negatives, fxGold,
+      coverage: { assigned: pct(assignedVal), reliable: pct(assignedFresh), explicit: pct(explicitVal), unassignedValue: Math.max(0, by.none.value) },
+      invariantOk: this.KEYS.concat('none').reduce((s, k) => s + by[k].value, 0) === gross
+    };
+  },
+  /** Chi tiêu bình quân/tháng từ danh sách {month, expense} — chỉ các tháng đã kết thúc, tối đa n tháng gần nhất có dữ liệu. */
+  avgMonthlySpend(months, n = 3) {
+    const xs = (months || []).filter(m => Number.isFinite(m.expense) && m.expense > 0).slice(-n);
+    if (!xs.length) return null;
+    return Math.round(xs.reduce((s, m) => s + m.expense, 0) / xs.length);
+  },
+  /**
+   * Đối chiếu với nguyên tắc DO NGƯỜI DÙNG ĐẶT. Không có nguyên tắc nào mặc định.
+   * plan: { targets: {layer: pct|null}, band, reserveMonths, fxGoldMin, fxGoldMax, noFloatingDebt }
+   * ctx: { monthlySpend, debts: [{name, balance, rateType}] }
+   * → [{ id, label, status: 'ok'|'out'|'nodata', detail }]
+   */
+  checkRules(agg, plan, ctx = {}) {
+    const out = []; plan = plan || {};
+    const pct = x => (Math.round(x * 1000) / 10).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + '%';
+    const pts = x => (x > 0 ? '+' : '') + (Math.round(x * 10) / 10).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + ' điểm %';
+    const weak = !(agg.coverage.reliable >= 0.5);
+    const band = Number.isFinite(plan.band) && plan.band > 0 ? plan.band : 5;
+    for (const k of this.KEYS) {
+      const t = plan.targets && plan.targets[k];
+      if (!(Number.isFinite(t) && t >= 0 && t <= 100)) continue;
+      const label = `${this.LABELS[k]}: mục tiêu ${t}% (± ${band})`;
+      if (k === 'use' && !agg.includeUse) { out.push({ id: 't_' + k, label, status: 'nodata', detail: 'Đang không tính "Tài sản sử dụng" vào tỷ trọng.' }); continue; }
+      const w = agg.weights[k];
+      if (w === null || agg.base <= 0 || weak) { out.push({ id: 't_' + k, label, status: 'nodata', detail: weak ? 'Dưới 50% tài sản có lớp và số liệu còn mới.' : 'Chưa có tài sản.' }); continue; }
+      const diff = w * 100 - t;
+      const staleNote = agg.by[k].stale ? ` · ${agg.by[k].stale} khoản số cũ` : '';
+      out.push({ id: 't_' + k, label, status: Math.abs(diff) > band ? 'out' : 'ok', detail: `Hiện ${pct(w)} — lệch ${pts(diff)} so với mục tiêu bạn đặt${staleNote}` });
+    }
+    if (Number.isFinite(plan.reserveMonths) && plan.reserveMonths > 0) {
+      const label = `Quỹ dự phòng ≥ ${plan.reserveMonths} tháng chi tiêu`;
+      const spend = ctx.monthlySpend;
+      if (!(spend > 0)) out.push({ id: 'reserve_m', label, status: 'nodata', detail: 'Chưa có chi tiêu của các tháng đã qua để tính.' });
+      else {
+        const m = Math.max(0, agg.by.reserve.value) / spend;
+        out.push({ id: 'reserve_m', label, status: m + 1e-9 >= plan.reserveMonths ? 'ok' : 'out', detail: `Đủ ${(Math.floor(m * 10) / 10).toLocaleString('vi-VN')} tháng (chi bình quân ${(Math.round(spend / 1e5) / 10).toLocaleString('vi-VN')} tr/tháng)` });
+      }
+    }
+    const hasMin = Number.isFinite(plan.fxGoldMin), hasMax = Number.isFinite(plan.fxGoldMax);
+    if (hasMin || hasMax) {
+      const lo = hasMin ? plan.fxGoldMin : 0, hi = hasMax ? plan.fxGoldMax : 100;
+      const label = `Vàng + ngoại tệ trong khoảng ${lo}–${hi}%`;
+      if (agg.base <= 0 || weak) out.push({ id: 'fxgold', label, status: 'nodata', detail: weak ? 'Dưới 50% tài sản có lớp và số liệu còn mới.' : 'Chưa có tài sản.' });
+      else { const w = agg.fxGold / agg.base * 100; out.push({ id: 'fxgold', label, status: w + 1e-9 < lo || w - 1e-9 > hi ? 'out' : 'ok', detail: `Hiện ${pct(w / 100)} tổng tài sản tính tỷ trọng` }); }
+    }
+    if (plan.noFloatingDebt) {
+      const label = 'Không có khoản nợ lãi thả nổi';
+      const live = (ctx.debts || []).filter(d => d.balance > 0);
+      const fl = live.filter(d => d.rateType === 'floating'); const unk = live.filter(d => d.rateType !== 'fixed' && d.rateType !== 'floating');
+      if (fl.length) out.push({ id: 'nofloat', label, status: 'out', detail: `Đang có: ${fl.map(d => d.name).join(', ')}` });
+      else if (unk.length) out.push({ id: 'nofloat', label, status: 'nodata', detail: `Chưa ghi loại lãi suất cho: ${unk.map(d => d.name).join(', ')}` });
+      else out.push({ id: 'nofloat', label, status: 'ok', detail: live.length ? 'Các khoản nợ đều lãi cố định.' : 'Không có khoản nợ.' });
+    }
+    return out;
+  },
+  /** Cổ tức tiền thực nhận ước tính: KL × cổ tức/cp × (1 − thuế 5%), làm tròn đồng. */
+  netDividend(qty, dps, taxRate = 0.05) {
+    if (!Number.isSafeInteger(qty) || qty <= 0 || !Number.isFinite(dps) || dps <= 0) return null;
+    return Math.round(qty * dps * (1 - taxRate));
+  }
+};
+
+/* ==========================================================================
    DISCIPLINE — kỷ luật tài chính: phân bổ khi tiền về, khóa ảo, "Được phép chi",
    nhật ký cam kết, khóa 72 giờ. Nguyên tắc: chặn ý định, không chặn sự thật.
    ========================================================================== */
@@ -2915,6 +3075,60 @@ const Holdings = {
   total(st) { return Util.sum(this.rows(st), r => r.value); },
   valTotals(st) { return Portfolio.valuationTotals(this.rows(st).map(r => ({ qty: r.holding.qty, val: r.val }))); },
   symbols(st) { return Array.from(new Set((st.holdings || []).filter(x => x.qty > 0).map(x => x.symbol))); }
+};
+
+/* --------------------------- Lớp tài sản: dựng danh sách khoản từ dữ liệu thật --------------------------- */
+const LayerData = {
+  reserveAccounts(st) {
+    return new Set((st.goals || []).filter(g => g.type === 'emergency' && g.mode === 'account' && g.accountId && g.status !== 'done').map(g => g.accountId));
+  },
+  /** Mỗi khoản đúng một lần: tài khoản (số dư sổ) · tài sản nhập tay (giá trị gần nhất) · mã cổ phiếu (KL × giá thị trường). */
+  items(st, today) {
+    const cur = Ledger.current(st); const ctx = { reserveAccounts: this.reserveAccounts(st) }; const out = [];
+    for (const a of st.accounts) {
+      const v = cur.balances.get(a.id) || 0; if (!a.active && v === 0) continue;
+      const r = Layers.resolve('account', a, ctx);
+      out.push({ key: 'acc:' + a.id, kind: 'account', ref: a.id, name: a.name, sub: ACCOUNT_TYPES[a.type] + (a.type === 'investment' ? ' · phần tiền mặt' : ''), ...r, value: v, stale: false, staleNote: '', valuedAt: today, fxGold: false });
+    }
+    for (const as of st.assets) {
+      const v = Ledger.assetValue(as, today); let last = '';
+      for (const x of as.history) if (x.date <= today) last = x.date;
+      const lim = Layers.STALE_DAYS[as.group] || 90; const age = last ? DateUtil.diffDays(last, today) : null;
+      const stale = !last || age > lim;
+      const r = Layers.resolve('asset', as, ctx);
+      out.push({ key: 'ast:' + as.id, kind: 'asset', ref: as.id, name: as.name, sub: ASSET_GROUPS[as.group] || '', ...r, value: v, stale, staleNote: stale ? (last ? `giá trị cập nhật ${age} ngày trước` : 'chưa có giá trị') : '', valuedAt: last, fxGold: as.group === 'gold' || as.group === 'foreign' });
+    }
+    for (const row of Holdings.rows(st)) {
+      const x = row.holding; if (!x.qty && !row.value) continue;
+      let stale = false, note = '', at = '';
+      if (row.priceSource === 'cost' || row.priceSource === 'none') { stale = true; note = 'chưa có giá thị trường (đang tính theo giá vốn)'; }
+      else if (row.priceSource === 'manual') { at = x.manualPriceAt ? DateUtil.isoDateVN(x.manualPriceAt) : ''; const age = at ? DateUtil.diffDays(at, today) : null; stale = !at || age > 7; note = stale ? (at ? `giá nhập tay ${age} ngày trước` : 'giá nhập tay chưa có ngày') : ''; }
+      else { at = row.quote && row.quote.fetchedAt ? DateUtil.isoDateVN(row.quote.fetchedAt) : ''; stale = row.fresh === 'stale'; note = stale ? 'giá chưa cập nhật phiên gần nhất' : ''; }
+      const r = Layers.resolve('holding', x, ctx);
+      out.push({ key: 'hld:' + x.id, kind: 'holding', ref: x.id, name: x.symbol, sub: `${Money.num(x.qty)} cp${row.account ? ' · ' + row.account.name : ''}`, ...r, value: row.value, stale, staleNote: note, valuedAt: at, fxGold: false });
+    }
+    return out;
+  },
+  /** Thu nhập thụ động đã nhận trong năm (giao dịch thu thuộc danh mục đánh dấu "thụ động"). */
+  passive(st, today) {
+    const cats = new Map(st.categories.filter(c => c.kind === 'income' && c.passive).map(c => [c.id, c]));
+    const from = today.slice(0, 4) + '-01-01';
+    const txns = st.transactions.filter(t => t.type === 'income' && cats.has(t.categoryId) && t.date >= from && t.date <= today).sort((a, b) => (a.date < b.date ? 1 : -1));
+    return { total: Util.sum(txns, t => t.amount), count: txns.length, txns, cats: Array.from(cats.values()), from };
+  },
+  build(st) {
+    const today = DateUtil.today();
+    return memo(st, 'layers:' + PriceService.version + ':' + today, () => {
+      const cur = Ledger.current(st); const plan = st.settings.layerPlan || Defaults.layerPlan();
+      const items = this.items(st, today); const agg = Layers.aggregate(items, { includeUse: plan.includeUse });
+      const lastFull = DateUtil.addMonthKey(DateUtil.monthKey(today), -1);
+      const spend = Layers.avgMonthlySpend(Ledger.monthly(st, DateUtil.addMonthKey(lastFull, -2), lastFull), 3);
+      const debts = st.debts.filter(d => d.active).map(d => ({ name: d.name, balance: cur.debtBalances.get(d.id) || 0, rateType: d.rateType }));
+      const rules = Layers.checkRules(agg, plan, { monthlySpend: spend, debts });
+      const passive = this.passive(st, today);
+      return { today, cur, plan, items, agg, rules, spend, passive, liabilities: cur.liabilities, netWorth: cur.netWorth, matchesLedger: agg.gross === cur.totalAssets };
+    });
+  }
 };
 
 /* ==========================================================================
@@ -3847,12 +4061,13 @@ const Forms = {
     const grid = h('div', { class: 'form-grid' },
       F.field('Tên danh mục', F.input('name', cat ? cat.name : '', { maxlength: 40, autofocus: true }), { required: true, name: 'name' }),
       F.field('Loại', F.select('kind', [{ value: 'expense', label: 'Chi tiêu' }, { value: 'income', label: 'Thu nhập' }], kind, { disabled: editing }), { name: 'kind', hint: editing ? 'Không đổi loại danh mục đã tạo để bảo toàn dữ liệu.' : null }),
+      h('div', { class: 'field full' }, F.check('passive', cat ? cat.passive : false, 'Thu nhập thụ động (cổ tức, lãi tiền gửi, tiền thuê…)'), h('div', { class: 'field-hint', text: 'Chỉ áp dụng cho danh mục thu nhập. Được cộng vào "Thu nhập thụ động" ở trang Quỹ & lớp tài sản.' })),
       F.field('Màu', colorRow, { full: true, name: 'color' }), F.field('Biểu tượng', emojiRow, { full: true, name: 'icon' }));
     form.append(grid, fe);
     let m;
     form.addEventListener('submit', async e => {
       e.preventDefault(); F.clearErrors(form);
-      const rec = Model.category({ ...(cat || {}), id: cat ? cat.id : Util.uid('cat'), name: F.val(form, 'name'), kind: editing ? cat.kind : F.val(form, 'kind'), color, icon, active: cat ? cat.active : true });
+      const rec = Model.category({ ...(cat || {}), id: cat ? cat.id : Util.uid('cat'), name: F.val(form, 'name'), kind: editing ? cat.kind : F.val(form, 'kind'), color, icon, passive: !!(form.elements.passive && form.elements.passive.checked), active: cat ? cat.active : true });
       const errs = Validation.category(rec, App.state); if (Object.keys(errs).length) return F.showErrors(form, errs);
       try { await App.commit(editing ? 'Sửa danh mục' : 'Thêm danh mục', d => { if (editing) { const i = d.categories.findIndex(x => x.id === rec.id); d.categories[i] = rec; } else d.categories.push(rec); }); Toast.show('Đã lưu danh mục', { type: 'success' }); m.close(); }
       catch (er) { fe.textContent = er.message; }
@@ -3939,7 +4154,7 @@ const Forms = {
     if (!editing) grid.append(F.field('Giá trị ước tính hiện tại', F.money('value', null), { required: true, name: 'value' }), F.field('Ngày định giá', F.date('valueDate', DateUtil.today()), { required: true, name: 'valueDate' }));
     else grid.append(h('div', { class: 'field full' }, C.callout('info', h('div', {}, 'Giá trị hiện tại: ', h('b', { class: 'money' }, Money.format(latest ? latest.value : 0)), ` (định giá ${latest ? DateUtil.toVN(latest.date) : '—'}). Dùng nút "Cập nhật giá trị" để ghi nhận định giá mới và giữ lịch sử.`))));
     grid.append(F.field('Giá mua ban đầu', F.money('purchaseValue', asset ? asset.purchaseValue : null, { placeholder: 'Không bắt buộc' }), { name: 'purchaseValue' }), F.field('Ngày mua', F.date('purchaseDate', asset ? asset.purchaseDate : ''), { name: 'purchaseDate' }), F.field('Ghi chú', F.textarea('note', asset ? asset.note : '', { maxlength: 300 }), { full: true, name: 'note' }));
-    grid.append(h('div', { class: 'field full' }, C.callout('alert', 'Không nhập lại tiền mặt, tiền gửi hay tài khoản đầu tư đã theo dõi ở mục Tài khoản — tránh tính trùng tài sản. Giá thị trường cần cập nhật thủ công (ứng dụng không lấy giá trực tuyến).', 'warn')));
+    grid.append(h('div', { class: 'field full' }, C.callout('alert', 'Không nhập lại tiền mặt, tiền gửi hay tài khoản đầu tư đã theo dõi ở mục Tài khoản — tránh tính trùng tài sản. Giá thị trường cần cập nhật thủ công (ứng dụng không lấy giá trực tuyến). Vàng: tính theo giá MUA vào của tiệm/ngân hàng; ngoại tệ: số lượng × tỷ giá mua — đó là số tiền bạn thật sự nhận được khi bán.', 'warn')));
     form.append(grid, fe);
     let m;
     form.addEventListener('submit', async e => {
@@ -4003,6 +4218,7 @@ const Forms = {
       F.field('Dư nợ ban đầu', F.money('initialBalance', debt ? debt.initialBalance : null, { placeholder: '0' }), { name: 'initialBalance', hint: 'Dư nợ tại ngày bắt đầu theo dõi. Có thể để 0 rồi ghi "Nhận tiền vay".' }),
       F.field('Ngày vay / bắt đầu theo dõi', F.date('startDate', debt ? debt.startDate : DateUtil.today()), { required: true, name: 'startDate' }),
       F.field('Lãi suất (%/năm)', F.input('interestRate', debt && debt.interestRate !== null ? String(debt.interestRate).replace('.', ',') : '', { inputmode: 'decimal', placeholder: 'VD: 9,5' }), { name: 'interestRate' }),
+      F.field('Loại lãi suất', F.select('rateType', [{ value: '', label: 'Chưa rõ' }, { value: 'fixed', label: 'Cố định' }, { value: 'floating', label: 'Thả nổi (theo lãi cơ sở + biên)' }], debt ? debt.rateType || '' : ''), { name: 'rateType', hint: 'Dùng cho nguyên tắc "không vay lãi thả nổi" ở trang Quỹ & lớp tài sản.' }),
       F.field('Kỳ hạn (tháng)', F.input('termMonths', debt && debt.termMonths !== null ? debt.termMonths : '', { inputmode: 'numeric', placeholder: 'VD: 240' }), { name: 'termMonths' }),
       F.field('Ngày đến hạn', F.date('dueDate', debt ? debt.dueDate : ''), { name: 'dueDate' }),
       F.field('Ghi chú', F.textarea('note', debt ? debt.note : '', { maxlength: 300 }), { name: 'note', full: true })), fe);
@@ -4014,7 +4230,7 @@ const Forms = {
       const ddRaw = F.val(form, 'dueDate').trim(); const dd = ddRaw ? F.dateVal(form, 'dueDate') : ''; if (ddRaw && !dd) errs.dueDate = 'Ngày không hợp lệ.';
       const rate = this.parseRate(F.val(form, 'interestRate')); if (!rate.ok) errs.interestRate = rate.error;
       const tmRaw = F.val(form, 'termMonths').trim(); const tm = tmRaw === '' ? null : (/^\d+$/.test(tmRaw) ? Number(tmRaw) : NaN);
-      const rec = Model.debt({ ...(debt || {}), id: debt ? debt.id : Util.uid('debt'), name: F.val(form, 'name'), type: F.val(form, 'type'), initialBalance: ib.ok ? (ib.value || 0) : NaN, startDate: sd, dueDate: dd || '', interestRate: rate.ok ? rate.value : null, termMonths: tm, note: F.val(form, 'note'), active: debt ? debt.active : true, adjustments: debt ? debt.adjustments : [], createdAt: debt ? debt.createdAt : Util.nowISO() });
+      const rec = Model.debt({ ...(debt || {}), id: debt ? debt.id : Util.uid('debt'), name: F.val(form, 'name'), type: F.val(form, 'type'), initialBalance: ib.ok ? (ib.value || 0) : NaN, startDate: sd, dueDate: dd || '', interestRate: rate.ok ? rate.value : null, rateType: F.val(form, 'rateType'), termMonths: tm, note: F.val(form, 'note'), active: debt ? debt.active : true, adjustments: debt ? debt.adjustments : [], createdAt: debt ? debt.createdAt : Util.nowISO() });
       Object.assign(errs, Validation.debt(rec), errs);
       if (editing && sd) { const early = App.state.transactions.find(t => t.debtId === rec.id && t.date < sd); if (early) errs.startDate = `Đã có giao dịch của khoản nợ từ ${DateUtil.toVN(early.date)}.`; }
       if (Object.keys(errs).length) return F.showErrors(form, errs);
@@ -4224,7 +4440,7 @@ Pages.dashboard = function (view) {
     Charts.safe(c5, () => Charts.line(c5, { labels: snaps.map(s => DateUtil.shortVN(s.date)), tipLabels: snaps.map(s => DateUtil.toVN(s.date)), series: [{ name: 'Tài sản ròng', color: 'var(--primary)', values: snaps.map(s => s.netWorth) }], emptyText: 'Cần ít nhất 2 bản chụp (2 ngày có dữ liệu) để vẽ biến động. Ứng dụng tự chụp số liệu mỗi ngày bạn sử dụng.' }));
     const alloc = [];
     for (const [t, v] of Object.entries(cur.byType)) alloc.push({ label: ACCOUNT_TYPES[t], value: v, color: { cash: '#0b8f63', bank: '#1d3f8f', ewallet: '#0891b2', savings: '#65a30d', investment: '#8b5cf6', other: '#64748b' }[t] });
-    for (const [g, v] of Object.entries(cur.byGroup)) alloc.push({ label: ASSET_GROUPS[g], value: v, color: { realestate: '#d97706', vehicle: '#db2777', gold: '#ca8a04', securities: '#4f46e5', other: '#94a3b8' }[g] });
+    for (const [g, v] of Object.entries(cur.byGroup)) alloc.push({ label: ASSET_GROUPS[g], value: v, color: { realestate: '#d97706', vehicle: '#db2777', gold: '#ca8a04', foreign: '#0f766e', securities: '#4f46e5', other: '#94a3b8' }[g] });
     Charts.safe(c6, () => Charts.donut(c6, { items: alloc, centerLabel: 'Tổng tài sản', emptyText: 'Chưa có tài sản dương' }));
   });
 };
@@ -5701,6 +5917,231 @@ Pages.holdingDelete = async function (x) {
 };
 
 /* ==========================================================================
+   QUỸ & LỚP TÀI SẢN (v1.4) — mỗi khoản tiền nằm ở đúng một lớp.
+   Chỉ mô tả và đo lệch so với nguyên tắc DO NGƯỜI DÙNG ĐẶT; không khuyến nghị.
+   ========================================================================== */
+const LAYER_COLORS = { reserve: 'var(--l-reserve)', defensive: 'var(--l-defensive)', income: 'var(--l-income)', growth: 'var(--l-growth)', risk: 'var(--l-risk)', use: 'var(--l-use)', none: 'var(--l-none)' };
+const RULE_STATUS = { ok: ['Trong ngưỡng', 'green'], out: ['Ngoài ngưỡng', 'red'], nodata: ['Thiếu dữ liệu', 'amber'] };
+
+Pages.layers = function (view) {
+  const st = App.state; const L = LayerData.build(st); const a = L.agg; const plan = L.plan;
+  const pct = (x, d = 0) => (x === null || !Number.isFinite(x) ? '—' : Util.fmtPct(x * 100, d));
+  view.append(C.pageHead('Quỹ & lớp tài sản', 'Mỗi khoản tiền nằm ở đúng một lớp, gán ngay tại tài khoản, tài sản hoặc từng mã cổ phiếu. Mục tiêu tài chính chỉ là nhãn, không cộng thêm vào tổng. Cách phân lớp và các ngưỡng là của bạn — FinPilot không khuyến nghị phân bổ.',
+    [C.btn('Phân lớp', () => Pages.layerAssign(), { icon: 'edit', cls: 'btn-primary' }), C.btn('Đặt nguyên tắc', () => Pages.layerPlanForm(), { icon: 'settings' })]));
+  const V = h('div', { class: 'stack-16' }); view.append(V);
+  if (!L.items.length) {
+    V.append(C.card(null, C.empty('pie', 'Chưa có gì để phân lớp', 'Thêm tài khoản, tài sản hoặc mã cổ phiếu. Mỗi khoản sẽ được xếp sẵn vào một lớp theo loại, bạn sửa lại nếu khác ý.',
+      [C.btn('Thêm tài khoản', () => Forms.openAccount(), { icon: 'plus', cls: 'btn-primary' }), C.btn('Thêm tài sản', () => Forms.openAsset(), { icon: 'plus' })])));
+    return;
+  }
+  if (!a.invariantOk || !L.matchesLedger) V.append(C.callout('alert', `Tổng các lớp (${Money.format(a.gross)}) không khớp tổng tài sản (${Money.format(L.cur.totalAssets)}). Đây là lỗi của ứng dụng — số liệu trang này tạm không đáng tin.`, 'danger'));
+  if ((st.holdings || []).some(x => x.qty > 0) && st.assets.some(x => x.group === 'securities' && Ledger.assetValue(x, L.today) > 0)) V.append(C.callout('alert', 'Vừa có tài sản nhập tay nhóm "Chứng khoán / đầu tư" vừa có Danh mục cổ phiếu. Nếu là cùng một khoản, nó đang bị tính hai lần ở cả tổng tài sản lẫn các lớp — hãy xóa một bên.', 'warn'));
+  if (a.negatives.length) V.append(C.callout('info', `${a.negatives.map(i => i.name).join(', ')} đang âm và vẫn được tính trong lớp của nó. Nếu đó là khoản vay (thấu chi, thẻ tín dụng), nên ghi ở mục Khoản nợ để tách khỏi tài sản.`));
+
+  const cov = a.coverage; const weak = !(cov.reliable >= 0.5);
+  const staleN = L.items.filter(i => i.stale && i.value > 0 && (a.includeUse || i.layer !== 'use')).length;
+  const defVal = Math.max(0, a.by.defensive.value) + Math.max(0, a.by.reserve.value);
+  const ytdSpend = Ledger.totals(st, L.passive.from, L.today).expense;
+  V.append(h('div', { class: 'kpi-grid' },
+    C.kpi({ label: 'Độ tin cậy dữ liệu', value: pct(cov.reliable), icon: 'check', featured: true, tone: weak ? 'warn' : '', sub: `${pct(cov.assigned)} tài sản tính tỷ trọng đã có lớp · ${staleN ? staleN + ' khoản số cũ' : 'không có số cũ'} · ${pct(cov.explicit)} do bạn tự gán`, tip: 'Phần trăm giá trị tài sản vừa đã có lớp vừa có số liệu còn mới. Dưới 50% thì tỷ trọng các lớp chưa đáng tin.' }),
+    C.kpi({ label: 'Tổng tài sản', value: C.money(a.gross), icon: 'wallet', sub: `Nợ ${Money.compact(L.liabilities)} · tài sản ròng ${Money.compact(L.netWorth)}` }),
+    C.kpi({ label: 'Lớp phòng thủ', value: C.money(defVal), icon: 'lock', sub: a.base > 0 ? `${pct(defVal / a.base)} tài sản tính tỷ trọng, gồm quỹ dự phòng ${Money.compact(Math.max(0, a.by.reserve.value))}` : 'Chưa có tài sản tính tỷ trọng' }),
+    C.kpi({ label: `Thu nhập thụ động năm ${L.today.slice(0, 4)}`, value: C.money(L.passive.total), icon: 'trendUp', sub: `Từ 01/01 tới ${DateUtil.toVN(L.today).slice(0, 5)} · ${L.passive.count} khoản${ytdSpend > 0 ? ` · bằng ${pct(L.passive.total / ytdSpend)} chi tiêu cùng kỳ` : ''}` })));
+
+  if (weak) {
+    const top = L.items.filter(i => i.value > 0).sort((x, y) => y.value - x.value).slice(0, 5);
+    V.append(C.card('Kiểm tra 5 khoản lớn nhất trước', h('div', {},
+      h('p', { class: 'small', text: `Mới ${pct(cov.reliable)} giá trị tài sản vừa có lớp vừa có số liệu còn mới, nên biểu đồ tỷ trọng chưa được vẽ để tránh hiện con số đẹp mà sai. Xác nhận lớp và cập nhật giá trị cho các khoản dưới đây.` }),
+      Pages.layerItemTable(top, { showLayer: true })), { sub: 'Mỗi lần đổi được lưu ngay.' }));
+  } else {
+    const layerItems = Layers.KEYS.concat('none').filter(k => a.includeUse || k !== 'use').map(k => ({ label: Layers.LABELS[k], value: Math.max(0, a.by[k].value), color: LAYER_COLORS[k] }));
+    const c1 = h('div', { class: 'chart-box' });
+    const foot = h('div', { class: 'small muted mt-8' },
+      !a.includeUse && a.by.use.value ? h('div', {}, `Không tính "Tài sản sử dụng" ${Money.compact(a.by.use.value)} (nhà ở, xe) vào tỷ trọng — đổi trong Đặt nguyên tắc.`) : null,
+      L.liabilities > 0 ? h('div', {}, `Nợ phải trả ${Money.compact(L.liabilities)} được tách riêng, không trừ vào lớp nào. Tài sản ròng ${Money.compact(L.netWorth)}.`) : null,
+      a.by.none.value > 0 ? h('div', { class: 'warn-text' }, `${a.by.none.n} khoản (${Money.compact(a.by.none.value)}) chưa phân lớp.`) : null);
+    const sel = Pages._layerSel && a.by[Pages._layerSel] && a.by[Pages._layerSel].n ? Pages._layerSel : (Layers.KEYS.concat('none').find(k => a.by[k].n && a.by[k].value > 0) || 'defensive');
+    const chips = h('div', { class: 'chip-row', role: 'tablist', 'aria-label': 'Chọn lớp' }, Layers.KEYS.concat('none').filter(k => a.by[k].n).map(k => h('button', { type: 'button', class: 'chip-btn' + (k === sel ? ' active' : ''), role: 'tab', 'aria-selected': String(k === sel), onclick: () => { Pages._layerSel = k; App.render(); } }, h('span', { class: 'dot', style: { background: LAYER_COLORS[k] } }), ' ' + Layers.LABELS[k])));
+    const c2 = h('div', { class: 'chart-box' });
+    const inLayer = a.by[sel].items;
+    V.append(h('div', { class: 'grid-12' },
+      C.card('Tỷ trọng các lớp', h('div', {}, c1, foot), { cls: 'span-6', sub: a.includeUse ? 'Trên tổng tài sản dương' : 'Trên tổng tài sản dương, trừ tài sản sử dụng' }),
+      C.card('Từng khoản trong lớp', h('div', {}, chips, h('p', { class: 'small muted', text: Layers.HINTS[sel] }), c2), { cls: 'span-6' })));
+    lateRender(() => {
+      Charts.safe(c1, () => Charts.donut(c1, { items: layerItems, centerLabel: 'Tổng tính tỷ trọng', emptyText: 'Chưa có tài sản dương', maxItems: 8 }));
+      Charts.safe(c2, () => Charts.donut(c2, { items: inLayer.map((it, i) => ({ label: it.name, value: Math.max(0, it.value), color: `color-mix(in srgb, ${LAYER_COLORS[sel]} ${Math.max(35, 100 - i * 16)}%, var(--surface))` })), centerLabel: Layers.LABELS[sel], emptyText: 'Lớp này chưa có khoản dương', maxItems: 6 }));
+    });
+    V.append(C.card(`${Layers.LABELS[sel]} — chi tiết`, Pages.layerItemTable(inLayer, { showLayer: true }), { sub: 'Đổi lớp ngay tại đây; "mặc định" nghĩa là app xếp theo loại và bạn chưa xác nhận.' }));
+  }
+
+  // Đối chiếu nguyên tắc
+  const cnt = s => L.rules.filter(r => r.status === s).length;
+  V.append(C.card('Đối chiếu nguyên tắc của bạn', L.rules.length ? h('div', { class: 'rule-list' }, L.rules.map(r => h('div', { class: 'rule-row' }, C.badge(RULE_STATUS[r.status][0], RULE_STATUS[r.status][1]), h('div', { class: 'rule-text' }, h('div', { class: 'cell-main', text: r.label }), h('div', { class: 'small muted', text: r.detail })))))
+    : C.empty('target', 'Bạn chưa đặt nguyên tắc nào', 'Ví dụ: tỷ trọng mục tiêu cho từng lớp, quỹ dự phòng đủ bao nhiêu tháng chi tiêu, vàng + ngoại tệ trong khoảng nào, không vay lãi thả nổi. FinPilot không đặt sẵn con số nào cho bạn.', [C.btn('Đặt nguyên tắc', () => Pages.layerPlanForm(), { icon: 'settings', cls: 'btn-primary' })]),
+  { sub: 'Chỉ so với ngưỡng bạn tự đặt — không phải khuyến nghị đầu tư.', actions: L.rules.length ? h('div', { class: 'badge-row' }, cnt('out') ? C.badge(`${cnt('out')} ngoài ngưỡng`, 'red') : null, cnt('nodata') ? C.badge(`${cnt('nodata')} thiếu dữ liệu`, 'amber') : null, cnt('ok') ? C.badge(`${cnt('ok')} trong ngưỡng`, 'green') : null) : null }));
+
+  // Cập nhật nhanh: các khoản số cũ, cũ nhất trước
+  const stale = L.items.filter(i => i.stale && i.value > 0).sort((x, y) => (x.valuedAt || '') < (y.valuedAt || '') ? -1 : 1);
+  if (stale.length) V.append(C.card('Cập nhật nhanh', Pages.layerItemTable(stale, { showLayer: false, update: true }), { sub: 'Các khoản có số liệu cũ, cũ nhất trước. Vàng tính theo giá MUA vào; ngoại tệ theo tỷ giá mua của ngân hàng.' }));
+
+  // Thu nhập thụ động
+  const P = L.passive; const hasHold = (st.holdings || []).some(x => x.qty > 0);
+  V.append(C.card('Thu nhập thụ động đã nhận', h('div', {},
+    h('p', { class: 'small muted' }, 'Tính các giao dịch thu thuộc danh mục: ', P.cats.length ? P.cats.map(c => c.name).join(', ') : 'chưa có danh mục nào', '. Đánh dấu thêm trong Cài đặt → Danh mục (sửa danh mục thu nhập). Cổ tức bằng cổ phiếu không phải tiền nên không tính.'),
+    P.txns.length ? h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' }, h('thead', {}, h('tr', {}, h('th', {}, 'Ngày'), h('th', {}, 'Nội dung'), h('th', { class: 'num' }, 'Số tiền'))),
+      h('tbody', {}, P.txns.slice(0, 8).map(t => h('tr', {}, h('td', { dataset: { label: 'Ngày' } }, DateUtil.toVN(t.date)), h('td', { class: 'td-main', dataset: { label: 'Nội dung' } }, t.payee || (st.categories.find(c => c.id === t.categoryId) || {}).name || ''), h('td', { class: 'num', dataset: { label: 'Số tiền' } }, C.money(t.amount)))))))
+      : h('p', { class: 'small', text: 'Chưa có khoản nào trong năm nay.' })),
+  { actions: hasHold ? C.btn('Ghi cổ tức', () => Pages.dividendRecord(), { icon: 'plus', cls: 'btn-sm btn-touch' }) : null }));
+};
+
+/** Bảng khoản: tên · lớp (đổi tại chỗ) · giá trị · % trong lớp · độ mới. */
+Pages.layerItemTable = function (items, { showLayer = true, update = false } = {}) {
+  const tot = Util.sum(items.filter(i => i.value > 0), i => i.value);
+  if (!items.length) return h('p', { class: 'small muted', text: 'Không có khoản nào.' });
+  return h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' },
+    h('thead', {}, h('tr', {}, h('th', {}, 'Khoản'), showLayer ? h('th', {}, 'Lớp') : null, h('th', { class: 'num' }, 'Giá trị'), showLayer ? h('th', { class: 'num' }, '% trong nhóm') : null, h('th', {}, update ? 'Vì sao cũ' : 'Số liệu'), update ? h('th', {}, '') : null)),
+    h('tbody', {}, items.map(it => h('tr', {},
+      h('td', { class: 'td-main' }, h('div', { class: 'cell-main', text: it.name }), h('div', { class: 'cell-sub', text: it.sub })),
+      showLayer ? h('td', { dataset: { label: 'Lớp' } }, Pages.layerSelect(it), !it.explicit ? h('div', { class: 'tiny muted', text: 'mặc định' }) : null) : null,
+      h('td', { class: 'num', dataset: { label: 'Giá trị' } }, C.money(it.value)),
+      showLayer ? h('td', { class: 'num', dataset: { label: '% trong nhóm' } }, tot > 0 && it.value > 0 ? Util.fmtPct(it.value / tot * 100, 1) : '—') : null,
+      h('td', { dataset: { label: update ? 'Vì sao cũ' : 'Số liệu' } }, it.stale ? h('span', { class: 'warn-text small', text: it.staleNote || 'số cũ' }) : h('span', { class: 'small muted', text: it.valuedAt ? 'mới · ' + DateUtil.toVN(it.valuedAt) : 'theo sổ' })),
+      update ? h('td', { class: 'actions' }, Pages.layerUpdateBtn(it)) : null)))));
+};
+Pages.layerUpdateBtn = function (it) {
+  const st = App.state;
+  if (it.kind === 'asset') { const as = st.assets.find(x => x.id === it.ref); return as ? C.btn('Cập nhật giá trị', () => Forms.openAssetValue(as), { cls: 'btn-sm btn-ghost btn-touch', icon: 'history' }) : null; }
+  if (it.kind === 'holding') { const x = (st.holdings || []).find(y => y.id === it.ref); if (!x) return null; return PriceService.enabled() ? C.btn('Lấy giá', () => Pages.refreshPrices(true), { cls: 'btn-sm btn-ghost btn-touch', icon: 'sync' }) : C.btn('Nhập giá', () => Pages.holdingEdit(x), { cls: 'btn-sm btn-ghost btn-touch', icon: 'edit' }); }
+  return null;
+};
+/** Ô chọn lớp: đổi là lưu ngay vào đúng bản ghi nguồn (tài khoản / tài sản / mã). */
+Pages.layerSelect = function (it) {
+  const opts = [{ value: '', label: `Mặc định (${Layers.LABELS[Pages.layerDefault(it)]})` }].concat(Layers.KEYS.map(k => ({ value: k, label: Layers.LABELS[k] })));
+  const sel = F.select('layer_' + it.key, opts, it.explicit ? it.layer : '', { 'aria-label': 'Lớp của ' + it.name, class: 'layer-select' });
+  sel.addEventListener('change', () => Pages.setLayers([{ kind: it.kind, ref: it.ref, layer: sel.value }]));
+  return sel;
+};
+Pages.layerDefault = function (it) {
+  const st = App.state; const ctx = { reserveAccounts: LayerData.reserveAccounts(st) };
+  const rec = it.kind === 'account' ? st.accounts.find(x => x.id === it.ref) : it.kind === 'asset' ? st.assets.find(x => x.id === it.ref) : (st.holdings || []).find(x => x.id === it.ref);
+  return Layers.defaultFor(it.kind, rec || {}, ctx);
+};
+Pages.setLayers = async function (changes) {
+  if (!changes.length) return;
+  const now = Util.nowISO(); const coll = { account: 'accounts', asset: 'assets', holding: 'holdings' }; const mk = { account: 'account', asset: 'asset', holding: 'holding' };
+  try {
+    await App.commit('Đổi lớp tài sản', d => {
+      for (const c of changes) {
+        const arr = d[coll[c.kind]]; const i = arr.findIndex(x => x.id === c.ref); if (i < 0) continue;
+        if ((arr[i].layer || '') === (c.layer || '')) continue;
+        arr[i] = Model[mk[c.kind]]({ ...arr[i], layer: c.layer, updatedAt: now });
+      }
+    });
+    Toast.show(changes.length > 1 ? `Đã lưu lớp cho ${changes.length} khoản.` : 'Đã đổi lớp.', { type: 'success' });
+  } catch (e) { Toast.show(e.message, { type: 'error' }); }
+};
+
+/** Phân lớp hàng loạt: mọi khoản trên một màn hình. */
+Pages.layerAssign = function () {
+  const L = LayerData.build(App.state);
+  const rows = L.items.slice().sort((x, y) => y.value - x.value);
+  const sels = new Map();
+  const body = h('div', {},
+    h('p', { class: 'small muted', text: 'Mỗi khoản thuộc đúng một lớp. "Mặc định" là app xếp theo loại — chọn lớp cụ thể để xác nhận. Tài khoản chứng khoán chỉ gồm phần tiền mặt; cổ phiếu được phân lớp theo từng mã.' }),
+    h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' }, h('thead', {}, h('tr', {}, h('th', {}, 'Khoản'), h('th', { class: 'num' }, 'Giá trị'), h('th', {}, 'Lớp'))),
+      h('tbody', {}, rows.map(it => {
+        const opts = [{ value: '', label: `Mặc định (${Layers.LABELS[Pages.layerDefault(it)]})` }].concat(Layers.KEYS.map(k => ({ value: k, label: Layers.LABELS[k] })));
+        const s = F.select('bulk_' + it.key, opts, it.explicit ? it.layer : '', { 'aria-label': 'Lớp của ' + it.name, class: 'layer-select' }); sels.set(it, s);
+        return h('tr', {}, h('td', { class: 'td-main' }, h('div', { class: 'cell-main', text: it.name }), h('div', { class: 'cell-sub', text: it.sub })), h('td', { class: 'num', dataset: { label: 'Giá trị' } }, C.money(it.value)), h('td', { dataset: { label: 'Lớp' } }, s));
+      })))));
+  let m;
+  const save = async () => {
+    const ch = []; for (const [it, s] of sels) if ((it.explicit ? it.layer : '') !== s.value) ch.push({ kind: it.kind, ref: it.ref, layer: s.value });
+    m.close(); if (ch.length) await Pages.setLayers(ch); else Toast.show('Không có thay đổi.', {});
+  };
+  m = Modal.open({ title: 'Phân lớp tài sản', body, size: 'lg', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'button', onclick: save }, 'Lưu phân lớp')] });
+};
+
+/** Đặt nguyên tắc — mọi ô để trống mặc định. */
+Pages.layerPlanForm = function () {
+  const st = App.state; const L = LayerData.build(st); const p = L.plan;
+  const form = h('form', { novalidate: true, id: 'lp-form' }); const fe = F.formError();
+  const num = v => (v === null || v === undefined ? '' : String(v).replace('.', ','));
+  const sumEl = h('div', { class: 'small muted' });
+  const targets = Layers.KEYS.map(k => F.field(`${Layers.LABELS[k]} (%)`, F.input('t_' + k, num(p.targets[k]), { inputmode: 'decimal', placeholder: 'Trống = không theo dõi' }), { name: 't_' + k, hint: L.agg.weights[k] !== null && L.agg.base > 0 ? `Hiện ${Util.fmtPct(L.agg.weights[k] * 100, 1)}` : (k === 'use' ? 'Chỉ áp dụng khi tính cả tài sản sử dụng' : null) }));
+  form.append(h('div', { class: 'form-grid' },
+    h('div', { class: 'field full' }, h('div', { class: 'section-label', text: 'Tỷ trọng mục tiêu của bạn cho từng lớp' }), h('div', { class: 'field-hint', text: 'Để trống lớp nào thì lớp đó không bị đối chiếu. FinPilot không gợi ý con số.' }), sumEl),
+    ...targets,
+    F.field('Biên cho phép (± điểm %)', F.input('band', num(p.band), { inputmode: 'decimal' }), { name: 'band' }),
+    h('div', { class: 'field full' }, F.check('includeUse', p.includeUse, 'Tính cả "Tài sản sử dụng" (nhà đang ở, xe) vào tỷ trọng')),
+    h('div', { class: 'field full' }, h('div', { class: 'section-label', text: 'Nguyên tắc khác' })),
+    F.field('Quỹ dự phòng đủ ít nhất (tháng chi tiêu)', F.input('reserveMonths', num(p.reserveMonths), { inputmode: 'decimal', placeholder: 'VD: 6' }), { name: 'reserveMonths', hint: L.spend ? `Chi bình quân 3 tháng gần nhất: ${Money.format(L.spend)}/tháng` : 'Cần chi tiêu của các tháng đã qua.' }),
+    F.field('Vàng + ngoại tệ từ (%)', F.input('fxMin', num(p.fxGoldMin), { inputmode: 'decimal', placeholder: 'VD: 10' }), { name: 'fxMin' }),
+    F.field('Vàng + ngoại tệ đến (%)', F.input('fxMax', num(p.fxGoldMax), { inputmode: 'decimal', placeholder: 'VD: 15' }), { name: 'fxMax', hint: 'Tính các tài sản nhóm Vàng và Ngoại tệ.' }),
+    h('div', { class: 'field full' }, F.check('noFloat', p.noFloatingDebt, 'Không có khoản nợ lãi thả nổi'), h('div', { class: 'field-hint', text: 'Ghi loại lãi suất (cố định / thả nổi) trong từng Khoản nợ.' }))), fe);
+  const upd = () => { let s = 0, n = 0; for (const k of Layers.KEYS) { const v = F.val(form, 't_' + k).trim(); if (v) { s += Number(v.replace(',', '.')) || 0; n++; } } sumEl.textContent = n ? `Tổng mục tiêu: ${s.toLocaleString('vi-VN')}%${Math.abs(s - 100) > 0.05 ? ' (chưa bằng 100%)' : ''}` : ''; };
+  form.addEventListener('input', upd); upd();
+  let m;
+  form.addEventListener('submit', async e => {
+    e.preventDefault(); F.clearErrors(form); const errs = {};
+    const rd = (name, lo, hi) => { const raw = F.val(form, name).trim(); if (!raw) return null; const v = Number(raw.replace(',', '.')); if (!Number.isFinite(v) || v < lo || v > hi) { errs[name] = `Từ ${lo} đến ${hi}.`; return null; } return v; };
+    const t = {}; for (const k of Layers.KEYS) { const v = rd('t_' + k, 0, 100); if (v !== null) t[k] = v; }
+    const band = rd('band', 0.5, 50); const rm = rd('reserveMonths', 0.5, 60); const lo = rd('fxMin', 0, 100), hi = rd('fxMax', 0, 100);
+    if (lo !== null && hi !== null && lo > hi) errs.fxMax = 'Phải ≥ mức "từ".';
+    if (Object.keys(errs).length) return F.showErrors(form, errs);
+    const plan = Model.layerPlan({ targets: t, band: band === null ? 5 : band, reserveMonths: rm, fxGoldMin: lo, fxGoldMax: hi, noFloatingDebt: form.elements.noFloat.checked, includeUse: form.elements.includeUse.checked });
+    try { await App.commit('Đặt nguyên tắc lớp tài sản', d => { d.settings = { ...d.settings, layerPlan: plan, updatedAt: Util.nowISO() }; }); m.close(); Toast.show('Đã lưu nguyên tắc.', { type: 'success' }); }
+    catch (er) { fe.textContent = er.message; }
+  });
+  m = Modal.open({ title: 'Nguyên tắc của bạn', body: form, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'lp-form' }, 'Lưu')] });
+};
+
+/** Ghi cổ tức tiền: số thực nhận (sau thuế 5%) vào chính tài khoản chứng khoán, danh mục thu nhập thụ động. */
+Pages.dividendRecord = function () {
+  const st = App.state; const hs = (st.holdings || []).filter(x => x.qty > 0);
+  const acc = Util.byId(st.accounts);
+  const cats = st.categories.filter(c => c.kind === 'income' && c.passive && c.active);
+  const catOpts = cats.slice().sort((x, y) => (y.id === 'cat_inc_dividend') - (x.id === 'cat_inc_dividend')).map(c => ({ value: c.id, label: c.name }));
+  if (!st.categories.some(c => c.id === 'cat_inc_dividend')) catOpts.unshift({ value: '__new_dividend', label: 'Cổ tức (tạo danh mục mới, tính là thụ động)' });
+  if (!catOpts.length) st.categories.filter(c => c.kind === 'income' && c.active).forEach(c => catOpts.push({ value: c.id, label: c.name + ' (chưa đánh dấu thụ động)' }));
+  const form = h('form', { novalidate: true, id: 'div-form' }); const fe = F.formError();
+  const hint = h('div', { class: 'small muted' });
+  form.append(h('div', { class: 'form-grid' },
+    F.field('Mã', F.select('hold', hs.map(x => ({ value: x.id, label: `${x.symbol} · ${Money.num(x.qty)} cp · ${(acc.get(x.accountId) || { name: '?' }).name}` })), hs[0] ? hs[0].id : ''), { name: 'hold', required: true }),
+    F.field('Cổ tức tiền mỗi cổ phiếu (đ)', F.money('dps', null, { placeholder: 'VD: 1.000' }), { name: 'dps', hint: '10% mệnh giá = 1.000 đ/cp.' }),
+    F.field('Số tiền thực nhận', F.money('amount', null), { name: 'amount', required: true, hint: 'Tự tính = KL × cổ tức × 95% (trừ thuế TNCN 5%); sửa nếu số về tài khoản khác.' }),
+    F.field('Ngày tiền về', F.date('date', DateUtil.today()), { name: 'date', required: true }),
+    F.field('Danh mục', F.select('cat', catOpts, catOpts[0] ? catOpts[0].value : ''), { name: 'cat', required: true }),
+    h('div', { class: 'field full' }, hint)), fe);
+  const recalc = () => {
+    const x = hs.find(y => y.id === F.val(form, 'hold')); const d = F.moneyVal(form, 'dps', { allowEmpty: true });
+    const net = x && d.ok && d.value ? Layers.netDividend(x.qty, d.value) : null;
+    if (net) { form.elements.amount.value = Money.num(net); hint.textContent = `${Money.num(x.qty)} × ${Money.num(d.value)} × 95% = ${Money.format(net)} — ghi vào ${(acc.get(x.accountId) || { name: '?' }).name}.`; }
+  };
+  form.elements.dps.addEventListener('input', recalc); form.elements.hold.addEventListener('change', recalc);
+  let m;
+  form.addEventListener('submit', async e => {
+    e.preventDefault(); F.clearErrors(form); const errs = {};
+    const x = hs.find(y => y.id === F.val(form, 'hold')); if (!x) errs.hold = 'Chọn mã.';
+    const amt = F.moneyVal(form, 'amount'); if (!amt.ok) errs.amount = amt.error;
+    const date = F.dateVal(form, 'date'); if (!date) errs.date = 'Ngày không hợp lệ.'; else if (date > DateUtil.today()) errs.date = 'Chỉ ghi khi tiền đã về (không ghi ngày tương lai).';
+    let catId = F.val(form, 'cat'); if (!catId) errs.cat = 'Chọn danh mục.';
+    if (Object.keys(errs).length) return F.showErrors(form, errs);
+    const now = Util.nowISO(); const d1 = F.moneyVal(form, 'dps', { allowEmpty: true });
+    try {
+      await App.commit('Ghi cổ tức', d => {
+        if (catId === '__new_dividend') { catId = 'cat_inc_dividend'; if (!d.categories.some(c => c.id === catId)) d.categories.push(Model.category({ id: catId, name: 'Cổ tức', kind: 'income', color: '#0e7490', icon: '💰', passive: true, updatedAt: now })); }
+        const t = Model.transaction({ id: Util.uid('txn'), type: 'income', date, amount: amt.value, accountId: x.accountId, categoryId: catId, payee: `Cổ tức ${x.symbol}`, note: d1.ok && d1.value ? `${Money.num(x.qty)} cp × ${Money.num(d1.value)} đ, đã trừ thuế 5%` : '', tags: ['cổ tức'], createdAt: now, updatedAt: now });
+        const er = Validation.transaction(t, d); if (Object.keys(er).length) throw new AppError(Validation.first(er));
+        d.transactions.push(t);
+      });
+      m.close(); Toast.show(`Đã ghi cổ tức ${x.symbol}: ${Money.format(amt.value)}`, { type: 'success' });
+    } catch (er) { fe.textContent = er.message; }
+  });
+  m = Modal.open({ title: 'Ghi cổ tức tiền đã nhận', body: form, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'div-form' }, 'Ghi')] });
+};
+
+/* ==========================================================================
    APP — khởi tạo, điều hướng, ghi dữ liệu (commit), hoàn tác, đồng bộ
    ========================================================================== */
 const ROUTES = {
@@ -5713,6 +6154,7 @@ const ROUTES = {
   goals: { title: 'Mục tiêu tài chính', icon: 'target' },
   discipline: { title: 'Kỷ luật tài chính', icon: 'lock' },
   portfolio: { title: 'Danh mục chứng khoán', icon: 'layers' },
+  layers: { title: 'Quỹ & lớp tài sản', icon: 'pie' },
   recurring: { title: 'Giao dịch định kỳ', icon: 'repeat' },
   data: { title: 'Sao lưu & dữ liệu', icon: 'database' },
   settings: { title: 'Cài đặt', icon: 'settings' }
@@ -6049,7 +6491,7 @@ window.FinPilot = Object.freeze({
   totals: (from, to) => Ledger.totals(App.state, from, to),
   current: () => { const c = Ledger.current(App.state); return { cash: c.cash, totalAssets: c.totalAssets, liabilities: c.liabilities, netWorth: c.netWorth, balances: Object.fromEntries(c.balances), debts: Object.fromEntries(c.debtBalances) }; },
   integrity: () => Validation.integrity(App.state),
-  _internal: { App, Ledger, Validation, MergeService, ImportExport, Recurring, DateUtil, Money, SyncService, StorageService, Discipline, TrustedClock, CommitLog, Alloc, Model, Goals, Holdings: typeof Holdings !== 'undefined' ? Holdings : null, PriceService: typeof PriceService !== 'undefined' ? PriceService : null, Pages, Portfolio }
+  _internal: { App, Ledger, Validation, MergeService, ImportExport, Recurring, DateUtil, Money, SyncService, StorageService, Discipline, TrustedClock, CommitLog, Alloc, Model, Goals, Holdings: typeof Holdings !== 'undefined' ? Holdings : null, PriceService: typeof PriceService !== 'undefined' ? PriceService : null, Pages, Portfolio, Layers, LayerData: typeof LayerData !== 'undefined' ? LayerData : null }
 });
 
 installTouchIcon();
