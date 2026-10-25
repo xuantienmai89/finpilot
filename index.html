@@ -494,6 +494,8 @@ body.privacy .money:hover{filter:none}
 .stack-16{display:flex;flex-direction:column;gap:16px}.stack-16>*{margin:0}
 .ex-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px 12px;margin-top:6px}
 .ex-grid .check{min-height:36px}
+.ac-split{display:flex;flex-direction:column;gap:4px;margin:6px 0 4px;padding:8px 10px;border-radius:8px;background:var(--surface-2)}
+.ac-split a{text-decoration:none}.ac-split a:hover{text-decoration:underline}
 
 </style>
 </head>
@@ -533,7 +535,7 @@ body.privacy .money:hover{filter:none}
    FinPilot Offline — CORE: hằng số, tiện ích, tiền tệ, ngày tháng, DOM helpers
    ========================================================================== */
 const APP_NAME = 'FinPilot Offline';
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.1';
 const SCHEMA_VERSION = 5; // v5 (1.6): ngân sách tổng có danh sách loại trừ (exclude). v4 v4 (1.5): ngân sách "Tất cả chi tiêu" (categoryId __all__). v3 v3 (FinPilot 1.4): lớp tài sản trên tài khoản/tài sản/mã, cờ thu nhập thụ động, loại lãi suất nợ, nhóm ngoại tệ, kế hoạch lớp
 const MAX_AMOUNT = 100000000000000; // 100 nghìn tỷ đồng / một khoản
 const TZ = 'Asia/Ho_Chi_Minh';
@@ -4047,7 +4049,7 @@ const Forms = {
     const form = h('form', { novalidate: true, id: 'adj-form' }); const fe = F.formError(); const grid = h('div', { class: 'form-grid' });
     const info = h('div', { class: 'field full' });
     const dateWrap = F.date('date', DateUtil.today());
-    grid.append(F.field('Số dư thực tế', F.money('actual', null, { placeholder: 'Theo sao kê / đếm thực tế', autofocus: true }), { required: true, name: 'actual' }), F.field('Tính đến ngày', dateWrap, { required: true, name: 'date' }), F.field('Lý do', F.input('note', 'Đối chiếu số dư', { maxlength: 120 }), { name: 'note', full: true }), info);
+    grid.append(F.field(acc.type === 'investment' ? 'Tiền mặt thực tế trong tài khoản' : 'Số dư thực tế', F.money('actual', null, { placeholder: acc.type === 'investment' ? 'Số dư tiền / sức mua trên app CTCK' : 'Theo sao kê / đếm thực tế', autofocus: true }), { required: true, name: 'actual', hint: acc.type === 'investment' ? 'Chỉ nhập phần TIỀN MẶT. Giá trị cổ phiếu đã được tính ở Danh mục chứng khoán — nhập cả vào đây sẽ bị tính hai lần.' : null }), F.field('Tính đến ngày', dateWrap, { required: true, name: 'date' }), F.field('Lý do', F.input('note', 'Đối chiếu số dư', { maxlength: 120 }), { name: 'note', full: true }), info);
     const upd = () => {
       const d = F.dateVal(form, 'date') || DateUtil.today(); const bal = Ledger.accountBalances(App.state, d).get(acc.id) || 0;
       const a = Money.parse(F.val(form, 'actual'), { allowZero: true, allowEmpty: true });
@@ -4601,22 +4603,29 @@ Pages.accounts = function (view) {
   view.append(C.pageHead('Tài khoản & số dư', 'Số dư hiện tại = số dư ban đầu + biến động trong sổ giao dịch (tính đến hôm nay). Muốn khớp số dư thực tế, dùng "Điều chỉnh số dư".', [C.btn('Thêm tài khoản', () => Forms.openAccount(), { icon: 'plus', cls: 'btn-primary' })]));
   if (!st.accounts.length) { view.append(C.card(null, C.empty('wallet', 'Chưa có tài khoản', 'Tạo tài khoản tiền mặt, ngân hàng, ví điện tử, tiết kiệm hoặc đầu tư.', [C.btn('Tạo tài khoản', () => Forms.openAccount(), { cls: 'btn-primary', icon: 'plus' })]))); return; }
   view.append(h('div', { class: 'kpi-grid mb-12' },
-    C.kpi({ label: 'Tổng số dư', value: C.money(cur.cash), icon: 'wallet', featured: true, sub: `${st.accounts.length} tài khoản` }),
+    C.kpi({ label: 'Tổng số dư', value: C.money(cur.cash), icon: 'wallet', featured: true, sub: `${st.accounts.length} tài khoản${cur.portfolio ? ` · chưa gồm cổ phiếu ${Money.compact(cur.portfolio)}` : ''}` }),
     C.kpi({ label: 'Thanh khoản', value: C.money(cur.liquid), icon: 'coins', sub: 'Tiền mặt, ngân hàng, ví, tiết kiệm' }),
-    C.kpi({ label: 'Tài khoản đầu tư', value: C.money(cur.byType.investment || 0), icon: 'trendUp' }),
+    C.kpi({ label: 'Tài khoản đầu tư', value: C.money((cur.byType.investment || 0) + (cur.portfolio || 0)), icon: 'trendUp', sub: cur.portfolio ? `Tiền mặt ${Money.compact(cur.byType.investment || 0)} · cổ phiếu ${Money.compact(cur.portfolio)}` : null }),
     C.kpi({ label: 'Khác', value: C.money(cur.byType.other || 0), icon: 'more' })));
+  const hold = new Map(); // giá trị cổ phiếu theo tài khoản (từ Danh mục chứng khoán)
+  if (typeof Holdings !== 'undefined') for (const r of Holdings.rows(st)) { if (!r.holding.qty) continue; const x = hold.get(r.holding.accountId) || { value: 0, n: 0 }; x.value += r.value; x.n++; hold.set(r.holding.accountId, x); }
   const counts = new Map(); for (const t of st.transactions) { counts.set(t.accountId, (counts.get(t.accountId) || 0) + 1); if (t.toAccountId) counts.set(t.toAccountId, (counts.get(t.toAccountId) || 0) + 1); }
   const sorted = st.accounts.slice().sort((a, b) => (b.active - a.active) || a.name.localeCompare(b.name, 'vi'));
   view.append(h('div', { class: 'acct-grid' }, sorted.map(a => {
     const bal = cur.balances.get(a.id) || 0; const n = counts.get(a.id) || 0;
+    const hv = hold.get(a.id); const inv = a.type === 'investment';
     return h('div', { class: 'card acct-card' + (a.active ? '' : ' inactive') },
       h('div', { class: 'flex between' }, h('div', { class: 'flex' }, h('div', { class: 'txn-ico', text: ACCOUNT_ICONS[a.type] }), h('div', {}, h('div', { class: 'cell-main', text: a.name }), h('div', { class: 'cell-sub', text: ACCOUNT_TYPES[a.type] }))), !a.active ? C.badge('Ngừng', 'amber') : st.settings.defaultAccountId === a.id ? C.badge('Mặc định', 'blue') : null),
-      h('div', { class: 'ac-bal' }, C.money(bal, { tone: bal < 0 ? 'neg' : '' })),
-      h('div', { class: 'small muted' }, `Số dư đầu ${Money.format(a.openingBalance)} từ ${DateUtil.toVN(a.startDate)} · ${n} giao dịch`),
+      inv && hv ? h('div', { class: 'tiny muted', style: { marginTop: '8px' }, text: 'Tổng giá trị (tiền + cổ phiếu)' }) : null,
+      h('div', { class: 'ac-bal' }, C.money(inv && hv ? bal + hv.value : bal, { tone: bal < 0 ? 'neg' : '' })),
+      inv ? h('div', { class: 'ac-split small' },
+        h('div', { class: 'flex between' }, h('span', { class: 'muted' }, 'Tiền mặt (số dư sổ)'), C.money(bal, { tone: bal < 0 ? 'neg' : '' })),
+        h('div', { class: 'flex between' }, h('a', { href: '#/portfolio', class: 'muted' }, `Cổ phiếu${hv ? ` (${hv.n} mã)` : ''} →`), hv ? C.money(hv.value) : h('span', { class: 'muted', text: 'chưa có mã' }))) : null,
+      h('div', { class: 'small muted' }, `${inv ? 'Tiền mặt đầu kỳ' : 'Số dư đầu'} ${Money.format(a.openingBalance)} từ ${DateUtil.toVN(a.startDate)} · ${n} giao dịch`),
       a.description ? h('div', { class: 'small', text: a.description }) : null,
       h('div', { class: 'ac-actions' },
         C.btn('Giao dịch', () => { Object.assign(App.ui.txnFilter, { q: '', from: '', to: '', type: '', categoryId: '', accountId: a.id, page: 1 }); App.navigate('transactions'); }, { cls: 'btn-sm btn-ghost', icon: 'list' }),
-        C.btn('Điều chỉnh', () => Forms.openAdjust(a), { cls: 'btn-sm btn-ghost', icon: 'swap', disabled: !a.active }),
+        C.btn(inv ? 'Điều chỉnh tiền mặt' : 'Điều chỉnh', () => Forms.openAdjust(a), { cls: 'btn-sm btn-ghost', icon: 'swap', disabled: !a.active }),
         C.iconBtn('edit', 'Sửa', () => Forms.openAccount(a)),
         C.iconBtn(a.active ? 'eyeOff' : 'eye', a.active ? 'Ngừng hoạt động' : 'Kích hoạt lại', () => Pages.toggleAccount(a)),
         C.iconBtn('trash', 'Xóa', () => Pages.deleteAccount(a), 'danger')));
