@@ -496,6 +496,20 @@ body.privacy .money:hover{filter:none}
 .ex-grid .check{min-height:36px}
 .ac-split{display:flex;flex-direction:column;gap:4px;margin:6px 0 4px;padding:8px 10px;border-radius:8px;background:var(--surface-2)}
 .ac-split a{text-decoration:none}.ac-split a:hover{text-decoration:underline}
+/* v1.7 — Gói cho Claude & checklist thiết lập */
+.brief{display:flex;flex-direction:column;gap:10px}
+.brief-text{width:100%;min-height:260px;font-family:inherit;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:10px;background:var(--surface-2);color:var(--text)}
+.setup-list{display:flex;flex-direction:column;margin-top:8px}
+.setup-item{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--border)}
+.setup-mark{flex:0 0 22px;height:22px;border-radius:50%;border:2px solid var(--border-strong);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--on-primary)}
+.setup-item.ok .setup-mark{background:var(--green);border-color:var(--green)}
+.setup-item.ok .cell-main{color:var(--text-2)}
+.setup-body{flex:1 1 auto;min-width:0}
+.setup-stuck summary{cursor:pointer;font-size:12.5px;color:var(--primary);margin-top:4px;min-height:28px;display:flex;align-items:center}
+.setup-stuck p{margin:4px 0 0}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.setup-card .card-head .btn-group{flex-wrap:nowrap}
+@media (max-width:560px){.setup-card .card-head{flex-direction:column;gap:6px}.setup-card .card-head .btn-group{align-self:flex-start;margin-left:-10px}}
 
 </style>
 </head>
@@ -535,7 +549,7 @@ body.privacy .money:hover{filter:none}
    FinPilot Offline — CORE: hằng số, tiện ích, tiền tệ, ngày tháng, DOM helpers
    ========================================================================== */
 const APP_NAME = 'FinPilot Offline';
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.7.0';
 const SCHEMA_VERSION = 5; // v5 (1.6): ngân sách tổng có danh sách loại trừ (exclude). v4 v4 (1.5): ngân sách "Tất cả chi tiêu" (categoryId __all__). v3 v3 (FinPilot 1.4): lớp tài sản trên tài khoản/tài sản/mã, cờ thu nhập thụ động, loại lãi suất nợ, nhóm ngoại tệ, kế hoạch lớp
 const MAX_AMOUNT = 100000000000000; // 100 nghìn tỷ đồng / một khoản
 const TZ = 'Asia/Ho_Chi_Minh';
@@ -2630,6 +2644,97 @@ const Layers = {
 };
 
 /* ==========================================================================
+   GÓI CHO CLAUDE (v1.7) — văn bản Markdown người dùng TỰ dán vào Claude.
+   Thuần: chỉ nhận ảnh chụp đã gộp (snap), không đọc trạng thái. Mặc định KHÔNG có
+   số tiền tuyệt đối, tên/số tài khoản, tên ngân hàng, ghi chú, tên khoản nợ.
+   ========================================================================== */
+const Brief = {
+  pct(x, d = 1) { return x === null || x === undefined || !Number.isFinite(x) ? '—' : (Math.round(x * Math.pow(10, d)) / Math.pow(10, d)).toLocaleString('vi-VN', { maximumFractionDigits: d }) + '%'; },
+  vnd(n) { return Number.isFinite(n) ? Math.round(n).toLocaleString('vi-VN') + ' đ' : '—'; },
+  date(iso) { if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return '—'; const [y, m, d] = iso.slice(0, 10).split('-'); return `${d}/${m}/${y}`; },
+  /** Bỏ ký tự có thể phá cấu trúc Markdown (|, xuống dòng) khỏi chuỗi do người dùng nhập. */
+  safe(s) { return String(s == null ? '' : s).replace(/[\r\n|`<>]/g, ' ').trim(); },
+  render(snap, opts = {}) {
+    const A = !!opts.includeAmounts; const s = snap || {}; const L = [];
+    L.push('# FinPilot — gói ngữ cảnh cho Claude');
+    L.push('');
+    L.push(`- Ngày chốt dữ liệu: ${this.date(s.asOf)} · FinPilot v${this.safe(s.appVersion)}`);
+    L.push(`- Độ tin cậy dữ liệu tài sản: ${this.pct(s.reliability, 0)} (phần giá trị tài sản đã phân lớp và có số liệu còn mới)`);
+    if (s.priceAsOf) L.push(`- Giá cổ phiếu cập nhật lần cuối: ${this.date(s.priceAsOf)}`);
+    L.push(`- Số tiền tuyệt đối: ${A ? 'CÓ (người dùng chủ động bật)' : 'KHÔNG kèm — chỉ tỷ lệ %'}`);
+    L.push('');
+    L.push('## Lời dặn cho Claude');
+    L.push('- Trả lời tiếng Việt, ngắn gọn; giải thích thuật ngữ ngay lần đầu.');
+    L.push('- Dùng số trong gói này làm nguồn chuẩn. Nếu số của bạn (từ nguồn khác) khác, nêu rõ chênh lệch và nguồn.');
+    L.push('- Con số nào cũng ghi rõ nguồn hoặc cách tính. Số nào đánh dấu "cũ" thì nhắc tôi cập nhật trước khi kết luận.');
+    L.push('- Không khuyến nghị mua/bán mã cụ thể. Chỉ phân tích dựa trên nguyên tắc do chính tôi đặt.');
+    L.push('- Chưa chắc thì hỏi lại tôi trước khi trả lời.');
+    L.push('');
+    const ly = s.layers || [];
+    if (ly.length) {
+      L.push(`## Tỷ trọng các lớp tài sản (trên tổng tài sản tính tỷ trọng${s.includeUse ? '' : ', không tính nhà ở/xe đang dùng'})`);
+      L.push(A ? '| Lớp | Tỷ trọng | Giá trị | Số liệu |' : '| Lớp | Tỷ trọng | Số liệu |');
+      L.push(A ? '|---|---:|---:|---|' : '|---|---:|---|');
+      for (const x of ly) L.push(A ? `| ${this.safe(x.label)} | ${this.pct(x.weight)} | ${this.vnd(x.value)} | ${x.stale ? `${x.stale} khoản cũ` : 'mới'} |` : `| ${this.safe(x.label)} | ${this.pct(x.weight)} | ${x.stale ? `${x.stale} khoản cũ` : 'mới'} |`);
+      L.push('');
+    }
+    if (A && s.amounts) {
+      L.push('## Số tổng (người dùng chủ động bật)');
+      L.push(`- Tổng tài sản: ${this.vnd(s.amounts.gross)} · Nợ: ${this.vnd(s.amounts.liabilities)} · Tài sản ròng: ${this.vnd(s.amounts.netWorth)}`);
+      if (Number.isFinite(s.amounts.monthlySpend)) L.push(`- Chi tiêu bình quân 3 tháng: ${this.vnd(s.amounts.monthlySpend)}/tháng`);
+      L.push('');
+    }
+    L.push('## Nguyên tắc do tôi tự đặt — trạng thái hiện tại');
+    if (!(s.rules || []).length) L.push('- (Chưa đặt nguyên tắc nào.)');
+    for (const r of s.rules || []) L.push(`- [${({ ok: 'Trong ngưỡng', out: 'Ngoài ngưỡng', nodata: 'Thiếu dữ liệu' })[r.status] || '?'}] ${this.safe(r.label)} — ${this.safe(r.metric)}`);
+    L.push('');
+    L.push('## Dòng tiền & an toàn');
+    if (Number.isFinite(s.reserveMonths)) L.push(`- Quỹ dự phòng đủ ${(Math.floor(s.reserveMonths * 10) / 10).toLocaleString('vi-VN')} tháng chi tiêu bình quân 3 tháng gần nhất`);
+    if (Number.isFinite(s.savingsRate)) L.push(`- Tỷ lệ tiết kiệm 3 tháng gần nhất: ${this.pct(s.savingsRate)} thu nhập`);
+    if (s.budget) L.push(`- Ngân sách tháng này (${this.safe(s.budget.label)}): đã dùng ${this.pct(s.budget.pct, 0)}${A && s.budget.limit ? ` (${this.vnd(s.budget.spent)} / ${this.vnd(s.budget.limit)})` : ''}`);
+    if (s.debt && s.debt.count) L.push(`- Nợ: ${s.debt.count} khoản · nợ/tổng tài sản ${this.pct(s.debt.ratio)} · lãi thả nổi ${s.debt.floating} · cố định ${s.debt.fixed} · chưa ghi loại lãi ${s.debt.unknown}`);
+    else L.push('- Nợ: không có khoản nợ đang dư');
+    L.push('');
+    const hs = s.holdings || [];
+    if (hs.length) {
+      L.push('## Danh mục cổ phiếu (giá trị hợp lý là định giá CỦA TÔI, không phải khuyến nghị)');
+      L.push(A ? '| Mã | Tỷ trọng DM | Khối lượng | Giá | Giá trị hợp lý của tôi | Vùng mua của tôi | Biên an toàn | Ngày định giá | Ghi chú dữ liệu |' : '| Mã | Tỷ trọng DM | Giá | Giá trị hợp lý của tôi | Vùng mua của tôi | Biên an toàn | Ngày định giá | Ghi chú dữ liệu |');
+      L.push(A ? '|---|---:|---:|---:|---:|---:|---:|---|---|' : '|---|---:|---:|---:|---:|---:|---|---|');
+      for (const x of hs) {
+        const cells = [this.safe(x.symbol), this.pct(x.weight), ...(A ? [Number.isFinite(x.qty) ? x.qty.toLocaleString('vi-VN') : '—'] : []), this.vnd(x.price), x.fair ? this.vnd(x.fair) : '—', x.buyBelow ? '≤ ' + this.vnd(x.buyBelow) : '—', Number.isFinite(x.mos) ? this.pct(x.mos * 100) : '—', x.valDate ? this.date(x.valDate) : '—', this.safe(x.note || '')];
+        L.push('| ' + cells.join(' | ') + ' |');
+      }
+      L.push('');
+      L.push('Biên an toàn = (giá trị hợp lý − giá) / giá trị hợp lý; âm nghĩa là giá đang cao hơn định giá của tôi.');
+      L.push('');
+    }
+    L.push('---');
+    L.push('Gói do FinPilot tạo; người dùng tự xem trước và tự dán. Không chứa tên/số tài khoản, ngân hàng, ghi chú hay tên khoản nợ.');
+    return L.join('\n');
+  }
+};
+
+/* ---------------- Checklist "Thiết lập FinPilot" — suy ra từ dữ liệu, không lưu trạng thái ---------------- */
+const Setup = {
+  ITEMS: [
+    { key: 'accounts', title: 'Tạo tài khoản và nhập số dư', route: 'accounts', done: 'Có ít nhất 1 tài khoản (tiền mặt, ngân hàng, ví…).', stuck: 'Số dư đầu = số tiền đang có HÔM NAY, ngày bắt đầu = hôm nay. Không cần nhập lại lịch sử cũ. Tài khoản chứng khoán chỉ nhập phần tiền mặt.' },
+    { key: 'recent', title: 'Ghi giao dịch thường xuyên', route: 'transactions', done: 'Có giao dịch trong 30 ngày qua.', stuck: 'Bấm "+ Giao dịch" ở góc trên. Mới bắt đầu thì chỉ cần ghi các khoản chi lớn; số dư lệch thì dùng "Điều chỉnh" để khớp lại.' },
+    { key: 'budget', title: 'Đặt ngân sách tháng này', route: 'budgets', done: 'Tháng này có ngân sách tổng hoặc ngân sách theo danh mục.', stuck: 'Cách nhanh nhất: một "Ngân sách tổng" (có thể trừ Nhà ở). Muốn tháng nào cũng có, đặt Ngân sách mặc định trong Cài đặt rồi bấm "Áp dụng mặc định".' },
+    { key: 'reserve', title: 'Lập quỹ dự phòng', route: 'goals', done: 'Có mục tiêu loại "Quỹ dự phòng".', stuck: 'Tạo Mục tiêu → loại Quỹ dự phòng. Nên chọn "Theo số dư một tài khoản" nếu bạn để quỹ ở một tài khoản riêng — app tự xếp tài khoản đó vào lớp Dự phòng.' },
+    { key: 'alloc', title: 'Đặt quy tắc phân bổ thu nhập', route: 'discipline', done: 'Có quy tắc chia thu nhập (lương) vào các tài khoản/mục tiêu.', stuck: 'Trang Kỷ luật tài chính → bật quy tắc lương. Tăng tỷ lệ áp dụng ngay; giảm tỷ lệ phải chờ 72 giờ — đó là cố ý, để chặn quyết định cảm tính.' },
+    { key: 'layers', title: 'Phân lớp tài sản và đặt nguyên tắc', route: 'layers', done: 'Đã đặt ít nhất một nguyên tắc ở trang Quỹ & lớp tài sản.', stuck: 'App đã tự xếp lớp theo loại; chỉ cần sửa chỗ khác ý ở "Phân lớp", rồi "Đặt nguyên tắc" (vd. quỹ dự phòng ≥ 6 tháng). FinPilot không đặt sẵn con số nào.' },
+    { key: 'valuation', title: 'Định giá ít nhất 1 mã đang nắm', route: 'portfolio', when: 'holdings', done: 'Có ít nhất 1 mã có "Giá trị hợp lý của bạn".', stuck: 'Trang Danh mục chứng khoán → Sửa mã → mục "Định giá của bạn", hoặc "Dán định giá" nhiều mã một lần. Đây là số của bạn, app chỉ so với giá để hiện biên an toàn.' },
+    { key: 'backup', title: 'Bật đồng bộ hoặc sao lưu', route: 'data', done: 'Đồng bộ Google Drive đang bật, hoặc đã sao lưu ra file trong 30 ngày.', stuck: 'Dữ liệu chỉ nằm trong trình duyệt. Xóa dữ liệu duyệt web là mất. Trang Sao lưu & dữ liệu → bật đồng bộ Drive, hoặc "Xuất sao lưu" định kỳ.' }
+  ],
+  /** facts: { accounts, recent, budget, reserve, alloc, layers, valuation, backup, holdings } (boolean). */
+  evaluate(facts) {
+    const items = this.ITEMS.filter(it => !it.when || facts[it.when]).map(it => ({ ...it, ok: !!facts[it.key] }));
+    const done = items.filter(i => i.ok).length;
+    return { items, done, total: items.length, complete: done === items.length, next: items.find(i => !i.ok) || null };
+  }
+};
+
+/* ==========================================================================
    DISCIPLINE — kỷ luật tài chính: phân bổ khi tiền về, khóa ảo, "Được phép chi",
    nhật ký cam kết, khóa 72 giờ. Nguyên tắc: chặn ý định, không chặn sự thật.
    ========================================================================== */
@@ -3155,6 +3260,75 @@ const LayerData = {
       return { today, cur, plan, items, agg, rules, spend, passive, liabilities: cur.liabilities, netWorth: cur.netWorth, matchesLedger: agg.gross === cur.totalAssets };
     });
   }
+};
+
+/* --------------------------- Gói cho Claude: gom số liệu đã tổng hợp (không chứa tên/số tài khoản) --------------------------- */
+const BriefData = {
+  collect(st) {
+    const today = DateUtil.today(); const L = LayerData.build(st); const a = L.agg; const plan = L.plan;
+    const layers = Layers.KEYS.concat('none').filter(k => (a.includeUse || k !== 'use') && a.by[k].n && a.weights[k] !== null)
+      .map(k => ({ key: k, label: Layers.LABELS[k], weight: a.weights[k] * 100, value: Math.max(0, a.by[k].value), stale: a.by[k].stale }));
+    const pts = x => (x > 0 ? '+' : '') + (Math.round(x * 10) / 10).toLocaleString('vi-VN', { maximumFractionDigits: 1 });
+    const pc = x => (Math.round(x * 10) / 10).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + '%';
+    const debtsLive = st.debts.filter(d => d.active && (L.cur.debtBalances.get(d.id) || 0) > 0);
+    const reserveMonths = L.spend > 0 ? Math.max(0, a.by.reserve.value) / L.spend : null;
+    // Chỉ số gọn cho từng nguyên tắc — tự dựng, không dùng câu chi tiết (có thể chứa số tiền/tên khoản nợ).
+    const rules = L.rules.map(r => {
+      let metric = '';
+      if (r.id.startsWith('t_')) { const k = r.id.slice(2); const w = a.weights[k]; metric = w === null || r.status === 'nodata' ? 'thiếu dữ liệu' : `hiện ${pc(w * 100)} (lệch ${pts(w * 100 - plan.targets[k])} điểm %)`; }
+      else if (r.id === 'reserve_m') metric = reserveMonths === null ? 'chưa có chi tiêu để tính' : `đủ ${(Math.floor(reserveMonths * 10) / 10).toLocaleString('vi-VN')} tháng`;
+      else if (r.id === 'fxgold') metric = a.base > 0 ? `hiện ${pc(a.fxGold / a.base * 100)}` : 'thiếu dữ liệu';
+      else if (r.id === 'nofloat') { const fl = debtsLive.filter(d => d.rateType === 'floating').length; const unk = debtsLive.filter(d => d.rateType !== 'fixed' && d.rateType !== 'floating').length; metric = `${fl} khoản thả nổi, ${unk} khoản chưa ghi loại lãi`; }
+      return { status: r.status, label: r.label, metric };
+    });
+    const lastFull = DateUtil.addMonthKey(DateUtil.monthKey(today), -1);
+    const ms = Ledger.monthly(st, DateUtil.addMonthKey(lastFull, -2), lastFull);
+    const inc = Util.sum(ms, m => m.income), exp = Util.sum(ms, m => m.expense);
+    const bu = Budget.usage(st, DateUtil.monthKey(today));
+    const budget = bu.headline ? { label: bu.all ? (bu.all.exclude.length ? `ngân sách tổng, trừ ${bu.all.excludeNames.join(', ')}` : 'ngân sách tổng') : 'theo danh mục', pct: bu.headline.pct, limit: bu.headline.limit, spent: bu.headline.spent } : null;
+    const rows = Holdings.rows(st).filter(r => r.holding.qty > 0);
+    const pfTotal = Util.sum(rows, r => r.value);
+    const bySym = new Map();
+    for (const r of rows) { const x = bySym.get(r.holding.symbol) || { symbol: r.holding.symbol, qty: 0, value: 0, row: r }; x.qty += r.holding.qty; x.value += r.value; bySym.set(r.holding.symbol, x); }
+    const holdings = Array.from(bySym.values()).sort((x, y) => y.value - x.value).map(x => {
+      const r = x.row; const v = r.val; const notes = [];
+      if (r.priceSource === 'cost' || r.priceSource === 'none') notes.push('chưa có giá thị trường');
+      else if (r.fresh === 'stale') notes.push('giá cũ');
+      if (v && v.stale) notes.push('định giá cần cập nhật (' + v.reason + ')');
+      return { symbol: x.symbol, qty: x.qty, weight: pfTotal > 0 ? x.value / pfTotal * 100 : null, price: r.priceSource === 'cost' || r.priceSource === 'none' ? null : r.price, fair: v ? v.fair : null, buyBelow: v ? v.buyBelow : null, mos: v ? v.mos : null, valDate: v && r.holding.valDate ? r.holding.valDate : '', note: notes.join('; ') };
+    });
+    const fetched = rows.map(r => r.quote && r.quote.fetchedAt).filter(Boolean).sort().slice(-1)[0];
+    return {
+      asOf: today, appVersion: APP_VERSION, reliability: a.coverage.reliable === null ? null : a.coverage.reliable * 100, priceAsOf: fetched ? DateUtil.isoDateVN(fetched) : '',
+      includeUse: a.includeUse, layers, rules, reserveMonths, savingsRate: inc > 0 ? (inc - exp) / inc * 100 : null, budget,
+      debt: { count: debtsLive.length, ratio: a.gross > 0 ? L.liabilities / a.gross * 100 : null, floating: debtsLive.filter(d => d.rateType === 'floating').length, fixed: debtsLive.filter(d => d.rateType === 'fixed').length, unknown: debtsLive.filter(d => d.rateType !== 'fixed' && d.rateType !== 'floating').length },
+      holdings, amounts: { gross: a.gross, liabilities: L.liabilities, netWorth: L.netWorth, monthlySpend: L.spend }
+    };
+  },
+  build(st, opts) { return Brief.render(this.collect(st), opts); }
+};
+
+/* --------------------------- Checklist thiết lập: dữ kiện suy ra từ dữ liệu --------------------------- */
+const SetupData = {
+  facts(st, prefs = {}) {
+    const today = DateUtil.today(); const from = DateUtil.addDays(today, -30);
+    let alloc = false;
+    try { const v = typeof Discipline !== 'undefined' ? Discipline.view(st) : null; alloc = !!(v && v.cfg && (v.cfg.rules || []).some(r => (r.steps || []).length)); } catch (e) { alloc = false; }
+    const lb = prefs.lastBackupAt ? DateUtil.isoDateVN(prefs.lastBackupAt) : '';
+    const sync = typeof SyncService !== 'undefined' && SyncService.isEnabled && SyncService.isEnabled();
+    return {
+      accounts: st.accounts.length > 0,
+      recent: st.transactions.some(t => t.date >= from && t.date <= today),
+      budget: !!Budget.usage(st, DateUtil.monthKey(today)).headline,
+      reserve: st.goals.some(g => g.type === 'emergency'),
+      alloc,
+      layers: LayerData.build(st).rules.length > 0,
+      holdings: (st.holdings || []).some(x => x.qty > 0),
+      valuation: (st.holdings || []).some(x => x.qty > 0 && x.fairValue),
+      backup: !!sync || (!!lb && lb >= from)
+    };
+  },
+  evaluate(st, prefs) { return Setup.evaluate(this.facts(st, prefs)); }
 };
 
 /* ==========================================================================
@@ -4434,6 +4608,7 @@ Pages.dashboard = function (view) {
   if (due.length) view.append(h('div', { class: 'banner warn' }, Icon('repeat'), h('div', { class: 'b-body' }, h('div', { class: 'b-title', text: `${due.length} giao dịch định kỳ đến hạn chờ xác nhận` }), h('div', { class: 'small', text: due.slice(0, 3).map(d => `${DateUtil.shortVN(d.date)} · ${d.rule.name}`).join(' — ') + (due.length > 3 ? '…' : '') })), h('a', { class: 'btn btn-sm', href: '#/recurring' }, 'Xem & xác nhận')));
 
   const hero = Pages.disciplineHero ? Pages.disciplineHero(st) : null; if (hero) view.append(hero);
+  const setup = Pages.setupCard ? Pages.setupCard(st) : null; if (setup) view.append(h('div', { class: 'mb-12' }, setup));
   view.append(C.sectionTitle('Hiện tại', `tính đến ${DateUtil.toVN(cur.asOf)}`));
   view.append(h('div', { class: 'kpi-grid' },
     C.kpi({ label: 'Tài sản ròng', value: C.money(cur.netWorth), sub: 'Tổng tài sản − Tổng nợ', icon: 'shield', featured: true }),
@@ -4979,6 +5154,10 @@ Pages.data = function (view) {
     h('p', { class: 'tiny muted', text: counts }),
     h('div', { class: 'btn-group mt-12' }, C.btn('Tải file sao lưu', () => Pages.exportBackup(false), { icon: 'download', cls: 'btn-primary' }), ('showSaveFilePicker' in window) ? C.btn('Lưu vào thư mục…', () => Pages.exportBackup(true), { icon: 'download' }) : null),
     h('p', { class: 'tiny muted mt-8' }, 'Lần sao lưu ra file gần nhất trên thiết bị này: ', App.prefs.lastBackupAt ? DateUtil.dateTimeVN(App.prefs.lastBackupAt) : 'chưa có')), { cls: 'span-6', sub: `Tên file gợi ý: ${ImportExport.filename()}` }));
+
+  // --- Gói cho Claude ---
+  grid.append(Pages.briefCard());
+  if (App.prefs.setupHidden) grid.append(C.card('Checklist thiết lập', h('div', {}, h('p', { class: 'small', text: 'Bạn đã ẩn checklist "Thiết lập FinPilot" ở Tổng quan trên thiết bị này.' }), h('div', { class: 'btn-group mt-12' }, C.btn('Hiện lại', () => { App.setPref('setupHidden', false); App.navigate('dashboard'); }, { cls: 'btn-sm' }))), { cls: 'span-6' }));
 
   // --- Khôi phục ---
   const fileInput = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' } });
@@ -5992,7 +6171,7 @@ Pages.layers = function (view) {
   const st = App.state; const L = LayerData.build(st); const a = L.agg; const plan = L.plan;
   const pct = (x, d = 0) => (x === null || !Number.isFinite(x) ? '—' : Util.fmtPct(x * 100, d));
   view.append(C.pageHead('Quỹ & lớp tài sản', 'Mỗi khoản tiền nằm ở đúng một lớp, gán ngay tại tài khoản, tài sản hoặc từng mã cổ phiếu. Mục tiêu tài chính chỉ là nhãn, không cộng thêm vào tổng. Cách phân lớp và các ngưỡng là của bạn — FinPilot không khuyến nghị phân bổ.',
-    [C.btn('Phân lớp', () => Pages.layerAssign(), { icon: 'edit', cls: 'btn-primary' }), C.btn('Đặt nguyên tắc', () => Pages.layerPlanForm(), { icon: 'settings' })]));
+    [C.btn('Phân lớp', () => Pages.layerAssign(), { icon: 'edit', cls: 'btn-primary' }), C.btn('Đặt nguyên tắc', () => Pages.layerPlanForm(), { icon: 'settings' }), C.btn('Gói cho Claude', () => Pages.claudeBrief(), { icon: 'copy' })]));
   const V = h('div', { class: 'stack-16' }); view.append(V);
   if (!L.items.length) {
     V.append(C.card(null, C.empty('pie', 'Chưa có gì để phân lớp', 'Thêm tài khoản, tài sản hoặc mã cổ phiếu. Mỗi khoản sẽ được xếp sẵn vào một lớp theo loại, bạn sửa lại nếu khác ý.',
@@ -6207,6 +6386,64 @@ Pages.dividendRecord = function () {
 };
 
 /* ==========================================================================
+   v1.7 — Gói cho Claude (người dùng tự xem trước & tự dán) + Checklist thiết lập.
+   ========================================================================== */
+Pages.claudeBrief = function () {
+  const st = App.state; let amounts = false;
+  const ta = h('textarea', { class: 'brief-text', readonly: true, rows: 14, 'aria-label': 'Nội dung gói cho Claude', spellcheck: 'false' });
+  const meta = h('div', { class: 'tiny muted' });
+  const draw = () => { const md = BriefData.build(st, { includeAmounts: amounts }); ta.value = md; meta.textContent = `${md.split('\n').length} dòng · ${md.length.toLocaleString('vi-VN')} ký tự`; return md; };
+  const amt = h('label', { class: 'check' }, h('input', { type: 'checkbox', name: 'brief_amounts', onchange: e => { amounts = e.target.checked; draw(); } }), 'Kèm số tiền tuyệt đối (tổng tài sản, nợ, khối lượng cổ phiếu)');
+  const body = h('div', { class: 'brief' },
+    C.callout('alert', h('div', {},
+      h('b', {}, 'Dán vào Claude nghĩa là gửi dữ liệu này lên máy chủ của Anthropic.'),
+      h('ul', { class: 'small' },
+        h('li', {}, 'Trước khi dán: trong Claude vào Cài đặt → Quyền riêng tư, tắt mục cho phép dùng dữ liệu để cải thiện mô hình.'),
+        h('li', {}, 'Gói chỉ của hồ sơ đang mở. Chỉ xuất hồ sơ của chính bạn.'),
+        h('li', {}, 'Mặc định KHÔNG có số tiền tuyệt đối, tên/số tài khoản, tên ngân hàng, ghi chú, tên khoản nợ. Chỉ tỷ lệ % và số liệu tổng hợp.'),
+        h('li', {}, 'Gợi ý: dán vào một Project "Tài chính cá nhân" trên Claude; khi số liệu đổi, xuất gói mới và thay gói cũ.'))), 'warn'),
+    h('div', { class: 'field' }, amt),
+    ta, meta);
+  const md0 = draw();
+  let m;
+  const copy = async () => {
+    const md = ta.value;
+    try { await navigator.clipboard.writeText(md); Toast.show('Đã sao chép gói. Dán vào Claude (Project "Tài chính cá nhân").', { type: 'success' }); }
+    catch (e) { ta.focus(); ta.select(); try { ta.setSelectionRange(0, md.length); } catch (er) {} Toast.show('Trình duyệt không cho tự sao chép — đã chọn sẵn toàn bộ, hãy nhấn giữ/Ctrl+C để sao chép, hoặc tải file .md.', { type: 'warn', timeout: 8000 }); }
+  };
+  const dl = () => { Util.download(ta.value, `FinPilot_GoiChoClaude_${DateUtil.today()}.md`, 'text/markdown;charset=utf-8'); Toast.show('Đã tải file .md', { type: 'success' }); };
+  m = Modal.open({ title: 'Gói cho Claude', body, size: 'lg', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Đóng'), h('button', { class: 'btn', type: 'button', onclick: dl }, 'Tải file .md'), h('button', { class: 'btn btn-primary', type: 'button', onclick: copy }, 'Sao chép')] });
+  void md0;
+};
+Pages.briefCard = function () {
+  return C.card('Gói cho Claude', h('div', {},
+    h('p', { class: 'small', text: 'Tạo bản tóm tắt tình hình tài chính (tỷ trọng %, nguyên tắc bạn đặt, quỹ dự phòng, danh mục và định giá của bạn) để dán vào Claude khi muốn hỏi ý kiến. Bạn xem trước toàn văn; mặc định không có số tiền tuyệt đối, tên hay số tài khoản.' }),
+    h('div', { class: 'btn-group mt-12' }, C.btn('Tạo gói cho Claude', () => Pages.claudeBrief(), { icon: 'copy', cls: 'btn-primary' }))), { cls: 'span-6', sub: 'Không kết nối tự động — chỉ khi bạn tự bấm và tự dán' });
+};
+
+/** Thẻ "Thiết lập FinPilot" trên Tổng quan: tự tick theo dữ liệu, ẩn được trên thiết bị này. */
+Pages.setupCard = function (st) {
+  if (App.prefs.setupHidden) return null;
+  const ev = SetupData.evaluate(st, App.prefs);
+  if (ev.complete) return null;
+  const open = Pages._setupOpen !== false;
+  const list = h('div', { class: 'setup-list' }, ev.items.map(it => h('div', { class: 'setup-item' + (it.ok ? ' ok' : '') },
+    h('span', { class: 'setup-mark', 'aria-hidden': 'true', text: it.ok ? '✓' : '' }),
+    h('div', { class: 'setup-body' },
+      h('div', { class: 'cell-main' }, it.title, it.ok ? h('span', { class: 'sr-only', text: ' — đã xong' }) : null),
+      h('div', { class: 'tiny muted', text: 'Xong khi: ' + it.done }),
+      !it.ok ? h('details', { class: 'setup-stuck' }, h('summary', {}, 'Kẹt ở đâu?'), h('p', { class: 'small', text: it.stuck })) : null),
+    !it.ok ? C.btn('Làm ngay', () => App.navigate(it.route), { cls: 'btn-sm btn-touch' }) : null)));
+  return C.card(`Thiết lập FinPilot · ${ev.done}/${ev.total}`, h('div', {},
+    C.progress(ev.done / ev.total * 100, '', false),
+    ev.next ? h('p', { class: 'small mt-8' }, 'Bước tiếp theo: ', h('b', {}, ev.next.title), '. ', h('a', { href: '#/' + ev.next.route }, 'Làm ngay →')) : null,
+    open ? list : null),
+  { sub: 'Tự đánh dấu theo dữ liệu thật của bạn — không cần tick tay.', cls: 'setup-card', actions: h('div', { class: 'btn-group' },
+    C.btn(open ? 'Thu gọn' : 'Xem các bước', () => { Pages._setupOpen = !open; App.render(); }, { cls: 'btn-sm btn-ghost btn-touch' }),
+    C.btn('Ẩn', async () => { App.setPref('setupHidden', true); App.render(); Toast.show('Đã ẩn checklist trên thiết bị này. Hiện lại trong Sao lưu & dữ liệu.', { type: 'info' }); }, { cls: 'btn-sm btn-ghost btn-touch' })) });
+};
+
+/* ==========================================================================
    APP — khởi tạo, điều hướng, ghi dữ liệu (commit), hoàn tác, đồng bộ
    ========================================================================== */
 const ROUTES = {
@@ -6230,7 +6467,7 @@ const App = {
   state: null,
   route: 'dashboard',
   ui: { txnFilter: { q: '', from: '', to: '', type: '', categoryId: '', accountId: '', sort: 'date_desc', page: 1 }, budgetMonth: null, reportTab: 'income-expense', reportListType: '' },
-  prefs: { theme: 'system', privacyMode: false, period: { key: 'month', custom: null }, lastBackupAt: null, noticeDismissed: false },
+  prefs: { theme: 'system', privacyMode: false, period: { key: 'month', custom: null }, lastBackupAt: null, noticeDismissed: false, setupHidden: false },
   busy: Promise.resolve(),
   undoEntry: null,
   writeBlocked: null,
