@@ -510,6 +510,25 @@ body.privacy .money:hover{filter:none}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
 .setup-card .card-head .btn-group{flex-wrap:nowrap}
 @media (max-width:560px){.setup-card .card-head{flex-direction:column;gap:6px}.setup-card .card-head .btn-group{align-self:flex-start;margin-left:-10px}}
+/* v1.8 — nhật ký quyết định, lịch dòng tiền */
+.dec-item{border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:var(--surface);display:flex;flex-direction:column;gap:6px;min-width:0}
+.dec-item.due{border-color:var(--amber, #d97706);box-shadow:inset 3px 0 0 var(--amber, #d97706)}
+.dec-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap}
+.dec-thesis{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.dec-item p{margin:0;overflow-wrap:anywhere}
+.dec-checks{display:flex;flex-direction:column;gap:4px}
+.dec-checks summary,.dec-recap summary,.inc-box summary{cursor:pointer;min-height:32px;display:flex;align-items:center}
+.dec-outcome{background:var(--surface-2);border-radius:8px;padding:8px 10px;font-size:13.5px;overflow-wrap:anywhere}
+.dec-panel{border:1px dashed var(--border-strong);border-radius:10px;padding:8px 12px;background:var(--surface-2)}
+.dec-recap{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.dec-recap p{margin:0;overflow-wrap:anywhere}
+.principles{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
+.principles li{overflow-wrap:anywhere}
+.chg-list{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}
+.inc-box{border:1px solid var(--border);border-radius:10px;padding:6px 12px 10px}
+.inc-box summary{font-weight:600;font-size:13.5px}
+.inc-box[open] summary{margin-bottom:4px}
+.inc-box .form-grid{margin-top:6px}
 
 </style>
 </head>
@@ -549,8 +568,8 @@ body.privacy .money:hover{filter:none}
    FinPilot Offline — CORE: hằng số, tiện ích, tiền tệ, ngày tháng, DOM helpers
    ========================================================================== */
 const APP_NAME = 'FinPilot Offline';
-const APP_VERSION = '1.7.0';
-const SCHEMA_VERSION = 5; // v5 (1.6): ngân sách tổng có danh sách loại trừ (exclude). v4 v4 (1.5): ngân sách "Tất cả chi tiêu" (categoryId __all__). v3 v3 (FinPilot 1.4): lớp tài sản trên tài khoản/tài sản/mã, cờ thu nhập thụ động, loại lãi suất nợ, nhóm ngoại tệ, kế hoạch lớp
+const APP_VERSION = '1.8.0';
+const SCHEMA_VERSION = 6; // v6 (1.8): nhật ký quyết định (decisions), nguyên tắc viết tay, trần sinh dòng tiền/lỗ, mốc lợi suất, lịch dòng tiền (lãi suất · kỳ trả · đáo hạn), EPS. v5 (1.6): ngân sách tổng có danh sách loại trừ (exclude). v4 v4 (1.5): ngân sách "Tất cả chi tiêu" (categoryId __all__). v3 v3 (FinPilot 1.4): lớp tài sản trên tài khoản/tài sản/mã, cờ thu nhập thụ động, loại lãi suất nợ, nhóm ngoại tệ, kế hoạch lớp
 const MAX_AMOUNT = 100000000000000; // 100 nghìn tỷ đồng / một khoản
 const TZ = 'Asia/Ho_Chi_Minh';
 const INTEREST_CAT_ID = 'cat_exp_interest';
@@ -578,12 +597,16 @@ const GOAL_TYPES = { emergency: 'Quỹ dự phòng', house: 'Mua nhà', car: 'Mu
 const GOAL_ICONS = { emergency: '🛟', house: '🏠', car: '🚗', travel: '✈️', education: '🎓', invest: '📈', other: '⭐' };
 const GOAL_MODES = { manual: 'Ghi nhận thủ công', account: 'Theo số dư một tài khoản', transfer: 'Theo giao dịch chuyển tiền gắn mục tiêu' };
 const GOAL_STATUS = { active: 'Đang thực hiện', paused: 'Tạm dừng', done: 'Hoàn thành' };
+/** Kỳ trả lãi/cổ tức (số tháng mỗi kỳ; "maturity" = trả một lần khi đáo hạn). */
+const INCOME_FREQ = { monthly: { label: 'Hằng tháng', months: 1 }, quarterly: { label: 'Hằng quý', months: 3 }, semiannual: { label: '6 tháng/lần', months: 6 }, annual: { label: 'Hằng năm', months: 12 }, maturity: { label: 'Cuối kỳ (khi đáo hạn)', months: 0 } };
+/** Loại quyết định trong nhật ký. */
+const DECISION_KINDS = { buy: 'Mua', sell: 'Bán', hold: 'Giữ / không làm gì', rule: 'Đổi nguyên tắc', other: 'Khác' };
 const PRIORITIES = { high: 'Cao', medium: 'Trung bình', low: 'Thấp' };
 const FREQUENCIES = { daily: 'ngày', weekly: 'tuần', monthly: 'tháng', yearly: 'năm' };
-const COLLECTIONS = ['categories', 'accounts', 'transactions', 'budgets', 'assets', 'debts', 'goals', 'recurring', 'snapshots', 'allocations', 'commitLog', 'commitNotes', 'holdings'];
+const COLLECTIONS = ['categories', 'accounts', 'transactions', 'budgets', 'assets', 'debts', 'goals', 'recurring', 'snapshots', 'allocations', 'commitLog', 'commitNotes', 'holdings', 'decisions'];
 /** Phiên bản cấu trúc bắt đầu có từng danh sách — file cũ hơn được coi là danh sách rỗng. */
-const COLL_SINCE = { allocations: 2, commitLog: 2, commitNotes: 2, holdings: 2 };
-const COLL_LABELS = { categories: 'Danh mục', accounts: 'Tài khoản', transactions: 'Giao dịch', budgets: 'Ngân sách', assets: 'Tài sản', debts: 'Khoản nợ', goals: 'Mục tiêu', recurring: 'Giao dịch định kỳ', snapshots: 'Bản chụp tài sản ròng', allocations: 'Phân bổ thu nhập', commitLog: 'Nhật ký cam kết', commitNotes: 'Ghi chú cam kết', holdings: 'Danh mục chứng khoán' };
+const COLL_SINCE = { allocations: 2, commitLog: 2, commitNotes: 2, holdings: 2, decisions: 6 };
+const COLL_LABELS = { categories: 'Danh mục', accounts: 'Tài khoản', transactions: 'Giao dịch', budgets: 'Ngân sách', assets: 'Tài sản', debts: 'Khoản nợ', goals: 'Mục tiêu', recurring: 'Giao dịch định kỳ', snapshots: 'Bản chụp tài sản ròng', allocations: 'Phân bổ thu nhập', commitLog: 'Nhật ký cam kết', commitNotes: 'Ghi chú cam kết', holdings: 'Danh mục chứng khoán', decisions: 'Nhật ký quyết định' };
 const PALETTE = ['#2563eb', '#0b8f63', '#f97316', '#8b5cf6', '#e11d48', '#0891b2', '#db2777', '#d97706', '#4f46e5', '#65a30d', '#c026d3', '#64748b', '#b91c1c', '#0d9488', '#a16207', '#1d3f8f'];
 const EMOJIS = ['💼', '🎁', '🏪', '📈', '➕', '🍜', '🏠', '🚗', '👨‍👩‍👧', '💊', '📚', '🛍️', '🎬', '🧾', '🏦', '📦', '☕', '✈️', '🐶', '💡', '📱', '🎓', '🏋️', '💰', '🧒', '🎉', '🔧', '⛽', '🛒', '💳', '🎮', '🍼'];
 
@@ -925,6 +948,7 @@ const ICON_PATHS = {
   flag: '<path d="M4 22V4"/><path d="M4 4h13l-2 4 2 4H4"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   layers: '<path d="M12 2l10 6-10 6L2 8z"/><path d="M2 16l10 6 10-6"/>',
+  book: '<path d="M2 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2z"/><path d="M22 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z"/>',
   link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>'
 };
 function Icon(name, size = 18, extraClass = '') {
@@ -1171,15 +1195,15 @@ const Defaults = {
     ];
   },
   /** Kế hoạch lớp tài sản: mọi ngưỡng để trống — FinPilot không đặt sẵn tỷ trọng cho bạn. */
-  layerPlan() { return { targets: {}, band: 5, reserveMonths: null, fxGoldMin: null, fxGoldMax: null, noFloatingDebt: false, includeUse: false }; },
+  layerPlan() { return { targets: {}, band: 5, reserveMonths: null, fxGoldMin: null, fxGoldMax: null, noFloatingDebt: false, includeUse: false, cashflowMin: null, lossLimitPct: null, hurdle: null }; },
   settings() {
-    return { currencySymbol: '₫', defaultAccountId: '', pageSize: 25, savingsRateTarget: 20, emergencyTargetMonths: 6, compactCharts: true, showInsights: true, defaultBudgets: [], disciplineEpoch: 0, layerPlan: Defaults.layerPlan(), updatedAt: '' };
+    return { currencySymbol: '₫', defaultAccountId: '', pageSize: 25, savingsRateTarget: 20, emergencyTargetMonths: 6, compactCharts: true, showInsights: true, defaultBudgets: [], disciplineEpoch: 0, layerPlan: Defaults.layerPlan(), principles: [], updatedAt: '' };
   },
   state() {
     return {
       meta: { schemaVersion: SCHEMA_VERSION, appVersion: APP_VERSION, createdAt: Util.nowISO(), revision: 0, updatedAt: '' },
       settings: this.settings(), categories: this.categories(), accounts: [], transactions: [], budgets: [],
-      assets: [], debts: [], goals: [], recurring: [], snapshots: [], allocations: [], commitLog: [], commitNotes: [], holdings: [], tombstones: []
+      assets: [], debts: [], goals: [], recurring: [], snapshots: [], allocations: [], commitLog: [], commitNotes: [], holdings: [], decisions: [], tombstones: []
     };
   }
 };
@@ -1195,13 +1219,18 @@ const Model = {
     for (const t of arr) { const x = this.s(t, 30).replace(/^#/, ''); if (x && !out.includes(x)) out.push(x); if (out.length >= 10) break; }
     return out;
   },
+  /** Lịch dòng tiền của một khoản (tiền gửi, trái phiếu, cổ tức…): lãi suất/tỷ suất %/năm · kỳ trả · ngày trả đầu tiên · ngày đáo hạn. */
+  income(r) {
+    const rate = typeof r.incomeRate === 'number' && Number.isFinite(r.incomeRate) && r.incomeRate > 0 && r.incomeRate <= 100 ? Math.round(r.incomeRate * 100) / 100 : null;
+    return { incomeRate: rate, incomeFreq: rate !== null && INCOME_FREQ[r.incomeFreq] ? r.incomeFreq : '', incomeStart: rate !== null && DateUtil.isISO(r.incomeStart) ? r.incomeStart : '', maturityDate: DateUtil.isISO(r.maturityDate) ? r.maturityDate : '' };
+  },
   category(r) {
     r = Util.isObj(r) ? r : {};
     return { id: this.s(r.id, 80), name: this.s(r.name, 40), kind: r.kind, color: /^#[0-9a-f]{6}$/i.test(r.color) ? r.color : '#64748b', icon: this.s(r.icon, 8), active: r.active !== false, system: r.id === INTEREST_CAT_ID, passive: r.kind === 'income' && (r.passive === true || (r.passive === undefined && (r.id === 'cat_inc_invest' || r.id === 'cat_inc_dividend'))), updatedAt: this.ts(r.updatedAt) };
   },
   account(r) {
     r = Util.isObj(r) ? r : {};
-    return { id: this.s(r.id, 80), name: this.s(r.name, 80), type: r.type, openingBalance: r.openingBalance, startDate: r.startDate, description: this.s(r.description, 300), active: r.active !== false, layer: Layers.valid(r.layer) ? r.layer : '', createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
+    return { id: this.s(r.id, 80), name: this.s(r.name, 80), type: r.type, openingBalance: r.openingBalance, startDate: r.startDate, description: this.s(r.description, 300), active: r.active !== false, layer: Layers.valid(r.layer) ? r.layer : '', ...this.income(r), createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
   },
   transaction(r) {
     r = Util.isObj(r) ? r : {};
@@ -1233,7 +1262,7 @@ const Model = {
     r = Util.isObj(r) ? r : {};
     const hist = Array.isArray(r.history) ? r.history.filter(Util.isObj).map(x => ({ date: x.date, value: x.value, note: this.s(x.note, 200) })) : [];
     hist.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-    return { id: this.s(r.id, 80), name: this.s(r.name, 80), group: r.group, purchaseValue: (r.purchaseValue === null || r.purchaseValue === undefined || r.purchaseValue === '') ? null : r.purchaseValue, purchaseDate: this.optDate(r.purchaseDate), note: this.s(r.note, 300), history: hist, layer: Layers.valid(r.layer) ? r.layer : '', createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
+    return { id: this.s(r.id, 80), name: this.s(r.name, 80), group: r.group, purchaseValue: (r.purchaseValue === null || r.purchaseValue === undefined || r.purchaseValue === '') ? null : r.purchaseValue, purchaseDate: this.optDate(r.purchaseDate), note: this.s(r.note, 300), history: hist, layer: Layers.valid(r.layer) ? r.layer : '', ...this.income(r), createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
   },
   debt(r) {
     r = Util.isObj(r) ? r : {};
@@ -1312,6 +1341,7 @@ const Model = {
     return { id: this.s(r.id, 120), accountId: this.s(r.accountId, 80), symbol: this.s(r.symbol, 10).toUpperCase(), qty: r.qty, avgCost: opt(r.avgCost), targetPct: tp, manualPrice: opt(r.manualPrice), manualPriceAt: this.ts(r.manualPriceAt), note: this.s(r.note, 200),
       fairValue: opt(r.fairValue), buyBelow: opt(r.buyBelow), valMethod: Portfolio.VAL_METHODS[r.valMethod] ? r.valMethod : '', valDate: DateUtil.isISO(r.valDate) ? r.valDate : '',
       layer: Layers.valid(r.layer) ? r.layer : '', valLink: typeof r.valLink === 'string' && /^https:\/\/[^\s"'<>]+$/i.test(r.valLink.trim()) ? r.valLink.trim().slice(0, 300) : '', valNote: this.s(r.valNote, 300),
+      eps: Number.isSafeInteger(r.eps) && Math.abs(r.eps) <= 1e7 && r.eps !== 0 ? r.eps : null, ...this.income(r),
       createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
   },
   layerPlan(p) {
@@ -1323,6 +1353,9 @@ const Model = {
     out.fxGoldMin = pc(p.fxGoldMin); out.fxGoldMax = pc(p.fxGoldMax);
     if (out.fxGoldMin !== null && out.fxGoldMax !== null && out.fxGoldMin > out.fxGoldMax) { out.fxGoldMin = null; out.fxGoldMax = null; }
     out.noFloatingDebt = p.noFloatingDebt === true; out.includeUse = p.includeUse === true;
+    out.cashflowMin = pc(p.cashflowMin);
+    if (typeof p.lossLimitPct === 'number' && Number.isFinite(p.lossLimitPct) && p.lossLimitPct >= 1 && p.lossLimitPct <= 100) out.lossLimitPct = Math.round(p.lossLimitPct * 10) / 10;
+    if (typeof p.hurdle === 'number' && Number.isFinite(p.hurdle) && p.hurdle > 0 && p.hurdle <= 50) out.hurdle = Math.round(p.hurdle * 100) / 100;
     return out;
   },
   settings(r) {
@@ -1338,8 +1371,27 @@ const Model = {
     if (Array.isArray(r.defaultBudgets)) out.defaultBudgets = r.defaultBudgets.filter(Util.isObj).map(x => { const cid = this.s(x.categoryId, 80); return cid === BUDGET_ALL ? { categoryId: cid, limit: x.limit, exclude: this.excludeList(x.exclude) } : { categoryId: cid, limit: x.limit }; }).filter(x => Validation.amt(x.limit));
     if (Number.isInteger(r.disciplineEpoch) && r.disciplineEpoch >= 0) out.disciplineEpoch = r.disciplineEpoch;
     out.layerPlan = this.layerPlan(r.layerPlan);
+    out.principles = this.principles(r.principles);
     out.updatedAt = this.ts(r.updatedAt);
     return out;
+  },
+  /** Nguyên tắc viết tay của người dùng (tối đa 30 dòng × 240 ký tự). */
+  principles(arr) {
+    if (!Array.isArray(arr)) return [];
+    const seen = new Set(); const out = [];
+    for (const x of arr) { if (!Util.isObj(x)) continue; const id = this.s(x.id, 60), text = this.s(x.text, 240); if (!id || !text || seen.has(id)) continue; seen.add(id); out.push({ id, text }); if (out.length >= 30) break; }
+    return out;
+  },
+  /** Một mục nhật ký quyết định. checks: ảnh chụp đối chiếu nguyên tắc TẠI THỜI ĐIỂM ghi (sự thật lúc đó, không tính lại). */
+  decision(r) {
+    r = Util.isObj(r) ? r : {};
+    const st = s => (['ok', 'out', 'nodata', 'info'].includes(s) ? s : 'info');
+    const checks = (Array.isArray(r.checks) ? r.checks : []).filter(Util.isObj).slice(0, 20).map(c => ({ id: this.s(c.id, 40), status: st(c.status), label: this.s(c.label, 160), detail: this.s(c.detail, 220) }));
+    const changes = (Array.isArray(r.changes) ? r.changes : []).filter(Util.isObj).slice(0, 40).map(c => ({ key: this.s(c.key, 60), label: this.s(c.label, 120), from: this.s(c.from, 260), to: this.s(c.to, 260) }));
+    const intOrNull = v => (Number.isSafeInteger(v) && v >= 0 ? v : null);
+    return { id: this.s(r.id, 120), date: r.date, kind: DECISION_KINDS[r.kind] ? r.kind : 'other', symbol: this.s(r.symbol, 10).toUpperCase(), amount: intOrNull(r.amount), price: Number.isSafeInteger(r.price) && r.price > 0 ? r.price : null,
+      fromRef: this.s(r.fromRef, 130), thesis: this.s(r.thesis, 600), wrongIf: this.s(r.wrongIf, 300), reviewDate: DateUtil.isISO(r.reviewDate) ? r.reviewDate : '',
+      status: r.status === 'closed' ? 'closed' : 'open', outcome: this.s(r.outcome, 600), outcomeAt: DateUtil.isISO(r.outcomeAt) ? r.outcomeAt : '', checks, changes, createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
   },
   tombstones(arr) {
     if (!Array.isArray(arr)) return [];
@@ -1362,6 +1414,7 @@ const Model = {
       commitLog: CommitLog.sort((d.commitLog || []).filter(Util.isObj).map(x => this.cev(x)).filter(e => e.id && e.at)),
       commitNotes: (d.commitNotes || []).map(x => this.note(x)),
       holdings: (d.holdings || []).map(x => this.holding(x)),
+      decisions: (d.decisions || []).map(x => this.decision(x)),
       tombstones: this.tombstones(d.tombstones)
     };
     if (!ds.categories.some(c => c.id === INTEREST_CAT_ID)) ds.categories.push(Defaults.categories().find(c => c.id === INTEREST_CAT_ID));
@@ -1559,6 +1612,28 @@ const Validation = {
     }
     return e;
   },
+  /** Thu nhập định kỳ trên tài khoản/tài sản/mã: chỉ kiểm tra khi có lãi suất. */
+  income(x) {
+    const e = {};
+    if (x.incomeRate === null || x.incomeRate === undefined) { if (x.incomeFreq || x.incomeStart) e.incomeRate = 'Có kỳ trả nhưng thiếu lãi suất/tỷ suất.'; return e; }
+    if (!(typeof x.incomeRate === 'number' && x.incomeRate > 0 && x.incomeRate <= 100)) e.incomeRate = 'Lãi suất/tỷ suất từ 0 đến 100%/năm.';
+    if (x.incomeFreq && !INCOME_FREQ[x.incomeFreq]) e.incomeFreq = 'Kỳ trả không hợp lệ.';
+    if (x.incomeFreq === 'maturity' && (!x.maturityDate || !x.incomeStart)) e.maturityDate = 'Trả cuối kỳ cần ngày bắt đầu và ngày đáo hạn.';
+    if (x.maturityDate && x.incomeStart && x.maturityDate <= x.incomeStart) e.maturityDate = 'Ngày đáo hạn phải sau ngày bắt đầu/trả đầu tiên.';
+    return e;
+  },
+  decision(x) {
+    const e = {};
+    if (!DateUtil.isISO(x.date)) e.date = 'Ngày không hợp lệ.';
+    if (!DECISION_KINDS[x.kind]) e.kind = 'Loại quyết định không hợp lệ.';
+    if (!x.thesis || x.thesis.length < 3) e.thesis = x.kind === 'rule' ? 'Ghi lý do đổi nguyên tắc.' : 'Ghi lý do của bạn.';
+    if ((x.kind === 'buy' || x.kind === 'sell') && !x.symbol) e.symbol = 'Nhập mã.';
+    if (x.symbol && !/^[A-Z0-9]{2,10}$/.test(x.symbol)) e.symbol = 'Mã không hợp lệ.';
+    if (x.amount !== null && !(Number.isSafeInteger(x.amount) && x.amount >= 0 && x.amount <= MAX_AMOUNT)) e.amount = 'Số tiền không hợp lệ.';
+    if (x.reviewDate && DateUtil.isISO(x.date) && x.reviewDate < x.date) e.reviewDate = 'Ngày xem lại phải từ ngày quyết định trở đi.';
+    if (x.status === 'closed' && !x.outcome) e.outcome = 'Ghi kết quả khi đóng.';
+    return e;
+  },
   snapshot(s) {
     const okN = v => typeof v === 'number' && Number.isSafeInteger(v);
     if (!DateUtil.isISO(s.date)) return 'ngày không hợp lệ';
@@ -1603,6 +1678,8 @@ const Validation = {
     }
     for (const r of st.recurring) { const e = this.recurring(r, st, { ctx }); if (Object.keys(e).length) add(errors, `Giao dịch định kỳ "${r.name || r.id}": ${this.first(e)}`); }
     for (const x of st.holdings || []) { const e = this.holding(x, st, { ctx }); if (Object.keys(e).length) add(errors, `Danh mục ${x.symbol || x.id}: ${this.first(e)}`); }
+    for (const [c, lab] of [['accounts', 'Tài khoản'], ['assets', 'Tài sản'], ['holdings', 'Mã']]) for (const x of st[c] || []) { const e = this.income(x); if (Object.keys(e).length) add(errors, `${lab} "${x.name || x.symbol || x.id}" (lịch dòng tiền): ${this.first(e)}`); }
+    for (const x of st.decisions || []) { const e = this.decision(x); if (Object.keys(e).length) add(errors, `Nhật ký quyết định ${DateUtil.isISO(x.date) ? DateUtil.toVN(x.date) : x.id}: ${this.first(e)}`); }
     if ((st.holdings || []).some(x => x.qty > 0) && st.assets.some(a => a.group === 'securities' && Ledger.assetValue(a, DateUtil.today()) > 0)) add(warnings, 'Vừa có tài sản nhập tay nhóm "Chứng khoán / đầu tư" vừa có danh mục cổ phiếu — nếu là cùng một khoản, tài sản ròng đang bị tính trùng.');
     for (const a of st.allocations || []) { if (!st.transactions.some(t => t.id === a.incomeTxnId)) add(warnings, `Phân bổ ${a.ruleName || ''} ngày ${DateUtil.toVN(a.date)}: khoản thu gốc đã bị xóa.`); }
     const sdates = new Set();
@@ -2462,6 +2539,8 @@ const Portfolio = {
     const reason = !okDate ? 'chưa có ngày định giá' : ageDays > this.VAL_MAX_AGE ? `đã ${ageDays} ngày (quá ${this.VAL_MAX_AGE})` : newerReport ? `có BCTC quý mới từ ${DateUtil.toVN(due)}` : '';
     return { fair, buyBelow: buy, price: p, mos, zone, ageDays, stale, reason, method: this.VAL_METHODS[h.valMethod] ? h.valMethod : '' };
   },
+  /** Lợi suất lợi nhuận = EPS / giá × 100 (nghịch đảo P/E). null nếu thiếu số. */
+  earningsYield(eps, price) { return Number.isSafeInteger(eps) && eps !== 0 && Number.isSafeInteger(price) && price > 0 ? eps / price * 100 : null; },
   /** Tổng hợp: giá trị thị trường và giá trị theo định giá của bạn (chỉ các mã đã nhập định giá và có giá). */
   valuationTotals(items) {
     let market = 0, fair = 0, n = 0, stale = 0;
@@ -2554,7 +2633,7 @@ const Layers = {
   aggregate(items, opts = {}) {
     const includeUse = !!opts.includeUse;
     const by = {}; for (const k of this.KEYS.concat('none')) by[k] = { key: k, value: 0, positive: 0, n: 0, stale: 0, items: [], oldest: '' };
-    let gross = 0, positiveTotal = 0, assignedFresh = 0, assignedVal = 0, explicitVal = 0, fxGold = 0;
+    let gross = 0, positiveTotal = 0, assignedFresh = 0, assignedVal = 0, explicitVal = 0, fxGold = 0, cashflow = 0, cashflowN = 0;
     const negatives = [];
     for (const it of items || []) {
       const k = this.valid(it.layer) ? it.layer : 'none';
@@ -2569,6 +2648,7 @@ const Layers = {
       gross += v;
       if (v > 0 && inBase && k !== 'none') { assignedVal += v; if (!it.stale) assignedFresh += v; if (it.explicit) explicitVal += v; }
       if (v > 0 && it.fxGold) fxGold += v;
+      if (v > 0 && inBase && it.cashflow) { cashflow += v; cashflowN++; }
     }
     for (const k in by) by[k].items.sort((a, b) => b.value - a.value);
     // Nền tỷ trọng: tài sản dương, bỏ "Tài sản sử dụng" nếu không chọn tính.
@@ -2576,7 +2656,7 @@ const Layers = {
     const weights = {}; for (const k in by) weights[k] = base > 0 && (includeUse || k !== 'use') ? Math.max(0, by[k].value) / base : null;
     const pct = x => (positiveTotal > 0 ? x / positiveTotal : null);
     return {
-      gross, base, includeUse, by, weights, negatives, fxGold,
+      gross, base, includeUse, by, weights, negatives, fxGold, cashflow, cashflowN,
       coverage: { assigned: pct(assignedVal), reliable: pct(assignedFresh), explicit: pct(explicitVal), unassignedValue: Math.max(0, by.none.value) },
       invariantOk: this.KEYS.concat('none').reduce((s, k) => s + by[k].value, 0) === gross
     };
@@ -2634,12 +2714,186 @@ const Layers = {
       else if (unk.length) out.push({ id: 'nofloat', label, status: 'nodata', detail: `Chưa ghi loại lãi suất cho: ${unk.map(d => d.name).join(', ')}` });
       else out.push({ id: 'nofloat', label, status: 'ok', detail: live.length ? 'Các khoản nợ đều lãi cố định.' : 'Không có khoản nợ.' });
     }
+    if (Number.isFinite(plan.cashflowMin)) {
+      const label = `Tài sản sinh dòng tiền ≥ ${plan.cashflowMin}%`;
+      if (agg.base <= 0 || weak) out.push({ id: 'cashflow', label, status: 'nodata', detail: weak ? 'Dưới 50% tài sản có lớp và số liệu còn mới.' : 'Chưa có tài sản.' });
+      else { const w = (agg.cashflow || 0) / agg.base * 100; out.push({ id: 'cashflow', label, status: w + 1e-9 >= plan.cashflowMin ? 'ok' : 'out', detail: `Hiện ${pct(w / 100)} — chỉ tính ${agg.cashflowN || 0} khoản bạn đã ghi lãi suất/tỷ suất cổ tức` }); }
+    }
+    if (Number.isFinite(plan.lossLimitPct)) {
+      const label = `Lỗ mỗi mã không quá ${plan.lossLimitPct}% giá vốn`;
+      const hs = (ctx.holdings || []).filter(x => Number.isFinite(x.lossPct));
+      if (!hs.length) out.push({ id: 'loss', label, status: 'nodata', detail: 'Chưa có mã nào vừa có giá vốn vừa có giá thị trường.' });
+      else {
+        const over = hs.filter(x => x.lossPct > plan.lossLimitPct + 1e-9).sort((a, b) => b.lossPct - a.lossPct);
+        out.push({ id: 'loss', label, status: over.length ? 'out' : 'ok', detail: over.length ? 'Đang quá ngưỡng: ' + over.map(x => `${x.symbol} lỗ ${pct(x.lossPct / 100)}`).join(', ') : `${hs.length} mã đều trong ngưỡng` });
+      }
+    }
     return out;
   },
   /** Cổ tức tiền thực nhận ước tính: KL × cổ tức/cp × (1 − thuế 5%), làm tròn đồng. */
   netDividend(qty, dps, taxRate = 0.05) {
     if (!Number.isSafeInteger(qty) || qty <= 0 || !Number.isFinite(dps) || dps <= 0) return null;
     return Math.round(qty * dps * (1 - taxRate));
+  }
+};
+
+/* ==========================================================================
+   LỊCH DÒNG TIỀN THỤ ĐỘNG (v1.8) — chỉ từ lãi suất / kỳ trả / ngày người dùng ghi.
+   Ước tính đơn giản (giá trị hiện tại × lãi suất × số tháng/12), không phải số ngân hàng sẽ trả.
+   ========================================================================== */
+const Income = {
+  pad(n) { return String(n).padStart(2, '0'); },
+  dim(y, m) { return [31, (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]; },
+  /** Cộng n tháng, giữ ngày (kẹp về cuối tháng nếu tháng đích ngắn hơn). */
+  addMonths(iso, n) {
+    const [y, m, d] = iso.split('-').map(Number); const t = y * 12 + (m - 1) + n; const Y = Math.floor(t / 12), M = t - Y * 12 + 1;
+    return `${Y}-${this.pad(M)}-${this.pad(Math.min(d, this.dim(Y, M)))}`;
+  },
+  monthsBetween(a, b) { const [y1, m1] = a.split('-').map(Number), [y2, m2] = b.split('-').map(Number); return (y2 - y1) * 12 + (m2 - m1); },
+  /** Lãi một kỳ (đồng, làm tròn). */
+  perPeriod(value, rate, months) { return Math.round(value * rate / 100 * months / 12); },
+  /**
+   * items: [{ key, name, kind, value(int), rate(%/năm), freq, start(ISO|''), maturity(ISO|'') }]
+   * → { events: [{ key, name, date, amount, type: 'income'|'principal' }], missing: [item], runRate }
+   */
+  schedule(items, from, to) {
+    const events = [], missing = []; let runRate = 0;
+    for (const it of items || []) {
+      if (!(it.rate > 0) || !(it.value > 0)) continue;
+      runRate += it.value * it.rate / 100;
+      const mat = DateUtil.isISO(it.maturity) ? it.maturity : '';
+      if (mat && mat >= from && mat <= to && it.kind !== 'holding') events.push({ key: it.key, name: it.name, date: mat, amount: it.value, type: 'principal' });
+      const f = INCOME_FREQ[it.freq];
+      if (!f || !DateUtil.isISO(it.start)) { missing.push(it); continue; }
+      if (it.freq === 'maturity') {
+        if (mat && mat >= from && mat <= to) events.push({ key: it.key, name: it.name, date: mat, amount: Math.round(it.value * it.rate / 100 * DateUtil.diffDays(it.start, mat) / 365), type: 'income' });
+        continue;
+      }
+      const per = this.perPeriod(it.value, it.rate, f.months);
+      let k = Math.max(0, Math.floor(this.monthsBetween(it.start, from) / f.months) - 1);
+      for (let guard = 0; guard < 2000; guard++, k++) {
+        const d = this.addMonths(it.start, k * f.months);
+        if (d > to || (mat && d > mat)) break;
+        if (d >= from) events.push({ key: it.key, name: it.name, date: d, amount: per, type: 'income' });
+      }
+    }
+    events.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : b.amount - a.amount));
+    return { events, missing, runRate: Math.round(runRate) };
+  },
+  /** Tóm tắt cho năm hiện tại + 90 ngày tới + đáo hạn 12 tháng tới. */
+  summary(items, today, receivedYTD = 0) {
+    const y = today.slice(0, 4); const yFrom = y + '-01-01', yTo = y + '-12-31';
+    const horizon = DateUtil.addDays(today, 365);
+    const sc = this.schedule(items, yFrom, horizon > yTo ? horizon : yTo);
+    const inc = sc.events.filter(e => e.type === 'income');
+    const inYear = inc.filter(e => e.date <= yTo);
+    const soonTo = DateUtil.addDays(today, 90);
+    return {
+      year: y, runRate: sc.runRate, missing: sc.missing,
+      expectedYear: Util.sum(inYear, e => e.amount), expectedToDate: Util.sum(inYear.filter(e => e.date <= today), e => e.amount),
+      receivedYTD, upcoming: inc.filter(e => e.date > today && e.date <= soonTo),
+      maturities: sc.events.filter(e => e.type === 'principal' && e.date > today && e.date <= horizon),
+      items: (items || []).filter(it => it.rate > 0 && it.value > 0).length
+    };
+  }
+};
+
+/* ==========================================================================
+   NHẬT KÝ QUYẾT ĐỊNH (v1.8) — app CHỈ đối chiếu với nguyên tắc người dùng tự đặt
+   và ghi lại sự thật tại thời điểm quyết định. Không chặn, không khuyến nghị.
+   ========================================================================== */
+const Decisions = {
+  STATUS: { ok: 'Trong ngưỡng', out: 'Chạm ngưỡng', nodata: 'Thiếu dữ liệu', info: 'Ghi nhận' },
+  pc(x, d = 1) { return (Math.round(x * Math.pow(10, d)) / Math.pow(10, d)).toLocaleString('vi-VN', { maximumFractionDigits: d }) + '%'; },
+  vnd(n) { return Math.round(n).toLocaleString('vi-VN') + ' đ'; },
+  /**
+   * in: { agg, plan, spend, draft: { kind, amount, price }, target: { symbol, layer, cashflow, value, pfTotal, lossPct, fair, buyBelow, valStale, eps, targetPct, price },
+   *       source: { layer, cashflow, newMoney } }
+   * → [{ id, status, label, detail }]
+   */
+  check(inp) {
+    const out = []; const { agg, plan = {}, draft = {}, target = {}, source = {} } = inp || {};
+    const kind = draft.kind; if (kind !== 'buy' && kind !== 'sell' && kind !== 'hold') return out;
+    const A = Number.isSafeInteger(draft.amount) && draft.amount > 0 ? draft.amount : 0;
+    const price = Number.isSafeInteger(draft.price) && draft.price > 0 ? draft.price : (Number.isSafeInteger(target.price) && target.price > 0 ? target.price : null);
+    const band = Number.isFinite(plan.band) && plan.band > 0 ? plan.band : 5;
+    const sgn = kind === 'buy' ? 1 : kind === 'sell' ? -1 : 0;
+    if (agg && A && sgn) {
+      const d = {}; const add = (k, v) => { if (Layers.valid(k)) d[k] = (d[k] || 0) + v; };
+      add(target.layer, sgn * A);
+      if (!source.newMoney) add(source.layer, -sgn * A);
+      const base = agg.base + (source.newMoney ? sgn * A : 0);
+      const inBase = k => agg.includeUse || k !== 'use';
+      for (const k of Layers.KEYS) {
+        const t = plan.targets && plan.targets[k];
+        if (!d[k] || !(Number.isFinite(t))) continue;
+        if (!inBase(k)) continue;
+        const now = agg.base > 0 ? Math.max(0, agg.by[k].value) / agg.base * 100 : null;
+        const post = base > 0 ? Math.max(0, agg.by[k].value + d[k]) / base * 100 : null;
+        if (post === null) { out.push({ id: 'l_' + k, status: 'nodata', label: `${Layers.LABELS[k]}: mục tiêu ${t}% (± ${band})`, detail: 'Chưa có tài sản để tính.' }); continue; }
+        out.push({ id: 'l_' + k, status: Math.abs(post - t) > band ? 'out' : 'ok', label: `${Layers.LABELS[k]}: mục tiêu ${t}% (± ${band})`, detail: `Sau quyết định ${this.pc(post)} (hiện ${now === null ? '—' : this.pc(now)})` });
+      }
+      if (Number.isFinite(plan.reserveMonths) && d.reserve) {
+        const lab = `Quỹ dự phòng ≥ ${plan.reserveMonths} tháng chi tiêu`;
+        if (!(inp.spend > 0)) out.push({ id: 'reserve_m', status: 'nodata', label: lab, detail: 'Chưa có chi tiêu của các tháng đã qua để tính.' });
+        else { const m = Math.max(0, agg.by.reserve.value + d.reserve) / inp.spend; out.push({ id: 'reserve_m', status: m + 1e-9 >= plan.reserveMonths ? 'ok' : 'out', label: lab, detail: `Sau quyết định còn đủ ${(Math.floor(m * 10) / 10).toLocaleString('vi-VN')} tháng` }); }
+      }
+      if (Number.isFinite(plan.cashflowMin) && (!!target.cashflow !== !!source.cashflow || source.newMoney)) {
+        const delta = sgn * A * ((target.cashflow ? 1 : 0) - (source.newMoney ? 0 : (source.cashflow ? 1 : 0)));
+        const post = base > 0 ? Math.max(0, (agg.cashflow || 0) + delta) / base * 100 : null;
+        out.push({ id: 'cashflow', status: post === null ? 'nodata' : post + 1e-9 >= plan.cashflowMin ? 'ok' : 'out', label: `Tài sản sinh dòng tiền ≥ ${plan.cashflowMin}%`, detail: post === null ? 'Chưa có tài sản.' : `Sau quyết định ${this.pc(post)} (hiện ${agg.base > 0 ? this.pc((agg.cashflow || 0) / agg.base * 100) : '—'})` });
+      }
+      if (kind === 'buy' && Number.isFinite(target.targetPct) && target.targetPct > 0) {
+        const pf = (target.pfTotal || 0) + A; const post = pf > 0 ? ((target.value || 0) + A) / pf * 100 : null;
+        if (post !== null) out.push({ id: 'pos', status: post > target.targetPct + band ? 'out' : 'ok', label: `Tỷ trọng ${target.symbol} trong danh mục: mục tiêu ${target.targetPct}% (± ${band})`, detail: `Sau khi mua ${this.pc(post)}` });
+      }
+    }
+    if (Number.isFinite(plan.lossLimitPct) && Number.isFinite(target.lossPct) && target.lossPct > plan.lossLimitPct + 1e-9) {
+      out.push({ id: 'loss', status: kind === 'buy' ? 'out' : 'info', label: `Lỗ mỗi mã không quá ${plan.lossLimitPct}% giá vốn`, detail: `${target.symbol} đang lỗ ${this.pc(target.lossPct)} so với giá vốn${kind === 'buy' ? ' — mua thêm là bình quân giá xuống' : ''}` });
+    }
+    if (target.symbol && (kind === 'buy' || kind === 'sell')) {
+      if (!(target.fair > 0)) out.push({ id: 'val', status: 'nodata', label: 'Định giá của bạn', detail: `Chưa có giá trị hợp lý của bạn cho ${target.symbol}.` });
+      else if (price === null) out.push({ id: 'val', status: 'nodata', label: 'Định giá của bạn', detail: 'Chưa có giá để so.' });
+      else {
+        const stale = target.valStale ? ' · định giá cần cập nhật' : '';
+        const mos = (target.fair - price) / target.fair * 100;
+        if (kind === 'buy') {
+          const lim = target.buyBelow > 0 ? target.buyBelow : target.fair; const nm = target.buyBelow > 0 ? 'vùng mua' : 'giá trị hợp lý';
+          out.push({ id: 'val', status: price > lim ? 'out' : 'ok', label: `Giá so với ${nm} của bạn`, detail: `Giá ${this.vnd(price)} ${price > lim ? 'cao hơn' : 'không cao hơn'} ${nm} ${this.vnd(lim)} · biên an toàn ${this.pc(mos)}${stale}` });
+        } else out.push({ id: 'val', status: 'info', label: 'Giá so với giá trị hợp lý của bạn', detail: `Giá ${this.vnd(price)} · giá trị hợp lý ${this.vnd(target.fair)} · biên an toàn ${this.pc(mos)}${stale}` });
+      }
+      if (kind === 'buy' && Number.isFinite(plan.hurdle)) {
+        const ey = Portfolio.earningsYield(target.eps, price);
+        out.push(ey === null ? { id: 'hurdle', status: 'nodata', label: `Lợi suất lợi nhuận ≥ mốc ${plan.hurdle}% của bạn`, detail: 'Chưa có EPS của mã này.' }
+          : { id: 'hurdle', status: ey + 1e-9 >= plan.hurdle ? 'ok' : 'out', label: `Lợi suất lợi nhuận ≥ mốc ${plan.hurdle}% của bạn`, detail: `EPS/giá = ${this.pc(ey)} (P/E ${(Math.round(price / target.eps * 10) / 10).toLocaleString('vi-VN')})` });
+      }
+    }
+    return out;
+  },
+  count(checks) { const c = { ok: 0, out: 0, nodata: 0, info: 0 }; for (const x of checks || []) c[x.status] = (c[x.status] || 0) + 1; return c; },
+  /** Quyết định đang mở đã đến (hoặc quá) ngày hẹn xem lại. */
+  due(list, today) { return (list || []).filter(x => x.status === 'open' && x.reviewDate && x.reviewDate <= today).sort((a, b) => (a.reviewDate < b.reviewDate ? -1 : 1)); },
+  /** So sánh giá lúc quyết định với giá hiện tại (sự thật, không đánh giá đúng/sai). */
+  priceChange(dec, priceNow) { return Number.isSafeInteger(dec.price) && dec.price > 0 && Number.isSafeInteger(priceNow) && priceNow > 0 ? (priceNow - dec.price) / dec.price * 100 : null; },
+  /** Danh sách thay đổi giữa hai bộ nguyên tắc (kế hoạch lớp + nguyên tắc viết tay), để ghi kèm lý do. */
+  diff(oldPlan, newPlan, oldP = [], newP = []) {
+    const o = oldPlan || {}, n = newPlan || {}; const out = [];
+    const v = (x, suf = '') => (x === null || x === undefined || x === '' ? 'không đặt' : String(x).replace('.', ',') + suf);
+    const push = (key, label, a, b) => { if (a !== b) out.push({ key, label, from: a, to: b }); };
+    for (const k of Layers.KEYS) push('t_' + k, `Mục tiêu lớp ${Layers.LABELS[k]}`, v((o.targets || {})[k], '%'), v((n.targets || {})[k], '%'));
+    push('band', 'Biên cho phép', v(o.band, ' điểm %'), v(n.band, ' điểm %'));
+    push('reserveMonths', 'Quỹ dự phòng tối thiểu', v(o.reserveMonths, ' tháng'), v(n.reserveMonths, ' tháng'));
+    push('fxGoldMin', 'Vàng + ngoại tệ từ', v(o.fxGoldMin, '%'), v(n.fxGoldMin, '%'));
+    push('fxGoldMax', 'Vàng + ngoại tệ đến', v(o.fxGoldMax, '%'), v(n.fxGoldMax, '%'));
+    push('noFloatingDebt', 'Không nợ lãi thả nổi', o.noFloatingDebt ? 'bật' : 'tắt', n.noFloatingDebt ? 'bật' : 'tắt');
+    push('includeUse', 'Tính tài sản sử dụng vào tỷ trọng', o.includeUse ? 'có' : 'không', n.includeUse ? 'có' : 'không');
+    push('cashflowMin', 'Tài sản sinh dòng tiền tối thiểu', v(o.cashflowMin, '%'), v(n.cashflowMin, '%'));
+    push('lossLimitPct', 'Ngưỡng lỗ mỗi mã', v(o.lossLimitPct, '% giá vốn'), v(n.lossLimitPct, '% giá vốn'));
+    push('hurdle', 'Mốc lợi suất so sánh', v(o.hurdle, '%/năm'), v(n.hurdle, '%/năm'));
+    const om = new Map(oldP.map(x => [x.id, x.text])), nm = new Map(newP.map(x => [x.id, x.text]));
+    for (const [id, t] of nm) { if (!om.has(id)) out.push({ key: 'p_' + id, label: 'Thêm nguyên tắc', from: '', to: t }); else if (om.get(id) !== t) out.push({ key: 'p_' + id, label: 'Sửa nguyên tắc', from: om.get(id), to: t }); }
+    for (const [id, t] of om) if (!nm.has(id)) out.push({ key: 'p_' + id, label: 'Bỏ nguyên tắc', from: t, to: '' });
+    return out;
   }
 };
 
@@ -2655,19 +2909,21 @@ const Brief = {
   /** Bỏ ký tự có thể phá cấu trúc Markdown (|, xuống dòng) khỏi chuỗi do người dùng nhập. */
   safe(s) { return String(s == null ? '' : s).replace(/[\r\n|`<>]/g, ' ').trim(); },
   render(snap, opts = {}) {
-    const A = !!opts.includeAmounts; const s = snap || {}; const L = [];
+    const A = !!opts.includeAmounts, N = !!opts.includeNotes; const s = snap || {}; const L = [];
     L.push('# FinPilot — gói ngữ cảnh cho Claude');
     L.push('');
     L.push(`- Ngày chốt dữ liệu: ${this.date(s.asOf)} · FinPilot v${this.safe(s.appVersion)}`);
     L.push(`- Độ tin cậy dữ liệu tài sản: ${this.pct(s.reliability, 0)} (phần giá trị tài sản đã phân lớp và có số liệu còn mới)`);
     if (s.priceAsOf) L.push(`- Giá cổ phiếu cập nhật lần cuối: ${this.date(s.priceAsOf)}`);
     L.push(`- Số tiền tuyệt đối: ${A ? 'CÓ (người dùng chủ động bật)' : 'KHÔNG kèm — chỉ tỷ lệ %'}`);
+    L.push(`- Lý do tôi viết trong nhật ký quyết định: ${N ? 'CÓ kèm (người dùng chủ động bật)' : 'KHÔNG kèm'}`);
     L.push('');
     L.push('## Lời dặn cho Claude');
     L.push('- Trả lời tiếng Việt, ngắn gọn; giải thích thuật ngữ ngay lần đầu.');
     L.push('- Dùng số trong gói này làm nguồn chuẩn. Nếu số của bạn (từ nguồn khác) khác, nêu rõ chênh lệch và nguồn.');
     L.push('- Con số nào cũng ghi rõ nguồn hoặc cách tính. Số nào đánh dấu "cũ" thì nhắc tôi cập nhật trước khi kết luận.');
     L.push('- Không khuyến nghị mua/bán mã cụ thể. Chỉ phân tích dựa trên nguyên tắc do chính tôi đặt.');
+    L.push('- Trước mọi việc liên quan tới tiền, đối chiếu với "Nguyên tắc viết tay" và các ngưỡng bên dưới. Nếu nguồn khác mâu thuẫn, nguyên tắc của tôi thắng — nêu rõ chỗ khác.');
     L.push('- Chưa chắc thì hỏi lại tôi trước khi trả lời.');
     L.push('');
     const ly = s.layers || [];
@@ -2684,6 +2940,8 @@ const Brief = {
       if (Number.isFinite(s.amounts.monthlySpend)) L.push(`- Chi tiêu bình quân 3 tháng: ${this.vnd(s.amounts.monthlySpend)}/tháng`);
       L.push('');
     }
+    const pr = s.principles || [];
+    if (pr.length) { L.push('## Nguyên tắc viết tay của tôi'); pr.forEach((t, i) => L.push(`${i + 1}. ${this.safe(t)}`)); L.push(''); }
     L.push('## Nguyên tắc do tôi tự đặt — trạng thái hiện tại');
     if (!(s.rules || []).length) L.push('- (Chưa đặt nguyên tắc nào.)');
     for (const r of s.rules || []) L.push(`- [${({ ok: 'Trong ngưỡng', out: 'Ngoài ngưỡng', nodata: 'Thiếu dữ liệu' })[r.status] || '?'}] ${this.safe(r.label)} — ${this.safe(r.metric)}`);
@@ -2692,6 +2950,11 @@ const Brief = {
     if (Number.isFinite(s.reserveMonths)) L.push(`- Quỹ dự phòng đủ ${(Math.floor(s.reserveMonths * 10) / 10).toLocaleString('vi-VN')} tháng chi tiêu bình quân 3 tháng gần nhất`);
     if (Number.isFinite(s.savingsRate)) L.push(`- Tỷ lệ tiết kiệm 3 tháng gần nhất: ${this.pct(s.savingsRate)} thu nhập`);
     if (s.budget) L.push(`- Ngân sách tháng này (${this.safe(s.budget.label)}): đã dùng ${this.pct(s.budget.pct, 0)}${A && s.budget.limit ? ` (${this.vnd(s.budget.spent)} / ${this.vnd(s.budget.limit)})` : ''}`);
+    const ic = s.income;
+    if (ic && ic.items) {
+      L.push(`- Dòng tiền thụ động theo lịch tôi ghi (${ic.items} khoản có lãi suất/tỷ suất): dự kiến năm ${ic.year} ${A ? this.vnd(ic.expectedYear) : this.pct(ic.expectedYearPct, 2) + ' tổng tài sản tính tỷ trọng'}; đã nhận từ đầu năm ${A ? this.vnd(ic.receivedYTD) : (Number.isFinite(ic.receivedVsExpected) ? this.pct(ic.receivedVsExpected, 0) + ' mức dự kiến tới hôm nay' : '—')}`);
+      L.push(`- Sắp nhận trong 90 ngày: ${ic.upcoming} khoản · đáo hạn trong 12 tháng: ${ic.maturities} khoản${ic.missing ? ` · ${ic.missing} khoản chưa ghi ngày trả` : ''}`);
+    }
     if (s.debt && s.debt.count) L.push(`- Nợ: ${s.debt.count} khoản · nợ/tổng tài sản ${this.pct(s.debt.ratio)} · lãi thả nổi ${s.debt.floating} · cố định ${s.debt.fixed} · chưa ghi loại lãi ${s.debt.unknown}`);
     else L.push('- Nợ: không có khoản nợ đang dư');
     L.push('');
@@ -2706,10 +2969,26 @@ const Brief = {
       }
       L.push('');
       L.push('Biên an toàn = (giá trị hợp lý − giá) / giá trị hợp lý; âm nghĩa là giá đang cao hơn định giá của tôi.');
+      const ey = hs.filter(x => Number.isFinite(x.ey));
+      if (ey.length) L.push(`Lợi suất lợi nhuận (EPS/giá, tôi nhập EPS): ${ey.map(x => `${this.safe(x.symbol)} ${this.pct(x.ey)}`).join(' · ')}${Number.isFinite(s.hurdle) ? ` — mốc so sánh của tôi ${this.pct(s.hurdle, 2)}/năm` : ''}.`);
+      L.push('');
+    }
+    const ds = s.decisions || [];
+    if (ds.length) {
+      L.push('## Nhật ký quyết định đang mở (đối chiếu nguyên tắc tại lúc ghi)');
+      L.push(N ? '| Ngày | Loại | Mã | Hẹn xem lại | Chạm ngưỡng | Thiếu dữ liệu | Lý do của tôi | Tôi sai nếu |' : '| Ngày | Loại | Mã | Hẹn xem lại | Chạm ngưỡng | Thiếu dữ liệu |');
+      L.push(N ? '|---|---|---|---|---:|---:|---|---|' : '|---|---|---|---|---:|---:|');
+      for (const d of ds) { const c = [this.date(d.date), this.safe(d.kindLabel), this.safe(d.symbol || '—'), d.reviewDate ? this.date(d.reviewDate) + (d.due ? ' (đến hạn)' : '') : '—', d.out, d.nodata]; if (N) c.push(this.safe(d.thesis), this.safe(d.wrongIf || '—')); L.push('| ' + c.join(' | ') + ' |'); }
+      L.push('');
+    }
+    const rc = s.ruleChanges || [];
+    if (rc.length) {
+      L.push('## Đổi nguyên tắc gần đây');
+      for (const r of rc) L.push(`- ${this.date(r.date)}: ${r.changes.map(c => `${this.safe(c.label)}${c.from || c.to ? ` (${this.safe(c.from || '—')} → ${this.safe(c.to || '—')})` : ''}`).join('; ')}${N && r.reason ? ` — lý do: ${this.safe(r.reason)}` : ''}`);
       L.push('');
     }
     L.push('---');
-    L.push('Gói do FinPilot tạo; người dùng tự xem trước và tự dán. Không chứa tên/số tài khoản, ngân hàng, ghi chú hay tên khoản nợ.');
+    L.push('Gói do FinPilot tạo; người dùng tự xem trước và tự dán. Không chứa tên/số tài khoản, ngân hàng, ghi chú hay tên khoản nợ' + (N ? '; có kèm lý do người dùng viết trong nhật ký.' : '.'));
     return L.join('\n');
   }
 };
@@ -3219,7 +3498,7 @@ const LayerData = {
     for (const a of st.accounts) {
       const v = cur.balances.get(a.id) || 0; if (!a.active && v === 0) continue;
       const r = Layers.resolve('account', a, ctx);
-      out.push({ key: 'acc:' + a.id, kind: 'account', ref: a.id, name: a.name, sub: ACCOUNT_TYPES[a.type] + (a.type === 'investment' ? ' · phần tiền mặt' : ''), ...r, value: v, stale: false, staleNote: '', valuedAt: today, fxGold: false });
+      out.push({ key: 'acc:' + a.id, kind: 'account', ref: a.id, name: a.name, sub: ACCOUNT_TYPES[a.type] + (a.type === 'investment' ? ' · phần tiền mặt' : ''), ...r, value: v, stale: false, staleNote: '', valuedAt: today, fxGold: false, ...this.inc(a) });
     }
     for (const as of st.assets) {
       const v = Ledger.assetValue(as, today); let last = '';
@@ -3227,7 +3506,7 @@ const LayerData = {
       const lim = Layers.STALE_DAYS[as.group] || 90; const age = last ? DateUtil.diffDays(last, today) : null;
       const stale = !last || age > lim;
       const r = Layers.resolve('asset', as, ctx);
-      out.push({ key: 'ast:' + as.id, kind: 'asset', ref: as.id, name: as.name, sub: ASSET_GROUPS[as.group] || '', ...r, value: v, stale, staleNote: stale ? (last ? `giá trị cập nhật ${age} ngày trước` : 'chưa có giá trị') : '', valuedAt: last, fxGold: as.group === 'gold' || as.group === 'foreign' });
+      out.push({ key: 'ast:' + as.id, kind: 'asset', ref: as.id, name: as.name, sub: ASSET_GROUPS[as.group] || '', ...r, value: v, stale, staleNote: stale ? (last ? `giá trị cập nhật ${age} ngày trước` : 'chưa có giá trị') : '', valuedAt: last, fxGold: as.group === 'gold' || as.group === 'foreign', ...this.inc(as) });
     }
     for (const row of Holdings.rows(st)) {
       const x = row.holding; if (!x.qty && !row.value) continue;
@@ -3236,9 +3515,24 @@ const LayerData = {
       else if (row.priceSource === 'manual') { at = x.manualPriceAt ? DateUtil.isoDateVN(x.manualPriceAt) : ''; const age = at ? DateUtil.diffDays(at, today) : null; stale = !at || age > 7; note = stale ? (at ? `giá nhập tay ${age} ngày trước` : 'giá nhập tay chưa có ngày') : ''; }
       else { at = row.quote && row.quote.fetchedAt ? DateUtil.isoDateVN(row.quote.fetchedAt) : ''; stale = row.fresh === 'stale'; note = stale ? 'giá chưa cập nhật phiên gần nhất' : ''; }
       const r = Layers.resolve('holding', x, ctx);
-      out.push({ key: 'hld:' + x.id, kind: 'holding', ref: x.id, name: x.symbol, sub: `${Money.num(x.qty)} cp${row.account ? ' · ' + row.account.name : ''}`, ...r, value: row.value, stale, staleNote: note, valuedAt: at, fxGold: false });
+      out.push({ key: 'hld:' + x.id, kind: 'holding', ref: x.id, name: x.symbol, sub: `${Money.num(x.qty)} cp${row.account ? ' · ' + row.account.name : ''}`, ...r, value: row.value, stale, staleNote: note, valuedAt: at, fxGold: false, ...this.inc(x) });
     }
     return out;
+  },
+  /** Trường lịch dòng tiền của một bản ghi nguồn → thuộc tính của khoản (cashflow = có lãi suất/tỷ suất). */
+  inc(rec) { const rate = rec.incomeRate > 0 ? rec.incomeRate : null; return { cashflow: rate !== null, rate, freq: rec.incomeFreq || '', start: rec.incomeStart || '', maturity: rec.maturityDate || '' }; },
+  /** Lỗ/lãi so với giá vốn theo từng mã (gộp nhiều tài khoản). lossPct > 0 là đang lỗ. */
+  symbolStats(st) {
+    const by = new Map();
+    for (const r of Holdings.rows(st)) {
+      const x = r.holding; if (!(x.qty > 0)) continue;
+      const g = by.get(x.symbol) || { symbol: x.symbol, qty: 0, value: 0, cost: 0, costKnown: true, priced: true, rec: x, price: null };
+      g.qty += x.qty; g.value += r.value; if (r.cost === null) g.costKnown = false; else g.cost += r.cost;
+      if (r.priceSource === 'cost' || r.priceSource === 'none') g.priced = false; else g.price = r.price;
+      by.set(x.symbol, g);
+    }
+    for (const g of by.values()) g.lossPct = g.costKnown && g.priced && g.cost > 0 ? (g.cost - g.value) / g.cost * 100 : null;
+    return by;
   },
   /** Thu nhập thụ động đã nhận trong năm (giao dịch thu thuộc danh mục đánh dấu "thụ động"). */
   passive(st, today) {
@@ -3255,9 +3549,11 @@ const LayerData = {
       const lastFull = DateUtil.addMonthKey(DateUtil.monthKey(today), -1);
       const spend = Layers.avgMonthlySpend(Ledger.monthly(st, DateUtil.addMonthKey(lastFull, -2), lastFull), 3);
       const debts = st.debts.filter(d => d.active).map(d => ({ name: d.name, balance: cur.debtBalances.get(d.id) || 0, rateType: d.rateType }));
-      const rules = Layers.checkRules(agg, plan, { monthlySpend: spend, debts });
+      const sym = this.symbolStats(st);
+      const rules = Layers.checkRules(agg, plan, { monthlySpend: spend, debts, holdings: Array.from(sym.values()).map(g => ({ symbol: g.symbol, lossPct: g.lossPct })) });
       const passive = this.passive(st, today);
-      return { today, cur, plan, items, agg, rules, spend, passive, liabilities: cur.liabilities, netWorth: cur.netWorth, matchesLedger: agg.gross === cur.totalAssets };
+      const income = Income.summary(items.filter(i => i.value > 0).map(i => ({ key: i.key, name: i.name, kind: i.kind, value: i.value, rate: i.rate, freq: i.freq, start: i.start, maturity: i.maturity })), today, passive.total);
+      return { today, cur, plan, items, agg, rules, spend, passive, income, sym, liabilities: cur.liabilities, netWorth: cur.netWorth, matchesLedger: agg.gross === cur.totalAssets };
     });
   }
 };
@@ -3278,6 +3574,8 @@ const BriefData = {
       if (r.id.startsWith('t_')) { const k = r.id.slice(2); const w = a.weights[k]; metric = w === null || r.status === 'nodata' ? 'thiếu dữ liệu' : `hiện ${pc(w * 100)} (lệch ${pts(w * 100 - plan.targets[k])} điểm %)`; }
       else if (r.id === 'reserve_m') metric = reserveMonths === null ? 'chưa có chi tiêu để tính' : `đủ ${(Math.floor(reserveMonths * 10) / 10).toLocaleString('vi-VN')} tháng`;
       else if (r.id === 'fxgold') metric = a.base > 0 ? `hiện ${pc(a.fxGold / a.base * 100)}` : 'thiếu dữ liệu';
+      else if (r.id === 'cashflow') metric = a.base > 0 && r.status !== 'nodata' ? `hiện ${pc(a.cashflow / a.base * 100)}` : 'thiếu dữ liệu';
+      else if (r.id === 'loss') { const hs = Array.from(L.sym.values()).filter(g => Number.isFinite(g.lossPct)); const over = hs.filter(g => g.lossPct > plan.lossLimitPct + 1e-9); metric = !hs.length ? 'thiếu dữ liệu' : over.length ? 'quá ngưỡng: ' + over.map(g => `${g.symbol} lỗ ${pc(g.lossPct)}`).join(', ') : `${hs.length} mã trong ngưỡng`; }
       else if (r.id === 'nofloat') { const fl = debtsLive.filter(d => d.rateType === 'floating').length; const unk = debtsLive.filter(d => d.rateType !== 'fixed' && d.rateType !== 'floating').length; metric = `${fl} khoản thả nổi, ${unk} khoản chưa ghi loại lãi`; }
       return { status: r.status, label: r.label, metric };
     });
@@ -3295,17 +3593,44 @@ const BriefData = {
       if (r.priceSource === 'cost' || r.priceSource === 'none') notes.push('chưa có giá thị trường');
       else if (r.fresh === 'stale') notes.push('giá cũ');
       if (v && v.stale) notes.push('định giá cần cập nhật (' + v.reason + ')');
-      return { symbol: x.symbol, qty: x.qty, weight: pfTotal > 0 ? x.value / pfTotal * 100 : null, price: r.priceSource === 'cost' || r.priceSource === 'none' ? null : r.price, fair: v ? v.fair : null, buyBelow: v ? v.buyBelow : null, mos: v ? v.mos : null, valDate: v && r.holding.valDate ? r.holding.valDate : '', note: notes.join('; ') };
+      const px = r.priceSource === 'cost' || r.priceSource === 'none' ? null : r.price;
+      return { symbol: x.symbol, qty: x.qty, weight: pfTotal > 0 ? x.value / pfTotal * 100 : null, price: px, fair: v ? v.fair : null, buyBelow: v ? v.buyBelow : null, mos: v ? v.mos : null, valDate: v && r.holding.valDate ? r.holding.valDate : '', note: notes.join('; '), ey: Portfolio.earningsYield(r.holding.eps, px) };
     });
     const fetched = rows.map(r => r.quote && r.quote.fetchedAt).filter(Boolean).sort().slice(-1)[0];
     return {
       asOf: today, appVersion: APP_VERSION, reliability: a.coverage.reliable === null ? null : a.coverage.reliable * 100, priceAsOf: fetched ? DateUtil.isoDateVN(fetched) : '',
       includeUse: a.includeUse, layers, rules, reserveMonths, savingsRate: inc > 0 ? (inc - exp) / inc * 100 : null, budget,
       debt: { count: debtsLive.length, ratio: a.gross > 0 ? L.liabilities / a.gross * 100 : null, floating: debtsLive.filter(d => d.rateType === 'floating').length, fixed: debtsLive.filter(d => d.rateType === 'fixed').length, unknown: debtsLive.filter(d => d.rateType !== 'fixed' && d.rateType !== 'floating').length },
-      holdings, amounts: { gross: a.gross, liabilities: L.liabilities, netWorth: L.netWorth, monthlySpend: L.spend }
+      holdings, amounts: { gross: a.gross, liabilities: L.liabilities, netWorth: L.netWorth, monthlySpend: L.spend },
+      principles: (st.settings.principles || []).map(p => p.text), hurdle: plan.hurdle,
+      income: { year: L.income.year, items: L.income.items, expectedYear: L.income.expectedYear, expectedYearPct: a.base > 0 ? L.income.expectedYear / a.base * 100 : null, receivedYTD: L.income.receivedYTD,
+        receivedVsExpected: L.income.expectedToDate > 0 ? L.income.receivedYTD / L.income.expectedToDate * 100 : null, upcoming: L.income.upcoming.length, maturities: L.income.maturities.length, missing: L.income.missing.length },
+      decisions: (st.decisions || []).filter(d => d.status === 'open' && d.kind !== 'rule').sort((x, y) => (x.date < y.date ? 1 : -1)).slice(0, 15).map(d => { const c = Decisions.count(d.checks); return { date: d.date, kindLabel: DECISION_KINDS[d.kind], symbol: d.symbol, reviewDate: d.reviewDate, due: !!d.reviewDate && d.reviewDate <= today, out: c.out, nodata: c.nodata, thesis: d.thesis, wrongIf: d.wrongIf }; }),
+      ruleChanges: (st.decisions || []).filter(d => d.kind === 'rule').sort((x, y) => ((x.createdAt || x.date) < (y.createdAt || y.date) ? 1 : -1)).slice(0, 5).map(d => ({ date: d.date, changes: d.changes, reason: d.thesis }))
     };
   },
   build(st, opts) { return Brief.render(this.collect(st), opts); }
+};
+
+/* --------------------------- Nhật ký quyết định: dựng đầu vào đối chiếu từ dữ liệu --------------------------- */
+const DecisionData = {
+  /** Nguồn tiền mặc định khi MUA: tài khoản chứng khoán chứa mã, hoặc tài khoản đầu tư đầu tiên. */
+  defaultSource(st, symbol) {
+    const h = (st.holdings || []).find(x => x.symbol === symbol && x.qty > 0) || (st.holdings || []).find(x => x.symbol === symbol);
+    if (h && st.accounts.some(a => a.id === h.accountId)) return 'acc:' + h.accountId;
+    const inv = st.accounts.find(a => a.active && a.type === 'investment'); return inv ? 'acc:' + inv.id : 'new';
+  },
+  input(st, draft) {
+    const L = LayerData.build(st); const sym = String(draft.symbol || '').toUpperCase(); const g = L.sym.get(sym) || null;
+    const rec = g ? g.rec : (st.holdings || []).find(x => x.symbol === sym) || null;
+    const today = DateUtil.today(); const val = rec ? Portfolio.valuation(rec, g ? g.price : null, today) : null;
+    const target = { symbol: sym, layer: Layers.resolve('holding', rec || {}, {}).layer, cashflow: !!(rec && rec.incomeRate > 0), value: g ? g.value : 0, pfTotal: Holdings.total(st),
+      lossPct: g ? g.lossPct : null, fair: rec && rec.fairValue ? rec.fairValue : null, buyBelow: rec && rec.buyBelow ? rec.buyBelow : null, valStale: !!(val && val.stale), eps: rec ? rec.eps : null, targetPct: rec ? rec.targetPct : null, price: g ? g.price : null };
+    const ref = draft.fromRef || 'new'; const it = ref === 'new' ? null : L.items.find(i => i.key === ref);
+    const source = it ? { layer: it.layer, cashflow: !!it.cashflow, newMoney: false, name: it.name } : { layer: '', cashflow: false, newMoney: true, name: 'Tiền mới (chưa có trong FinPilot)' };
+    return { agg: L.agg, plan: L.plan, spend: L.spend, draft: { kind: draft.kind, amount: draft.amount, price: draft.price }, target, source };
+  },
+  check(st, draft) { return Decisions.check(this.input(st, draft)); }
 };
 
 /* --------------------------- Checklist thiết lập: dữ kiện suy ra từ dữ liệu --------------------------- */
@@ -4190,6 +4515,7 @@ const Forms = {
       F.field('Ngày bắt đầu theo dõi', F.date('startDate', acc ? acc.startDate : DateUtil.today()), { required: true, name: 'startDate' }),
       F.field('Mô tả', F.textarea('description', acc ? acc.description : '', { maxlength: 300 }), { full: true, name: 'description' })
     );
+    const inc = Forms.incomeFields(acc, { kind: 'account' }); grid.append(inc.el);
     if (editing) grid.append(h('div', { class: 'field full' }, C.callout('info', 'Số dư hiện tại luôn được tính từ số dư ban đầu và lịch sử giao dịch. Muốn khớp số dư thực tế, hãy dùng "Điều chỉnh số dư" thay vì sửa số dư ban đầu.')));
     form.append(grid, fe);
     let m;
@@ -4198,8 +4524,9 @@ const Forms = {
       const errs = {}; const ob = F.moneyVal(form, 'openingBalance', { allowZero: true, allowEmpty: true }); if (!ob.ok) errs.openingBalance = ob.error;
       const sd = F.dateVal(form, 'startDate'); if (!sd) errs.startDate = 'Ngày không hợp lệ.';
       const now = Util.nowISO();
-      const rec = Model.account({ ...(acc || {}), id: acc ? acc.id : Util.uid('acc'), name: F.val(form, 'name'), type: F.val(form, 'type'), openingBalance: ob.ok ? (ob.value || 0) : NaN, startDate: sd, description: F.val(form, 'description'), active: acc ? acc.active : true, createdAt: acc ? acc.createdAt : now });
-      Object.assign(errs, Validation.account(rec, App.state), errs);
+      const ir = inc.read(form);
+      const rec = Model.account({ ...(acc || {}), id: acc ? acc.id : Util.uid('acc'), name: F.val(form, 'name'), type: F.val(form, 'type'), openingBalance: ob.ok ? (ob.value || 0) : NaN, startDate: sd, description: F.val(form, 'description'), active: acc ? acc.active : true, ...ir.values, createdAt: acc ? acc.createdAt : now });
+      Object.assign(errs, Validation.account(rec, App.state), Validation.income(rec), ir.errs, errs);
       if (Object.keys(errs).length) { F.showErrors(form, errs); return; }
       if (editing && (rec.openingBalance !== acc.openingBalance || rec.startDate !== acc.startDate)) {
         const before = Ledger.current(App.state);
@@ -4370,6 +4697,7 @@ const Forms = {
     if (!editing) grid.append(F.field('Giá trị ước tính hiện tại', F.money('value', null), { required: true, name: 'value' }), F.field('Ngày định giá', F.date('valueDate', DateUtil.today()), { required: true, name: 'valueDate' }));
     else grid.append(h('div', { class: 'field full' }, C.callout('info', h('div', {}, 'Giá trị hiện tại: ', h('b', { class: 'money' }, Money.format(latest ? latest.value : 0)), ` (định giá ${latest ? DateUtil.toVN(latest.date) : '—'}). Dùng nút "Cập nhật giá trị" để ghi nhận định giá mới và giữ lịch sử.`))));
     grid.append(F.field('Giá mua ban đầu', F.money('purchaseValue', asset ? asset.purchaseValue : null, { placeholder: 'Không bắt buộc' }), { name: 'purchaseValue' }), F.field('Ngày mua', F.date('purchaseDate', asset ? asset.purchaseDate : ''), { name: 'purchaseDate' }), F.field('Ghi chú', F.textarea('note', asset ? asset.note : '', { maxlength: 300 }), { full: true, name: 'note' }));
+    const inc = Forms.incomeFields(asset, { kind: 'asset' }); grid.append(inc.el);
     grid.append(h('div', { class: 'field full' }, C.callout('alert', 'Không nhập lại tiền mặt, tiền gửi hay tài khoản đầu tư đã theo dõi ở mục Tài khoản — tránh tính trùng tài sản. Giá thị trường cần cập nhật thủ công (ứng dụng không lấy giá trực tuyến). Vàng: tính theo giá MUA vào của tiệm/ngân hàng; ngoại tệ: số lượng × tỷ giá mua — đó là số tiền bạn thật sự nhận được khi bán.', 'warn')));
     form.append(grid, fe);
     let m;
@@ -4383,8 +4711,9 @@ const Forms = {
         const vd = F.dateVal(form, 'valueDate'); if (!vd) errs.valueDate = 'Ngày không hợp lệ.'; else if (vd > DateUtil.today()) errs.valueDate = 'Ngày định giá không được ở tương lai.';
         if (v.ok && vd) history = [{ date: vd, value: v.value, note: 'Giá trị ban đầu' }];
       }
-      const rec = Model.asset({ ...(asset || {}), id: asset ? asset.id : Util.uid('ast'), name: F.val(form, 'name'), group: F.val(form, 'group'), purchaseValue: pv.ok ? pv.value : null, purchaseDate: pd || '', note: F.val(form, 'note'), history, createdAt: asset ? asset.createdAt : Util.nowISO() });
-      Object.assign(errs, Validation.asset(rec), errs);
+      const ir = inc.read(form);
+      const rec = Model.asset({ ...(asset || {}), id: asset ? asset.id : Util.uid('ast'), name: F.val(form, 'name'), group: F.val(form, 'group'), purchaseValue: pv.ok ? pv.value : null, purchaseDate: pd || '', note: F.val(form, 'note'), history, ...ir.values, createdAt: asset ? asset.createdAt : Util.nowISO() });
+      Object.assign(errs, Validation.asset(rec), Validation.income(rec), ir.errs, errs);
       if (Object.keys(errs).length) return F.showErrors(form, errs);
       if (st.accounts.some(a => Util.norm(a.name) === Util.norm(rec.name)) && !(await Modal.confirm({ title: 'Có thể bị tính trùng', message: `Đã có tài khoản tên "${rec.name}". Nếu đây là cùng một khoản tiền, tài sản sẽ bị tính hai lần. Vẫn lưu?`, confirmText: 'Vẫn lưu' }))) return;
       try { await App.commit(editing ? 'Sửa tài sản' : 'Thêm tài sản', d => { if (editing) { const i = d.assets.findIndex(x => x.id === rec.id); d.assets[i] = rec; } else d.assets.push(rec); }); Toast.show('Đã lưu tài sản', { type: 'success' }); m.close(); }
@@ -4592,6 +4921,31 @@ const Forms = {
   }
 };
 
+/** Nhóm ô "Dòng tiền định kỳ" dùng chung cho tài khoản, tài sản, mã cổ phiếu. read(form) → { values, errs }. */
+Forms.incomeFields = function (rec, { kind = 'account' } = {}) {
+  rec = rec || {};
+  const isH = kind === 'holding';
+  const freqOpts = [{ value: '', label: '— Chưa rõ —' }].concat(Object.entries(INCOME_FREQ).filter(([k]) => !isH || k !== 'maturity').map(([value, o]) => ({ value, label: o.label })));
+  const det = h('details', { class: 'field full inc-box' + (rec.incomeRate > 0 ? ' has' : ''), open: rec.incomeRate > 0 },
+    h('summary', {}, isH ? 'Cổ tức tiền định kỳ — tùy chọn' : 'Dòng tiền định kỳ (lãi, trái tức, tiền thuê) — tùy chọn'),
+    h('p', { class: 'field-hint', text: (isH ? 'Tỷ suất do bạn ước tính trên giá thị trường. ' : '') + 'Dùng để tính "tài sản sinh dòng tiền" và lịch các khoản sắp nhận. Ước tính = giá trị hiện tại × lãi suất × số tháng/12 — không phải số bên trả cam kết.' }),
+    h('div', { class: 'form-grid' },
+      F.field(isH ? 'Tỷ suất cổ tức tiền (%/năm)' : 'Lãi suất / lợi suất (%/năm)', F.input('incomeRate', rec.incomeRate == null ? '' : String(rec.incomeRate).replace('.', ','), { inputmode: 'decimal', placeholder: isH ? 'VD: 4' : 'VD: 5,5' }), { name: 'incomeRate' }),
+      F.field('Kỳ trả', F.select('incomeFreq', freqOpts, rec.incomeFreq || ''), { name: 'incomeFreq' }),
+      F.field(isH ? 'Ngày nhận cổ tức gần nhất/sắp tới' : 'Ngày trả đầu tiên', F.date('incomeStart', rec.incomeStart || ''), { name: 'incomeStart', hint: isH ? 'App lặp lại theo kỳ trả.' : 'Kỳ trả lãi đầu tiên. Với "Cuối kỳ": ngày gửi/mua.' }),
+      isH ? null : F.field('Ngày đáo hạn', F.date('maturityDate', rec.maturityDate || ''), { name: 'maturityDate', hint: 'Để trống nếu không kỳ hạn.' })));
+  const read = form => {
+    const errs = {}; const raw = F.val(form, 'incomeRate').trim();
+    let rate = null; if (raw) { rate = Number(raw.replace(',', '.')); if (!(Number.isFinite(rate) && rate > 0 && rate <= 100)) { errs.incomeRate = 'Từ 0 đến 100 (%/năm).'; rate = null; } }
+    const dt = name => { const r = (F.val(form, name) || '').trim(); if (!r) return ''; const v = F.dateVal(form, name); if (!v) errs[name] = 'Ngày không hợp lệ (DD/MM/YYYY).'; return v || ''; };
+    const start = dt('incomeStart'); const mat = isH ? '' : dt('maturityDate');
+    const freq = F.val(form, 'incomeFreq');
+    if (rate === null && !errs.incomeRate && (freq || start)) errs.incomeRate = 'Nhập lãi suất/tỷ suất, hoặc xóa kỳ trả và ngày.';
+    return { values: { incomeRate: rate, incomeFreq: rate === null ? '' : freq, incomeStart: rate === null ? '' : start, maturityDate: isH ? (rec.maturityDate || '') : mat }, errs };
+  };
+  return { el: det, read };
+};
+
 /* ==========================================================================
    PAGES — 10 màn hình chức năng
    ========================================================================== */
@@ -4609,6 +4963,8 @@ Pages.dashboard = function (view) {
 
   const hero = Pages.disciplineHero ? Pages.disciplineHero(st) : null; if (hero) view.append(hero);
   const setup = Pages.setupCard ? Pages.setupCard(st) : null; if (setup) view.append(h('div', { class: 'mb-12' }, setup));
+  const jdue = Decisions.due(st.decisions || [], DateUtil.today());
+  if (jdue.length) view.append(h('div', { class: 'mb-12' }, C.callout('clock', h('span', {}, `${jdue.length} quyết định đến hạn xem lại (${jdue.slice(0, 3).map(d => (DECISION_KINDS[d.kind] + ' ' + (d.symbol || '')).trim()).join(', ')}${jdue.length > 3 ? '…' : ''}). `, h('a', { href: '#/journal' }, 'Đọc lại lý do & ghi kết quả →')))));
   view.append(C.sectionTitle('Hiện tại', `tính đến ${DateUtil.toVN(cur.asOf)}`));
   view.append(h('div', { class: 'kpi-grid' },
     C.kpi({ label: 'Tài sản ròng', value: C.money(cur.netWorth), sub: 'Tổng tài sản − Tổng nợ', icon: 'shield', featured: true }),
@@ -5956,7 +6312,7 @@ Pages.portfolio = function (view) {
   if (!invAccs.length) view.append(C.callout('info', h('span', {}, 'Danh mục cần gắn với một tài khoản loại "Tài khoản đầu tư" (tài khoản chứng khoán của bạn). ', h('a', { href: '#', onclick: e => { e.preventDefault(); Forms.openAccount(); } }, 'Tạo tài khoản'))));
   if (PriceService.needsReconsent()) view.append(C.callout('alert', h('span', {}, 'Nội dung về nguồn giá đã thay đổi — cần bạn đồng ý lại trước khi lấy giá. ', h('a', { href: '#', onclick: e => { e.preventDefault(); Pages.priceConsent(); } }, 'Xem & đồng ý')), 'warn'));
   if (rows.length && st.assets.some(a => a.group === 'securities' && Ledger.assetValue(a, DateUtil.today()) > 0)) view.append(C.callout('alert', 'Bạn có tài sản nhập tay nhóm "Chứng khoán / đầu tư". Nếu đó chính là danh mục này, hãy xóa hoặc đổi tài sản đó để tài sản ròng không bị tính trùng.', 'warn'));
-  const vt = Holdings.valTotals(st); const anyVal = rows.some(r => r.holding.fairValue);
+  const vt = Holdings.valTotals(st); const anyVal = rows.some(r => r.holding.fairValue || r.holding.eps);
   const cost = Util.sum(rows.filter(r => r.cost !== null && r.price), r => r.cost); const pnl = Util.sum(rows.filter(r => r.pnl !== null), r => r.pnl);
   const fetched = rows.map(r => r.quote && r.quote.fetchedAt).filter(Boolean).sort().slice(-1)[0];
   view.append(h('div', { class: 'kpi-grid' },
@@ -5980,7 +6336,7 @@ Pages.portfolio = function (view) {
         h('td', { class: 'num', dataset: { label: 'Lãi/lỗ' } }, r.pnl === null ? '—' : C.money(r.pnl, { sign: true, tone: 'auto' })),
         anyTarget ? h('td', { class: 'num', dataset: { label: 'Tỷ trọng' } }, `${Util.fmtPct(d.actual, 1)}${d.target !== null ? ' / ' + Util.fmtPct(d.target, 1) : ''}`, d.flag && allFresh ? h('div', { class: 'tiny warn-text', text: `lệch ${d.diff > 0 ? '+' : ''}${d.diff.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} điểm %` }) : null) : null,
         anyVal ? h('td', { class: 'num', dataset: { label: 'Định giá của bạn' } }, Pages.valCell(r)) : null,
-        h('td', { class: 'actions' }, C.iconBtn('plus', 'Ghi lệnh mua', () => Pages.holdingBuy(r.holding)), C.iconBtn('edit', 'Sửa', () => Pages.holdingEdit(r.holding)), C.iconBtn('trash', 'Xóa', () => Pages.holdingDelete(r.holding), 'danger')));
+        h('td', { class: 'actions' }, C.iconBtn('book', 'Ghi quyết định cho mã này', () => Pages.decisionForm({ symbol: r.holding.symbol })), C.iconBtn('plus', 'Ghi lệnh mua', () => Pages.holdingBuy(r.holding)), C.iconBtn('edit', 'Sửa', () => Pages.holdingEdit(r.holding)), C.iconBtn('trash', 'Xóa', () => Pages.holdingDelete(r.holding), 'danger')));
     })))), { sub: 'Giá chỉ mang tính tham khảo, từ nguồn công khai không chính thức (có thể trễ/sai). Không phải khuyến nghị đầu tư.' + (anyVal ? ' Cột "Định giá của bạn" là số do chính bạn nhập — FinPilot không tự định giá và không khuyến nghị mua/bán.' : '') }));
   if (anyTarget) {
     const flagged = drift.filter(d => d.flag);
@@ -5989,9 +6345,14 @@ Pages.portfolio = function (view) {
   if (on && rows.some(r => r.fresh === 'stale' || r.fresh === 'none')) lateRender(() => Pages.refreshPrices(false));
 };
 /** Ô "Định giá của bạn": giá trị hợp lý · biên an toàn · vùng · độ mới. Chỉ mô tả, không khuyến nghị. */
+Pages.eyLine = function (r) {
+  const px = r.priceSource === 'cost' || r.priceSource === 'none' ? null : r.price; const ey = Portfolio.earningsYield(r.holding.eps, px); if (ey === null) return null;
+  const hd = (App.state.settings.layerPlan || {}).hurdle; const below = Number.isFinite(hd) && ey < hd;
+  return h('div', { class: 'tiny ' + (below ? 'warn-text' : 'muted'), title: 'Lợi suất lợi nhuận = EPS / giá (nghịch đảo P/E)', text: `LS lợi nhuận ${Util.fmtPct(ey, 1)} · P/E ${(Math.round(px / r.holding.eps * 10) / 10).toLocaleString('vi-VN')}${Number.isFinite(hd) ? ` · mốc của bạn ${Util.fmtPct(hd, 2)}` : ''}` });
+};
 Pages.valCell = function (r) {
   const v = r.val;
-  if (!v) return h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => Pages.holdingEdit(r.holding) }, 'Thêm');
+  if (!v) return h('div', { class: 'val-cell' }, Pages.eyLine(r), h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => Pages.holdingEdit(r.holding) }, 'Thêm định giá'));
   const pct = x => Util.fmtPct(Math.abs(x) * 100, 1);
   const line = v.price === null ? 'Chưa có giá thị trường để so' : v.mos >= 0 ? `Biên an toàn ${pct(v.mos)}` : `Giá cao hơn định giá ${pct(v.price / v.fair - 1)}`;
   const zone = { buy: C.badge('≤ vùng mua bạn đặt', 'green'), below: C.badge('Dưới giá trị hợp lý', 'blue'), above: C.badge('Trên giá trị hợp lý', 'amber') }[v.zone] || null;
@@ -6000,6 +6361,7 @@ Pages.valCell = function (r) {
     h('div', { class: 'cell-main', text: Money.num(v.fair) }),
     h('div', { class: 'tiny muted', text: line + (v.buyBelow ? ` · vùng mua ≤ ${Money.num(v.buyBelow)}` : '') }),
     zone ? h('div', {}, zone) : null,
+    Pages.eyLine(r),
     h('div', { class: 'tiny ' + (v.stale ? 'warn-text' : 'muted') }, (v.method ? Portfolio.VAL_METHODS[v.method] + ' · ' : '') + (x.valDate ? DateUtil.toVN(x.valDate) : 'chưa có ngày') + (v.stale ? ` — ${v.reason}, nên định giá lại` : ''),
       x.valLink ? h('span', {}, ' · ', h('a', { href: x.valLink, target: '_blank', rel: 'noopener noreferrer' }, 'báo cáo')) : null));
 };
@@ -6095,7 +6457,7 @@ Pages.holdingPaste = function () {
   m = Modal.open({ title: 'Dán / thêm danh mục', body, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'button', onclick: save }, 'Lưu danh mục')] });
 };
 Pages.holdingEdit = function (x) {
-  const form = h('form', { novalidate: true, id: 'hold-form' }); const fe = F.formError();
+  const form = h('form', { novalidate: true, id: 'hold-form' }); const fe = F.formError(); const inc = Forms.incomeFields(x, { kind: 'holding' });
   form.append(h('div', { class: 'form-grid' },
     F.field('Mã', F.input('symbol', x.symbol, { disabled: true }), { name: 'symbol' }),
     F.field('Khối lượng', F.input('qty', Money.num(x.qty), { inputmode: 'numeric' }), { name: 'qty', required: true }),
@@ -6108,10 +6470,15 @@ Pages.holdingEdit = function (x) {
     F.field('Phương pháp', F.select('valMethod', [{ value: '', label: '— Chọn —' }].concat(Object.entries(Portfolio.VAL_METHODS).map(([value, label]) => ({ value, label }))), x.valMethod || ''), { name: 'valMethod' }),
     F.field('Ngày định giá', F.date('valDate', x.valDate || (x.fairValue ? '' : DateUtil.today())), { name: 'valDate', hint: 'Báo "nên định giá lại" khi quá 180 ngày hoặc đã có BCTC quý mới.' }),
     F.field('Liên kết báo cáo (https://…)', F.input('valLink', x.valLink, { inputmode: 'url', placeholder: 'https://' }), { name: 'valLink', full: true }),
-    F.field('Ghi chú định giá', F.textarea('valNote', x.valNote, { maxlength: 300 }), { name: 'valNote', full: true })), fe);
+    F.field('Ghi chú định giá', F.textarea('valNote', x.valNote, { maxlength: 300 }), { name: 'valNote', full: true }),
+    F.field('EPS 4 quý gần nhất (đ/cp)', F.input('eps', x.eps === null || x.eps === undefined ? '' : Money.num(x.eps), { inputmode: 'numeric', placeholder: 'VD: 3.300 (âm nếu lỗ)' }), { name: 'eps', hint: 'Lấy từ app CTCK của bạn. App tính lợi suất lợi nhuận = EPS / giá để so với mốc bạn đặt (nghịch đảo P/E).' }),
+    inc.el), fe);
   let m;
   form.addEventListener('submit', async e => {
     e.preventDefault(); F.clearErrors(form); const errs = {};
+    const ir = inc.read(form); Object.assign(errs, ir.errs);
+    const eRaw = F.val(form, 'eps').trim().replace(/\s/g, ''); let eps = null;
+    if (eRaw) { const neg = eRaw.startsWith('-'); const q = Portfolio.parseQty(neg ? eRaw.slice(1) : eRaw); if (!Number.isSafeInteger(q) || q === 0 || q > 1e7) errs.eps = 'EPS là số nguyên đồng/cp, khác 0 (VD 3.300 hoặc -500).'; else eps = neg ? -q : q; }
     const qty = Portfolio.parseQty(F.val(form, 'qty')); if (!Number.isSafeInteger(qty)) errs.qty = 'Khối lượng phải là số nguyên.';
     const ac = F.moneyVal(form, 'avgCost', { allowEmpty: true }); if (!ac.ok) errs.avgCost = ac.error;
     const mp = F.moneyVal(form, 'manualPrice', { allowEmpty: true }); if (!mp.ok) errs.manualPrice = mp.error;
@@ -6123,7 +6490,7 @@ Pages.holdingEdit = function (x) {
     if (Object.keys(errs).length) return F.showErrors(form, errs);
     const now = Util.nowISO();
     const rec = Model.holding({ ...x, qty, avgCost: ac.value, manualPrice: mp.value, manualPriceAt: mp.value && mp.value !== x.manualPrice ? now : x.manualPriceAt, targetPct: tp,
-      fairValue: fv.value, buyBelow: fv.value ? bb.value : null, valMethod: F.val(form, 'valMethod'), valDate: fv.value ? vd || '' : '', valLink: vl, valNote: F.val(form, 'valNote'), updatedAt: now });
+      fairValue: fv.value, buyBelow: fv.value ? bb.value : null, valMethod: F.val(form, 'valMethod'), valDate: fv.value ? vd || '' : '', valLink: vl, valNote: F.val(form, 'valNote'), eps, ...ir.values, updatedAt: now });
     const ve = Validation.holding(rec, App.state, { strict: true }); const vk = ['fairValue', 'buyBelow', 'valDate'].filter(k => ve[k]);
     if (vk.length) return F.showErrors(form, Object.fromEntries(vk.map(k => [k, ve[k]])));
     try { await App.commit('Sửa danh mục', d => { const i = d.holdings.findIndex(y => y.id === x.id); if (i < 0) throw new AppError('Mã không còn tồn tại.'); d.holdings[i] = rec; }); m.close(); }
@@ -6171,7 +6538,7 @@ Pages.layers = function (view) {
   const st = App.state; const L = LayerData.build(st); const a = L.agg; const plan = L.plan;
   const pct = (x, d = 0) => (x === null || !Number.isFinite(x) ? '—' : Util.fmtPct(x * 100, d));
   view.append(C.pageHead('Quỹ & lớp tài sản', 'Mỗi khoản tiền nằm ở đúng một lớp, gán ngay tại tài khoản, tài sản hoặc từng mã cổ phiếu. Mục tiêu tài chính chỉ là nhãn, không cộng thêm vào tổng. Cách phân lớp và các ngưỡng là của bạn — FinPilot không khuyến nghị phân bổ.',
-    [C.btn('Phân lớp', () => Pages.layerAssign(), { icon: 'edit', cls: 'btn-primary' }), C.btn('Đặt nguyên tắc', () => Pages.layerPlanForm(), { icon: 'settings' }), C.btn('Gói cho Claude', () => Pages.claudeBrief(), { icon: 'copy' })]));
+    [C.btn('Phân lớp', () => Pages.layerAssign(), { icon: 'edit', cls: 'btn-primary' }), C.btn('Đặt nguyên tắc', () => Pages.layerPlanForm(), { icon: 'settings' }), C.btn('Ghi quyết định', () => Pages.decisionForm(), { icon: 'book' }), C.btn('Gói cho Claude', () => Pages.claudeBrief(), { icon: 'copy' })]));
   const V = h('div', { class: 'stack-16' }); view.append(V);
   if (!L.items.length) {
     V.append(C.card(null, C.empty('pie', 'Chưa có gì để phân lớp', 'Thêm tài khoản, tài sản hoặc mã cổ phiếu. Mỗi khoản sẽ được xếp sẵn vào một lớp theo loại, bạn sửa lại nếu khác ý.',
@@ -6222,11 +6589,13 @@ Pages.layers = function (view) {
   const cnt = s => L.rules.filter(r => r.status === s).length;
   V.append(C.card('Đối chiếu nguyên tắc của bạn', L.rules.length ? h('div', { class: 'rule-list' }, L.rules.map(r => h('div', { class: 'rule-row' }, C.badge(RULE_STATUS[r.status][0], RULE_STATUS[r.status][1]), h('div', { class: 'rule-text' }, h('div', { class: 'cell-main', text: r.label }), h('div', { class: 'small muted', text: r.detail })))))
     : C.empty('target', 'Bạn chưa đặt nguyên tắc nào', 'Ví dụ: tỷ trọng mục tiêu cho từng lớp, quỹ dự phòng đủ bao nhiêu tháng chi tiêu, vàng + ngoại tệ trong khoảng nào, không vay lãi thả nổi. FinPilot không đặt sẵn con số nào cho bạn.', [C.btn('Đặt nguyên tắc', () => Pages.layerPlanForm(), { icon: 'settings', cls: 'btn-primary' })]),
-  { sub: 'Chỉ so với ngưỡng bạn tự đặt — không phải khuyến nghị đầu tư.', actions: L.rules.length ? h('div', { class: 'badge-row' }, cnt('out') ? C.badge(`${cnt('out')} ngoài ngưỡng`, 'red') : null, cnt('nodata') ? C.badge(`${cnt('nodata')} thiếu dữ liệu`, 'amber') : null, cnt('ok') ? C.badge(`${cnt('ok')} trong ngưỡng`, 'green') : null) : null }));
+  { sub: h('span', {}, 'Chỉ so với ngưỡng bạn tự đặt — không phải khuyến nghị đầu tư. Mỗi lần đổi ngưỡng được ghi kèm lý do ở ', h('a', { href: '#/journal' }, 'Nhật ký quyết định'), '.'), actions: L.rules.length ? h('div', { class: 'badge-row' }, cnt('out') ? C.badge(`${cnt('out')} ngoài ngưỡng`, 'red') : null, cnt('nodata') ? C.badge(`${cnt('nodata')} thiếu dữ liệu`, 'amber') : null, cnt('ok') ? C.badge(`${cnt('ok')} trong ngưỡng`, 'green') : null) : null }));
 
   // Cập nhật nhanh: các khoản số cũ, cũ nhất trước
   const stale = L.items.filter(i => i.stale && i.value > 0).sort((x, y) => (x.valuedAt || '') < (y.valuedAt || '') ? -1 : 1);
   if (stale.length) V.append(C.card('Cập nhật nhanh', Pages.layerItemTable(stale, { showLayer: false, update: true }), { sub: 'Các khoản có số liệu cũ, cũ nhất trước. Vàng tính theo giá MUA vào; ngoại tệ theo tỷ giá mua của ngân hàng.' }));
+
+  V.append(Pages.incomeCard(L));
 
   // Thu nhập thụ động
   const P = L.passive; const hasHold = (st.holdings || []).some(x => x.qty > 0);
@@ -6322,7 +6691,12 @@ Pages.layerPlanForm = function () {
     F.field('Quỹ dự phòng đủ ít nhất (tháng chi tiêu)', F.input('reserveMonths', num(p.reserveMonths), { inputmode: 'decimal', placeholder: 'VD: 6' }), { name: 'reserveMonths', hint: L.spend ? `Chi bình quân 3 tháng gần nhất: ${Money.format(L.spend)}/tháng` : 'Cần chi tiêu của các tháng đã qua.' }),
     F.field('Vàng + ngoại tệ từ (%)', F.input('fxMin', num(p.fxGoldMin), { inputmode: 'decimal', placeholder: 'VD: 10' }), { name: 'fxMin' }),
     F.field('Vàng + ngoại tệ đến (%)', F.input('fxMax', num(p.fxGoldMax), { inputmode: 'decimal', placeholder: 'VD: 15' }), { name: 'fxMax', hint: 'Tính các tài sản nhóm Vàng và Ngoại tệ.' }),
-    h('div', { class: 'field full' }, F.check('noFloat', p.noFloatingDebt, 'Không có khoản nợ lãi thả nổi'), h('div', { class: 'field-hint', text: 'Ghi loại lãi suất (cố định / thả nổi) trong từng Khoản nợ.' }))), fe);
+    h('div', { class: 'field full' }, F.check('noFloat', p.noFloatingDebt, 'Không có khoản nợ lãi thả nổi'), h('div', { class: 'field-hint', text: 'Ghi loại lãi suất (cố định / thả nổi) trong từng Khoản nợ.' })),
+    F.field('Tài sản sinh dòng tiền tối thiểu (%)', F.input('cashflowMin', num(p.cashflowMin), { inputmode: 'decimal', placeholder: 'VD: 70' }), { name: 'cashflowMin', hint: L.agg.base > 0 ? `Hiện ${Util.fmtPct(L.agg.cashflow / L.agg.base * 100, 1)} — chỉ tính khoản đã ghi lãi suất/tỷ suất (${L.agg.cashflowN} khoản).` : 'Tính các khoản bạn đã ghi lãi suất/tỷ suất cổ tức.' }),
+    F.field('Lỗ mỗi mã không quá (% giá vốn)', F.input('lossLimitPct', num(p.lossLimitPct), { inputmode: 'decimal', placeholder: 'VD: 20' }), { name: 'lossLimitPct', hint: 'Chỉ báo khi một mã lỗ quá ngưỡng — app không tự bán.' }),
+    F.field('Mốc lợi suất để so (%/năm)', F.input('hurdle', num(p.hurdle), { inputmode: 'decimal', placeholder: 'VD: 6 (lãi tiết kiệm 12 tháng)' }), { name: 'hurdle', hint: 'So với lợi suất lợi nhuận EPS/giá của từng mã (nhập EPS khi sửa mã).' }),
+    h('div', { class: 'field full' }, h('div', { class: 'section-label', text: 'Lý do thay đổi' })),
+    F.field('Vì sao bạn đổi nguyên tắc lần này?', F.textarea('reason', '', { maxlength: 600, rows: 2, placeholder: 'VD: Thu nhập ổn định hơn, muốn tăng phần tăng trưởng lên 35%.' }), { name: 'reason', full: true, hint: 'Bắt buộc khi có thay đổi. Được lưu vào Nhật ký quyết định để sau này bạn đọc lại còn hiểu.' })), fe);
   const upd = () => { let s = 0, n = 0; for (const k of Layers.KEYS) { const v = F.val(form, 't_' + k).trim(); if (v) { s += Number(v.replace(',', '.')) || 0; n++; } } sumEl.textContent = n ? `Tổng mục tiêu: ${s.toLocaleString('vi-VN')}%${Math.abs(s - 100) > 0.05 ? ' (chưa bằng 100%)' : ''}` : ''; };
   form.addEventListener('input', upd); upd();
   let m;
@@ -6331,11 +6705,17 @@ Pages.layerPlanForm = function () {
     const rd = (name, lo, hi) => { const raw = F.val(form, name).trim(); if (!raw) return null; const v = Number(raw.replace(',', '.')); if (!Number.isFinite(v) || v < lo || v > hi) { errs[name] = `Từ ${lo} đến ${hi}.`; return null; } return v; };
     const t = {}; for (const k of Layers.KEYS) { const v = rd('t_' + k, 0, 100); if (v !== null) t[k] = v; }
     const band = rd('band', 0.5, 50); const rm = rd('reserveMonths', 0.5, 60); const lo = rd('fxMin', 0, 100), hi = rd('fxMax', 0, 100);
+    const cfm = rd('cashflowMin', 0, 100), llp = rd('lossLimitPct', 1, 100), hd = rd('hurdle', 0.01, 50);
     if (lo !== null && hi !== null && lo > hi) errs.fxMax = 'Phải ≥ mức "từ".';
     if (Object.keys(errs).length) return F.showErrors(form, errs);
-    const plan = Model.layerPlan({ targets: t, band: band === null ? 5 : band, reserveMonths: rm, fxGoldMin: lo, fxGoldMax: hi, noFloatingDebt: form.elements.noFloat.checked, includeUse: form.elements.includeUse.checked });
-    try { await App.commit('Đặt nguyên tắc lớp tài sản', d => { d.settings = { ...d.settings, layerPlan: plan, updatedAt: Util.nowISO() }; }); m.close(); Toast.show('Đã lưu nguyên tắc.', { type: 'success' }); }
-    catch (er) { fe.textContent = er.message; }
+    const plan = Model.layerPlan({ targets: t, band: band === null ? 5 : band, reserveMonths: rm, fxGoldMin: lo, fxGoldMax: hi, noFloatingDebt: form.elements.noFloat.checked, includeUse: form.elements.includeUse.checked, cashflowMin: cfm, lossLimitPct: llp, hurdle: hd });
+    const changes = Decisions.diff(p, plan); const reason = F.val(form, 'reason').trim();
+    if (!changes.length) { m.close(); Toast.show('Không có thay đổi.', {}); return; }
+    if (reason.length < 3) return F.showErrors(form, { reason: 'Ghi ngắn gọn lý do (ít nhất vài chữ) — để sau này bạn biết vì sao đã đổi.' });
+    try {
+      await App.commit('Đặt nguyên tắc lớp tài sản', d => { d.settings = { ...d.settings, layerPlan: plan, updatedAt: Util.nowISO() }; Pages.pushRuleLog(d, changes, reason); });
+      m.close(); Toast.show(`Đã lưu ${changes.length} thay đổi nguyên tắc vào nhật ký.`, { type: 'success' });
+    } catch (er) { fe.textContent = er.message; }
   });
   m = Modal.open({ title: 'Nguyên tắc của bạn', body: form, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'lp-form' }, 'Lưu')] });
 };
@@ -6389,20 +6769,22 @@ Pages.dividendRecord = function () {
    v1.7 — Gói cho Claude (người dùng tự xem trước & tự dán) + Checklist thiết lập.
    ========================================================================== */
 Pages.claudeBrief = function () {
-  const st = App.state; let amounts = false;
+  const st = App.state; let amounts = false, notes = false;
   const ta = h('textarea', { class: 'brief-text', readonly: true, rows: 14, 'aria-label': 'Nội dung gói cho Claude', spellcheck: 'false' });
   const meta = h('div', { class: 'tiny muted' });
-  const draw = () => { const md = BriefData.build(st, { includeAmounts: amounts }); ta.value = md; meta.textContent = `${md.split('\n').length} dòng · ${md.length.toLocaleString('vi-VN')} ký tự`; return md; };
+  const draw = () => { const md = BriefData.build(st, { includeAmounts: amounts, includeNotes: notes }); ta.value = md; meta.textContent = `${md.split('\n').length} dòng · ${md.length.toLocaleString('vi-VN')} ký tự`; return md; };
   const amt = h('label', { class: 'check' }, h('input', { type: 'checkbox', name: 'brief_amounts', onchange: e => { amounts = e.target.checked; draw(); } }), 'Kèm số tiền tuyệt đối (tổng tài sản, nợ, khối lượng cổ phiếu)');
+  const nts = h('label', { class: 'check' }, h('input', { type: 'checkbox', name: 'brief_notes', onchange: e => { notes = e.target.checked; draw(); } }), 'Kèm lý do bạn viết trong Nhật ký quyết định');
   const body = h('div', { class: 'brief' },
     C.callout('alert', h('div', {},
       h('b', {}, 'Dán vào Claude nghĩa là gửi dữ liệu này lên máy chủ của Anthropic.'),
       h('ul', { class: 'small' },
         h('li', {}, 'Trước khi dán: trong Claude vào Cài đặt → Quyền riêng tư, tắt mục cho phép dùng dữ liệu để cải thiện mô hình.'),
         h('li', {}, 'Gói chỉ của hồ sơ đang mở. Chỉ xuất hồ sơ của chính bạn.'),
-        h('li', {}, 'Mặc định KHÔNG có số tiền tuyệt đối, tên/số tài khoản, tên ngân hàng, ghi chú, tên khoản nợ. Chỉ tỷ lệ % và số liệu tổng hợp.'),
+        h('li', {}, 'Mặc định KHÔNG có số tiền tuyệt đối, tên/số tài khoản, tên ngân hàng, ghi chú, tên khoản nợ, lý do trong nhật ký. Chỉ tỷ lệ % và số liệu tổng hợp.'),
+        h('li', {}, 'CÓ kèm "Nguyên tắc viết tay" của bạn — để Claude đối chiếu. Đọc lại phần đó trong ô xem trước trước khi dán.'),
         h('li', {}, 'Gợi ý: dán vào một Project "Tài chính cá nhân" trên Claude; khi số liệu đổi, xuất gói mới và thay gói cũ.'))), 'warn'),
-    h('div', { class: 'field' }, amt),
+    h('div', { class: 'field' }, amt, nts),
     ta, meta);
   const md0 = draw();
   let m;
@@ -6444,6 +6826,254 @@ Pages.setupCard = function (st) {
 };
 
 /* ==========================================================================
+   NHẬT KÝ QUYẾT ĐỊNH (v1.8) — ghi VÌ SAO trước khi làm; app đối chiếu với nguyên tắc
+   CỦA BẠN và lưu lại sự thật lúc đó. Không chặn, không khuyến nghị, không đặt lệnh.
+   ========================================================================== */
+const DEC_STATUS = { ok: ['Trong ngưỡng', 'green'], out: ['Chạm ngưỡng', 'red'], nodata: ['Thiếu dữ liệu', 'amber'], info: ['Ghi nhận', 'blue'] };
+const DEC_TONE = { buy: 'green', sell: 'red', hold: 'blue', rule: 'amber', other: '' };
+
+/** Ghi một lần đổi nguyên tắc (kèm lý do) vào nhật ký — gọi BÊN TRONG App.commit. */
+Pages.pushRuleLog = function (d, changes, reason) {
+  const now = Util.nowISO();
+  const rec = Model.decision({ id: Util.uid('dec'), date: DateUtil.today(), kind: 'rule', thesis: reason, changes, createdAt: now, updatedAt: now });
+  const e = Validation.decision(rec); if (Object.keys(e).length) throw new AppError(Validation.first(e));
+  d.decisions = d.decisions || []; d.decisions.push(rec);
+};
+
+Pages.checkList = function (checks, { empty = null } = {}) {
+  if (!checks || !checks.length) return empty || h('p', { class: 'small muted', text: 'Không có nguyên tắc nào của bạn liên quan tới quyết định này.' });
+  return h('div', { class: 'rule-list' }, checks.map(c => h('div', { class: 'rule-row' }, C.badge(DEC_STATUS[c.status][0], DEC_STATUS[c.status][1]), h('div', { class: 'rule-text' }, h('div', { class: 'cell-main', text: c.label }), h('div', { class: 'small muted', text: c.detail })))));
+};
+Pages.checkSummary = function (checks) {
+  const c = Decisions.count(checks);
+  if (!checks || !checks.length) return h('span', { class: 'small muted', text: 'Không có nguyên tắc liên quan' });
+  return h('span', { class: 'badge-row' }, c.out ? C.badge(`Chạm ${c.out} ngưỡng`, 'red') : C.badge('Không chạm ngưỡng nào', 'green'), c.nodata ? C.badge(`${c.nodata} thiếu dữ liệu`, 'amber') : null, c.info ? C.badge(`${c.info} ghi nhận`, 'blue') : null);
+};
+
+Pages.journal = function (view) {
+  const st = App.state; const today = DateUtil.today(); const all = st.decisions || [];
+  const trades = all.filter(d => d.kind !== 'rule'); const rules = all.filter(d => d.kind === 'rule');
+  const open = trades.filter(d => d.status === 'open'); const closed = trades.filter(d => d.status === 'closed');
+  const due = Decisions.due(open, today);
+  view.append(C.pageHead('Nhật ký quyết định', 'Ghi lại VÌ SAO trước khi mua, bán hay giữ. FinPilot đối chiếu với nguyên tắc do chính bạn đặt và lưu lại sự thật tại thời điểm đó; tới ngày hẹn, bạn đọc lại và ghi kết quả. App không chặn, không khuyến nghị, không đặt lệnh.',
+    [C.btn('Ghi quyết định', () => Pages.decisionForm(), { icon: 'plus', cls: 'btn-primary' }), C.btn('Nguyên tắc viết tay', () => Pages.principlesForm(), { icon: 'edit' }), C.btn('Gói cho Claude', () => Pages.claudeBrief(), { icon: 'copy' })]));
+  const V = h('div', { class: 'stack-16' }); view.append(V);
+  V.append(h('div', { class: 'kpi-grid' },
+    C.kpi({ label: 'Đang mở', value: String(open.length), icon: 'book', featured: true, sub: open.length ? `${open.filter(d => d.reviewDate).length} có hẹn xem lại` : 'Chưa có quyết định nào' }),
+    C.kpi({ label: 'Đến hạn xem lại', value: String(due.length), icon: 'clock', tone: due.length ? 'warn' : '', sub: due.length ? 'Đọc lại lý do và ghi kết quả' : 'Không có' }),
+    C.kpi({ label: 'Đã đóng', value: String(closed.length), icon: 'check', sub: closed.length ? 'Có kết quả để tự học lại' : '—' }),
+    C.kpi({ label: 'Lần đổi nguyên tắc', value: String(rules.length), icon: 'history', sub: rules.length ? 'Gần nhất ' + DateUtil.toVN(rules.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0].date) : 'Mỗi lần đổi đều kèm lý do' })));
+  if (due.length) V.append(C.card('Đến hạn xem lại', h('div', { class: 'log-list' }, due.map(d => Pages.decisionItem(d, { compact: true }))), { sub: 'Đọc lại lý do lúc quyết định, so với điều đã xảy ra, rồi ghi kết quả — đúng hay sai đều đáng ghi.' }));
+
+  const pr = st.settings.principles || [];
+  V.append(C.card('Nguyên tắc viết tay của bạn', pr.length ? h('ol', { class: 'principles' }, pr.map(p => h('li', { text: p.text })))
+    : C.empty('book', 'Chưa có nguyên tắc viết tay', 'Viết bằng lời của bạn, mỗi dòng một nguyên tắc. VD: "Không vay ký quỹ (margin)", "Mỗi mã tối đa 25% danh mục", "Chỉ mua khi giá dưới vùng mua tôi đã định giá". Các con số đo được (tỷ trọng, quỹ dự phòng, ngưỡng lỗ) đặt ở trang Quỹ & lớp tài sản.', [C.btn('Viết nguyên tắc', () => Pages.principlesForm(), { icon: 'edit', cls: 'btn-primary' })]),
+  { sub: 'Đi kèm Gói cho Claude để Claude đối chiếu trước khi trả lời. Đừng ghi tên hay số tài khoản vào đây.', actions: pr.length ? C.btn('Sửa', () => Pages.principlesForm(), { icon: 'edit', cls: 'btn-sm btn-touch' }) : null }));
+
+  const tab = ['open', 'closed', 'rules'].includes(Pages._jTab) ? Pages._jTab : 'open';
+  const tabs = [['open', `Đang mở (${open.length})`], ['closed', `Đã đóng (${closed.length})`], ['rules', `Đổi nguyên tắc (${rules.length})`]];
+  const chips = h('div', { class: 'chip-row', role: 'tablist', 'aria-label': 'Lọc nhật ký' }, tabs.map(([k, l]) => h('button', { type: 'button', class: 'chip-btn' + (k === tab ? ' active' : ''), role: 'tab', 'aria-selected': String(k === tab), onclick: () => { Pages._jTab = k; App.render(); } }, l)));
+  const sortD = arr => arr.slice().sort((a, b) => (a.date === b.date ? ((a.createdAt || '') < (b.createdAt || '') ? 1 : -1) : a.date < b.date ? 1 : -1));
+  let body;
+  if (tab === 'rules') body = rules.length ? h('div', { class: 'log-list' }, sortD(rules).map(d => Pages.ruleLogItem(d))) : h('p', { class: 'small muted', text: 'Chưa có lần đổi nguyên tắc nào. Từ bản 1.8, mỗi lần bạn đổi ngưỡng ở Quỹ & lớp tài sản hoặc sửa nguyên tắc viết tay đều được ghi ở đây kèm lý do.' });
+  else { const list = tab === 'open' ? open : closed; body = list.length ? h('div', { class: 'log-list' }, sortD(list).map(d => Pages.decisionItem(d))) : C.empty('book', tab === 'open' ? 'Chưa có quyết định đang mở' : 'Chưa đóng quyết định nào', tab === 'open' ? 'Trước khi mua/bán, bấm "Ghi quyết định": viết lý do, điều gì sẽ chứng minh bạn sai, và hẹn ngày đọc lại.' : 'Tới ngày hẹn, mở quyết định và ghi kết quả.', tab === 'open' ? [C.btn('Ghi quyết định', () => Pages.decisionForm(), { icon: 'plus', cls: 'btn-primary' })] : null); }
+  V.append(C.card('Nhật ký', h('div', {}, chips, h('div', { class: 'mt-8' }, body))));
+};
+
+Pages.decisionItem = function (d, { compact = false } = {}) {
+  const st = App.state; const today = DateUtil.today();
+  const g = d.symbol ? LayerData.build(st).sym.get(d.symbol) : null; const ch = g ? Decisions.priceChange(d, g.price) : null;
+  const isDue = d.status === 'open' && d.reviewDate && d.reviewDate <= today;
+  return h('article', { class: 'dec-item' + (isDue ? ' due' : '') },
+    h('div', { class: 'dec-head' },
+      h('div', {}, C.badge(DECISION_KINDS[d.kind], DEC_TONE[d.kind]), ' ', h('b', { text: d.symbol || '' }), d.amount ? h('span', { class: 'small muted' }, ' · ', C.money(d.amount)) : null, d.price ? h('span', { class: 'small muted', text: ` · giá ${Money.num(d.price)}` }) : null),
+      h('div', { class: 'small muted', text: DateUtil.toVN(d.date) + (d.reviewDate ? ` · hẹn xem lại ${DateUtil.toVN(d.reviewDate)}${isDue ? ' (đến hạn)' : ''}` : '') })),
+    h('p', { class: 'dec-thesis', text: d.thesis }),
+    d.wrongIf ? h('p', { class: 'small' }, h('b', {}, 'Tôi sai nếu: '), d.wrongIf) : null,
+    ch !== null ? h('p', { class: 'small muted', text: `Giá ${d.symbol} từ ${Money.num(d.price)} → ${Money.num(g.price)} (${ch > 0 ? '+' : ''}${Util.fmtPct(ch, 1)}) kể từ ngày quyết định — chỉ là sự thật về giá, không phải điểm đúng/sai.` }) : null,
+    h('div', { class: 'dec-checks' }, Pages.checkSummary(d.checks), d.checks.length ? h('details', {}, h('summary', { class: 'small' }, 'Đối chiếu lúc ghi'), Pages.checkList(d.checks)) : null),
+    d.status === 'closed' ? h('div', { class: 'dec-outcome' }, h('b', {}, `Kết quả (${d.outcomeAt ? DateUtil.toVN(d.outcomeAt) : ''}): `), d.outcome) : null,
+    compact ? h('div', { class: 'btn-group' }, C.btn('Xem lại & ghi kết quả', () => Pages.decisionClose(d), { cls: 'btn-sm btn-primary btn-touch', icon: 'check' }))
+      : h('div', { class: 'btn-group' },
+        d.status === 'open' ? C.btn('Xem lại & ghi kết quả', () => Pages.decisionClose(d), { cls: 'btn-sm btn-touch', icon: 'check' }) : C.btn('Sửa kết quả', () => Pages.decisionClose(d), { cls: 'btn-sm btn-ghost btn-touch', icon: 'edit' }),
+        C.btn('Xóa', () => Pages.decisionDelete(d), { cls: 'btn-sm btn-ghost btn-touch', icon: 'trash' })));
+};
+Pages.ruleLogItem = function (d) {
+  return h('article', { class: 'dec-item' },
+    h('div', { class: 'dec-head' }, h('div', {}, C.badge('Đổi nguyên tắc', 'amber')), h('div', { class: 'small muted', text: DateUtil.toVN(d.date) + (d.createdAt ? ' ' + DateUtil.dateTimeVN(d.createdAt).slice(-5) : '') })),
+    h('ul', { class: 'chg-list' }, d.changes.map(c => h('li', {}, h('b', { text: c.label }), c.from || c.to ? h('span', { class: 'small' }, ': ', h('span', { class: 'muted', text: c.from || '—' }), ' → ', h('span', { text: c.to || '—' })) : null))),
+    h('p', { class: 'small' }, h('b', {}, 'Lý do: '), d.thesis));
+};
+Pages.decisionDelete = async function (d) {
+  if (!(await Modal.confirm({ title: 'Xóa mục nhật ký?', message: 'Nhật ký có giá trị nhất khi giữ cả quyết định sai. Chỉ xóa nếu ghi nhầm.', confirmText: 'Xóa', danger: true }))) return;
+  try { await App.commit('Xóa mục nhật ký', x => { x.decisions = x.decisions.filter(y => y.id !== d.id); }, { undoLabel: 'Đã xóa mục nhật ký' }); Toast.show('Đã xóa.', { type: 'success', action: { label: 'Hoàn tác', fn: () => App.undo() } }); }
+  catch (e) { Toast.show(e.message, { type: 'error' }); }
+};
+
+/** Ghi quyết định: đối chiếu trực tiếp khi gõ; lưu kèm ảnh chụp đối chiếu. */
+Pages.decisionForm = function (pre = {}) {
+  const st = App.state; const L = LayerData.build(st);
+  const syms = Array.from(new Set((st.holdings || []).map(x => x.symbol))).sort();
+  const dl = h('datalist', { id: 'dec-syms' }, syms.map(s => h('option', { value: s })));
+  const accItems = L.items.filter(i => i.kind === 'account');
+  const kind0 = pre.kind || 'buy'; const sym0 = (pre.symbol || '').toUpperCase();
+  const srcOpts = () => accItems.map(i => ({ value: i.key, label: `${i.name} · ${Layers.LABELS[i.layer] || 'Chưa phân lớp'}` })).concat([{ value: 'new', label: 'Tiền mới (chưa có trong FinPilot)' }]);
+  const g0 = sym0 ? L.sym.get(sym0) : null;
+  const form = h('form', { novalidate: true, id: 'dec-form' }); const fe = F.formError();
+  const pickSrc = s => { const v = DecisionData.defaultSource(App.state, s || ''); return accItems.some(i => i.key === v) ? v : 'new'; };
+  const srcSel = F.select('fromRef', srcOpts(), pickSrc(sym0));
+  const srcLabel = h('span', {}, 'Tiền lấy từ');
+  const srcField = F.field(srcLabel, srcSel, { name: 'fromRef', hint: 'Để app tính lớp nào giảm, lớp nào tăng. Nhật ký không tự đổi số dư.' });
+  const panel = h('div', { class: 'dec-panel', 'aria-live': 'polite' });
+  const symInput = F.input('symbol', sym0, { maxlength: 10, list: 'dec-syms', placeholder: 'VD: ACB', autocapitalize: 'characters' });
+  form.append(dl, h('div', { class: 'form-grid' },
+    F.field('Loại', F.select('kind', ['buy', 'sell', 'hold', 'other'].map(k => ({ value: k, label: DECISION_KINDS[k] })), kind0), { name: 'kind', required: true }),
+    F.field('Mã', symInput, { name: 'symbol', hint: 'Bắt buộc khi mua/bán.' }),
+    F.field('Số tiền dự kiến', F.money('amount', pre.amount || null, { placeholder: 'VD: 50tr' }), { name: 'amount' }),
+    F.field('Giá dự kiến (đ/cp)', F.money('price', g0 && g0.price ? g0.price : null, { placeholder: 'Để trống = giá hiện tại' }), { name: 'price' }),
+    srcField,
+    F.field('Ngày quyết định', F.date('date', DateUtil.today()), { name: 'date', required: true }),
+    F.field('Vì sao? (lý do của bạn)', F.textarea('thesis', '', { maxlength: 600, rows: 3, placeholder: 'VD: Giá dưới vùng mua 18.300 tôi định giá; ROE ổn định; tỷ trọng ngân hàng còn dưới mục tiêu.' }), { name: 'thesis', full: true, required: true }),
+    F.field('Tôi sai nếu…', F.textarea('wrongIf', '', { maxlength: 300, rows: 2, placeholder: 'VD: Nợ xấu vượt 3% hai quý liên tiếp, hoặc tôi cần tiền trước 12 tháng.' }), { name: 'wrongIf', full: true, hint: 'Điều kiện cụ thể chứng minh lý do trên không còn đúng — viết ngay bây giờ, khi còn bình tĩnh.' }),
+    F.field('Hẹn ngày đọc lại', F.date('reviewDate', DateUtil.addDays(DateUtil.today(), 90)), { name: 'reviewDate', hint: 'Mặc định 3 tháng. Để trống nếu không cần.' }),
+    h('div', { class: 'field full' }, h('div', { class: 'section-label', text: 'Đối chiếu với nguyên tắc của bạn' }), panel)), fe);
+  const draft = () => {
+    const kind = F.val(form, 'kind'); const a = F.moneyVal(form, 'amount', { allowEmpty: true }); const p = F.moneyVal(form, 'price', { allowEmpty: true });
+    return { kind, symbol: F.val(form, 'symbol').trim().toUpperCase(), amount: a.ok ? a.value : null, price: p.ok ? p.value : null, fromRef: F.val(form, 'fromRef') };
+  };
+  const hasRules = () => { const pl = L.plan; return Object.keys(pl.targets || {}).length || [pl.reserveMonths, pl.cashflowMin, pl.lossLimitPct, pl.hurdle].some(Number.isFinite); };
+  let last = [];
+  const refresh = () => {
+    const d = draft(); srcLabel.textContent = d.kind === 'sell' ? 'Tiền về tài khoản' : 'Tiền lấy từ';
+    srcField.style.display = d.kind === 'buy' || d.kind === 'sell' ? '' : 'none';
+    last = d.kind === 'other' ? [] : DecisionData.check(App.state, d);
+    const c = Decisions.count(last);
+    panel.replaceChildren(
+      d.kind === 'other' ? h('p', { class: 'small muted', text: 'Loại "Khác" chỉ ghi lý do, không đối chiếu.' })
+        : h('div', {}, h('p', { class: 'small' }, last.length ? (c.out ? h('b', { class: 'neg', text: `Chạm ${c.out} ngưỡng bạn đặt. ` }) : h('b', { text: 'Không chạm ngưỡng nào bạn đặt. ' })) : null, 'Đây là sự thật để bạn cân nhắc — bạn vẫn quyết định và vẫn lưu được.'),
+          Pages.checkList(last, { empty: h('p', { class: 'small muted' }, hasRules() ? 'Nhập mã và số tiền để app đối chiếu.' : 'Bạn chưa đặt ngưỡng nào để đối chiếu. ', !hasRules() ? h('a', { href: '#', onclick: e => { e.preventDefault(); m.close(); Pages.layerPlanForm(); } }, 'Đặt nguyên tắc') : null) })));
+  };
+  const deb = Util.debounce(refresh, 150);
+  form.addEventListener('input', deb); form.addEventListener('change', e => {
+    if (e.target.name === 'symbol') { const s = F.val(form, 'symbol').trim().toUpperCase(); const g = L.sym.get(s); if (g && g.price && !F.val(form, 'price').trim()) form.elements.price.value = Money.num(g.price); if (s) srcSel.value = pickSrc(s); }
+    deb();
+  });
+  setTimeout(refresh);
+  let m;
+  form.addEventListener('submit', async e => {
+    e.preventDefault(); F.clearErrors(form); const errs = {};
+    const d = draft(); const a = F.moneyVal(form, 'amount', { allowEmpty: true }); if (!a.ok) errs.amount = a.error;
+    const p = F.moneyVal(form, 'price', { allowEmpty: true }); if (!p.ok) errs.price = p.error;
+    const date = F.dateVal(form, 'date'); if (!date) errs.date = 'Ngày không hợp lệ.';
+    const rRaw = F.val(form, 'reviewDate').trim(); const rd = rRaw ? F.dateVal(form, 'reviewDate') : ''; if (rRaw && !rd) errs.reviewDate = 'Ngày không hợp lệ.';
+    const now = Util.nowISO(); refresh();
+    const rec = Model.decision({ id: Util.uid('dec'), date, kind: d.kind, symbol: d.symbol, amount: a.ok ? a.value : null, price: p.ok && p.value ? p.value : (L.sym.get(d.symbol) || {}).price || null, fromRef: d.kind === 'buy' || d.kind === 'sell' ? d.fromRef : '',
+      thesis: F.val(form, 'thesis'), wrongIf: F.val(form, 'wrongIf'), reviewDate: rd || '', checks: last, createdAt: now, updatedAt: now });
+    Object.assign(errs, Validation.decision(rec), errs);
+    if (Object.keys(errs).length) return F.showErrors(form, errs);
+    try {
+      await App.commit('Ghi quyết định', x => { x.decisions = x.decisions || []; x.decisions.push(rec); });
+      m.close(); Toast.show((d.kind === 'buy' || d.kind === 'sell') ? 'Đã ghi vào nhật ký. Nhật ký không đặt lệnh — khớp lệnh xong thì cập nhật ở Danh mục chứng khoán.' : 'Đã ghi vào nhật ký.', { type: 'success', timeout: 6000 });
+    } catch (er) { fe.textContent = er.message; }
+  });
+  m = Modal.open({ title: 'Ghi quyết định', body: form, size: 'lg', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'dec-form' }, 'Lưu vào nhật ký')] });
+};
+
+/** Xem lại: đọc lại lý do + đối chiếu lúc đó, ghi kết quả (đóng) hoặc dời hẹn. */
+Pages.decisionClose = function (d) {
+  const form = h('form', { novalidate: true, id: 'decc-form' }); const fe = F.formError();
+  const g = d.symbol ? LayerData.build(App.state).sym.get(d.symbol) : null; const ch = g ? Decisions.priceChange(d, g.price) : null;
+  form.append(
+    h('div', { class: 'dec-recap' },
+      h('div', { class: 'small muted', text: `${DateUtil.toVN(d.date)} · ${DECISION_KINDS[d.kind]}${d.symbol ? ' ' + d.symbol : ''}${d.amount ? ' · ' + Money.format(d.amount) : ''}` }),
+      h('p', {}, h('b', {}, 'Lý do lúc đó: '), d.thesis),
+      d.wrongIf ? h('p', {}, h('b', {}, 'Tôi sai nếu: '), d.wrongIf) : null,
+      ch !== null ? h('p', { class: 'small', text: `Giá ${d.symbol}: ${Money.num(d.price)} → ${Money.num(g.price)} (${ch > 0 ? '+' : ''}${Util.fmtPct(ch, 1)}).` }) : null,
+      d.checks.length ? h('details', {}, h('summary', { class: 'small' }, 'Đối chiếu nguyên tắc lúc ghi'), Pages.checkList(d.checks)) : null),
+    h('div', { class: 'form-grid' },
+      F.field('Kết quả & bài học', F.textarea('outcome', d.outcome || '', { maxlength: 600, rows: 3, placeholder: 'Điều gì đã xảy ra? Lý do ban đầu còn đúng không? Lần sau làm gì khác?' }), { name: 'outcome', full: true }),
+      d.status === 'open' ? F.field('Hoặc dời ngày đọc lại', F.date('reviewDate', ''), { name: 'reviewDate', hint: 'Chưa đủ thông tin để kết luận thì dời hẹn.' }) : null), fe);
+  let m;
+  const save = async mode => {
+    F.clearErrors(form); const now = Util.nowISO(); const today = DateUtil.today();
+    let rec;
+    if (mode === 'snooze') {
+      const raw = F.val(form, 'reviewDate').trim(); const rd = raw ? F.dateVal(form, 'reviewDate') : '';
+      if (!rd) return F.showErrors(form, { reviewDate: 'Chọn ngày mới.' }); if (rd <= today) return F.showErrors(form, { reviewDate: 'Chọn ngày sau hôm nay.' });
+      rec = Model.decision({ ...d, reviewDate: rd, updatedAt: now });
+    } else {
+      const out = F.val(form, 'outcome').trim(); if (out.length < 3) return F.showErrors(form, { outcome: 'Ghi ngắn gọn kết quả để đóng.' });
+      rec = Model.decision({ ...d, status: 'closed', outcome: out, outcomeAt: d.outcomeAt || today, updatedAt: now });
+    }
+    const e = Validation.decision(rec); if (Object.keys(e).length) return F.showErrors(form, e);
+    try { await App.commit(mode === 'snooze' ? 'Dời hẹn xem lại' : 'Ghi kết quả quyết định', x => { const i = x.decisions.findIndex(y => y.id === d.id); if (i < 0) throw new AppError('Mục nhật ký không còn tồn tại.'); x.decisions[i] = rec; }); m.close(); Toast.show(mode === 'snooze' ? 'Đã dời hẹn.' : 'Đã lưu kết quả.', { type: 'success' }); }
+    catch (er) { fe.textContent = er.message; }
+  };
+  form.addEventListener('submit', e => { e.preventDefault(); save('close'); });
+  m = Modal.open({ title: 'Xem lại quyết định', body: form, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), d.status === 'open' ? h('button', { class: 'btn', type: 'button', onclick: () => save('snooze') }, 'Dời hẹn') : null, h('button', { class: 'btn btn-primary', type: 'submit', form: 'decc-form' }, d.status === 'open' ? 'Đóng & lưu kết quả' : 'Lưu')].filter(Boolean) });
+};
+
+/** Nguyên tắc viết tay: mỗi dòng một nguyên tắc; đổi phải kèm lý do (ghi vào nhật ký). */
+Pages.principlesForm = function () {
+  const st = App.state; const old = st.settings.principles || [];
+  const form = h('form', { novalidate: true, id: 'pr-form' }); const fe = F.formError();
+  form.append(h('div', { class: 'form-grid' },
+    F.field('Mỗi dòng một nguyên tắc (tối đa 30 dòng)', F.textarea('lines', old.map(p => p.text).join('\n'), { rows: 8, maxlength: 7500, placeholder: 'Không vay ký quỹ (margin)\nMỗi mã tối đa 25% danh mục\nChỉ mua khi giá dưới vùng mua tôi đã định giá\nKhông bán vì tin đồn — chờ đọc BCTC' }), { name: 'lines', full: true, hint: 'Viết bằng lời của bạn. Không ghi tên/số tài khoản. Các ngưỡng đo được (tỷ trọng, quỹ dự phòng, ngưỡng lỗ, mốc lợi suất) đặt ở trang Quỹ & lớp tài sản.' }),
+    F.field('Vì sao thay đổi?', F.textarea('reason', '', { maxlength: 600, rows: 2 }), { name: 'reason', full: true, hint: 'Bắt buộc khi có thay đổi — lưu vào nhật ký.' })), fe);
+  let m;
+  form.addEventListener('submit', async e => {
+    e.preventDefault(); F.clearErrors(form);
+    const lines = F.val(form, 'lines').split(/\r?\n/).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    if (lines.length > 30) return F.showErrors(form, { lines: `Tối đa 30 dòng (đang có ${lines.length}).` });
+    const long = lines.findIndex(x => x.length > 240); if (long >= 0) return F.showErrors(form, { lines: `Dòng ${long + 1} dài quá 240 ký tự.` });
+    // Giữ mã cho dòng không đổi; dòng sửa ở cùng vị trí giữ mã cũ (ghi là "Sửa").
+    const used = new Set(); const byText = new Map(old.map(p => [p.text, p]));
+    const next = lines.map(t => { const p = byText.get(t); if (p && !used.has(p.id)) { used.add(p.id); return { id: p.id, text: t }; } return { id: null, text: t }; });
+    next.forEach((x, i) => { if (!x.id && old[i] && !used.has(old[i].id) && !lines.includes(old[i].text)) { x.id = old[i].id; used.add(old[i].id); } });
+    next.forEach(x => { if (!x.id) x.id = Util.uid('pr'); });
+    const principles = Model.principles(next);
+    const changes = Decisions.diff(null, null, old, principles).filter(c => c.key.startsWith('p_'));
+    const order = old.map(p => p.id).join() !== principles.map(p => p.id).join();
+    if (!changes.length && !order) { m.close(); Toast.show('Không có thay đổi.', {}); return; }
+    const reason = F.val(form, 'reason').trim(); if (reason.length < 3) return F.showErrors(form, { reason: 'Ghi ngắn gọn lý do thay đổi.' });
+    try {
+      await App.commit('Sửa nguyên tắc viết tay', d => { d.settings = { ...d.settings, principles, updatedAt: Util.nowISO() }; Pages.pushRuleLog(d, changes.length ? changes : [{ key: 'order', label: 'Sắp xếp lại nguyên tắc', from: '', to: '' }], reason); });
+      m.close(); Toast.show('Đã lưu nguyên tắc và ghi lý do vào nhật ký.', { type: 'success' });
+    } catch (er) { fe.textContent = er.message; }
+  });
+  m = Modal.open({ title: 'Nguyên tắc viết tay', body: form, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'pr-form' }, 'Lưu')] });
+};
+
+/** Mở đúng form sửa của khoản (tài khoản / tài sản / mã) — để ghi lịch dòng tiền. */
+Pages.openItemEdit = function (it) {
+  const st = App.state;
+  if (it.kind === 'account') { const a = st.accounts.find(x => x.id === it.key.slice(4)); if (a) Forms.openAccount(a); }
+  else if (it.kind === 'asset') { const a = st.assets.find(x => x.id === it.key.slice(4)); if (a) Forms.openAsset(a); }
+  else if (it.kind === 'holding') { const x = (st.holdings || []).find(y => y.id === it.key.slice(4)); if (x) Pages.holdingEdit(x); }
+};
+
+/** Thẻ "Dòng tiền thụ động theo lịch" ở trang Quỹ & lớp tài sản. */
+Pages.incomeCard = function (L) {
+  const I = L.income; const a = L.agg;
+  if (!I.items) return C.card('Lịch dòng tiền thụ động', C.empty('calendar', 'Chưa có khoản nào ghi lãi suất/tỷ suất', 'Mở tài khoản tiết kiệm, trái phiếu (tài sản) hoặc mã cổ phiếu trả cổ tức tiền → mục "Dòng tiền định kỳ" → ghi lãi suất, kỳ trả, ngày trả đầu tiên, ngày đáo hạn. App sẽ lập lịch các khoản sắp nhận và tính tỷ lệ "tài sản sinh dòng tiền".'),
+    { sub: 'Ước tính từ số bạn ghi — không phải số bên trả cam kết.' });
+  const row = e => h('tr', {}, h('td', { dataset: { label: 'Ngày' } }, DateUtil.toVN(e.date)), h('td', { class: 'td-main', dataset: { label: 'Khoản' } }, e.name), h('td', { class: 'num', dataset: { label: e.type === 'principal' ? 'Gốc' : 'Ước tính' } }, C.money(e.amount)));
+  const tbl = (rows, head) => h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' }, h('thead', {}, h('tr', {}, h('th', {}, 'Ngày'), h('th', {}, 'Khoản'), h('th', { class: 'num' }, head))), h('tbody', {}, rows.map(row))));
+  const items = L.items.filter(i => i.cashflow && i.value > 0);
+  return C.card('Lịch dòng tiền thụ động', h('div', { class: 'stack-16' },
+    h('div', { class: 'kpi-grid' },
+      C.kpi({ label: `Dự kiến năm ${I.year}`, value: C.money(I.expectedYear), icon: 'calendar', sub: `Theo lịch ${I.items} khoản bạn ghi${I.missing.length ? ` · ${I.missing.length} khoản chưa có ngày trả` : ''}` }),
+      C.kpi({ label: 'Đã nhận từ đầu năm', value: C.money(I.receivedYTD), icon: 'trendUp', sub: I.expectedToDate > 0 ? `Lịch dự kiến tới hôm nay: ${Money.compact(I.expectedToDate)}` : 'Giao dịch thu nhập thụ động đã ghi' }),
+      C.kpi({ label: 'Mức một năm hiện tại', value: C.money(I.runRate), icon: 'coins', sub: a.base > 0 ? `≈ ${Util.fmtPct(I.runRate / a.base * 100, 2)} tổng tài sản tính tỷ trọng · sinh dòng tiền ${Util.fmtPct(a.cashflow / a.base * 100, 1)} tài sản` : '' })),
+    I.upcoming.length ? h('div', {}, h('div', { class: 'section-label', text: `Sắp nhận trong 90 ngày (${I.upcoming.length})` }), tbl(I.upcoming.slice(0, 12), 'Ước tính')) : h('p', { class: 'small muted', text: 'Không có khoản dự kiến trong 90 ngày tới.' }),
+    I.maturities.length ? h('div', {}, h('div', { class: 'section-label', text: `Đáo hạn trong 12 tháng (${I.maturities.length})` }), h('p', { class: 'small muted', text: 'Tiền gốc trở về — nên quyết định trước sẽ làm gì với khoản này (và ghi vào nhật ký).' }), tbl(I.maturities, 'Gốc')) : null,
+    I.missing.length ? h('div', {}, h('div', { class: 'section-label', text: 'Chưa có ngày trả — chưa lập được lịch' }), h('div', { class: 'btn-group' }, I.missing.map(it => C.btn(it.name, () => Pages.openItemEdit(L.items.find(x => x.key === it.key) || it), { cls: 'btn-sm btn-ghost btn-touch', icon: 'edit' })))) : null,
+    h('details', {}, h('summary', { class: 'small' }, `Các khoản sinh dòng tiền (${items.length})`), h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' }, h('thead', {}, h('tr', {}, h('th', {}, 'Khoản'), h('th', { class: 'num' }, 'Lãi suất'), h('th', {}, 'Kỳ trả'), h('th', {}, 'Đáo hạn'), h('th', {}, ''))),
+      h('tbody', {}, items.map(it => h('tr', {}, h('td', { class: 'td-main' }, h('div', { class: 'cell-main', text: it.name }), h('div', { class: 'cell-sub', text: it.sub })), h('td', { class: 'num', dataset: { label: 'Lãi suất' } }, Util.fmtPct(it.rate, 2)), h('td', { dataset: { label: 'Kỳ trả' } }, it.freq ? INCOME_FREQ[it.freq].label : '—'), h('td', { dataset: { label: 'Đáo hạn' } }, it.maturity ? DateUtil.toVN(it.maturity) : '—'), h('td', { class: 'actions' }, C.iconBtn('edit', 'Sửa ' + it.name, () => Pages.openItemEdit(it)))))))))),
+  { sub: 'Ước tính = giá trị hiện tại × lãi suất × số tháng/12 từ số bạn ghi — không phải số ngân hàng/doanh nghiệp cam kết. Cổ tức dự kiến chưa trừ thuế 5%.' });
+};
+
+/* ==========================================================================
    APP — khởi tạo, điều hướng, ghi dữ liệu (commit), hoàn tác, đồng bộ
    ========================================================================== */
 const ROUTES = {
@@ -6457,6 +7087,7 @@ const ROUTES = {
   discipline: { title: 'Kỷ luật tài chính', icon: 'lock' },
   portfolio: { title: 'Danh mục chứng khoán', icon: 'layers' },
   layers: { title: 'Quỹ & lớp tài sản', icon: 'pie' },
+  journal: { title: 'Nhật ký quyết định', icon: 'book' },
   recurring: { title: 'Giao dịch định kỳ', icon: 'repeat' },
   data: { title: 'Sao lưu & dữ liệu', icon: 'database' },
   settings: { title: 'Cài đặt', icon: 'settings' }
@@ -6728,6 +7359,8 @@ const App = {
     const bux = this.state ? Budget.usage(this.state, DateUtil.monthKey(DateUtil.today())) : null; const over = bux ? bux.overCount + (bux.allOver ? 1 : 0) : 0;
     const navB = document.querySelector('#nav [data-route=budgets]');
     if (navB) { const old = navB.querySelector('.nav-badge'); if (old) old.remove(); if (over) navB.append(h('span', { class: 'nav-badge', text: String(over) })); }
+    const jdue = this.state ? Decisions.due(this.state.decisions || [], DateUtil.today()).length : 0; const navJ = document.querySelector('#nav [data-route=journal]');
+    if (navJ) { const old = navJ.querySelector('.nav-badge'); if (old) old.remove(); if (jdue) navJ.append(h('span', { class: 'nav-badge warn', text: String(jdue), title: 'Quyết định đến hạn xem lại' })); }
     this.renderSidebarFoot();
   },
   renderSidebarFoot() {
@@ -6793,7 +7426,7 @@ window.FinPilot = Object.freeze({
   totals: (from, to) => Ledger.totals(App.state, from, to),
   current: () => { const c = Ledger.current(App.state); return { cash: c.cash, totalAssets: c.totalAssets, liabilities: c.liabilities, netWorth: c.netWorth, balances: Object.fromEntries(c.balances), debts: Object.fromEntries(c.debtBalances) }; },
   integrity: () => Validation.integrity(App.state),
-  _internal: { App, Ledger, Validation, MergeService, ImportExport, Recurring, DateUtil, Money, SyncService, StorageService, Discipline, TrustedClock, CommitLog, Alloc, Model, Goals, Holdings: typeof Holdings !== 'undefined' ? Holdings : null, PriceService: typeof PriceService !== 'undefined' ? PriceService : null, Pages, Portfolio, Layers, LayerData: typeof LayerData !== 'undefined' ? LayerData : null }
+  _internal: { App, Ledger, Validation, MergeService, ImportExport, Recurring, DateUtil, Money, SyncService, StorageService, Discipline, TrustedClock, CommitLog, Alloc, Model, Goals, Holdings: typeof Holdings !== 'undefined' ? Holdings : null, PriceService: typeof PriceService !== 'undefined' ? PriceService : null, Pages, Portfolio, Layers, LayerData: typeof LayerData !== 'undefined' ? LayerData : null, Decisions, Income }
 });
 
 installTouchIcon();
