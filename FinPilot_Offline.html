@@ -568,7 +568,7 @@ body.privacy .money:hover{filter:none}
    FinPilot Offline — CORE: hằng số, tiện ích, tiền tệ, ngày tháng, DOM helpers
    ========================================================================== */
 const APP_NAME = 'FinPilot Offline';
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.8.1';
 const SCHEMA_VERSION = 6; // v6 (1.8): nhật ký quyết định (decisions), nguyên tắc viết tay, trần sinh dòng tiền/lỗ, mốc lợi suất, lịch dòng tiền (lãi suất · kỳ trả · đáo hạn), EPS. v5 (1.6): ngân sách tổng có danh sách loại trừ (exclude). v4 v4 (1.5): ngân sách "Tất cả chi tiêu" (categoryId __all__). v3 v3 (FinPilot 1.4): lớp tài sản trên tài khoản/tài sản/mã, cờ thu nhập thụ động, loại lãi suất nợ, nhóm ngoại tệ, kế hoạch lớp
 const MAX_AMOUNT = 100000000000000; // 100 nghìn tỷ đồng / một khoản
 const TZ = 'Asia/Ho_Chi_Minh';
@@ -2538,6 +2538,33 @@ const Portfolio = {
     const stale = !okDate || ageDays > this.VAL_MAX_AGE || newerReport;
     const reason = !okDate ? 'chưa có ngày định giá' : ageDays > this.VAL_MAX_AGE ? `đã ${ageDays} ngày (quá ${this.VAL_MAX_AGE})` : newerReport ? `có BCTC quý mới từ ${DateUtil.toVN(due)}` : '';
     return { fair, buyBelow: buy, price: p, mos, zone, ageDays, stale, reason, method: this.VAL_METHODS[h.valMethod] ? h.valMethod : '' };
+  },
+  /** Thuế TNCN khi bán chứng khoán: 0,1% giá trị bán (khấu trừ tại nguồn). */
+  SELL_TAX: 0.001,
+  /**
+   * Tính một lệnh khớp (mua/bán) — thuần. fee: phí môi giới (đ); tax: thuế bán (đ).
+   * held: { qty, avgCost|null } · cash: tiền mặt theo sổ của tài khoản.
+   * Mua: giá vốn bình quân GỒM phí. Bán: giá vốn không đổi; lãi/lỗ đã thực hiện = tiền về − giá vốn × KL.
+   */
+  trade({ side, qty, price, fee = 0, tax = 0, held = {}, cash = 0 }) {
+    const errors = {};
+    if (side !== 'buy' && side !== 'sell') errors.side = 'Chọn Mua hoặc Bán.';
+    if (!Number.isSafeInteger(qty) || qty <= 0) errors.qty = 'Khối lượng phải là số nguyên dương.';
+    if (!Number.isSafeInteger(price) || price <= 0) errors.price = 'Giá khớp phải là số dương.';
+    if (!Number.isSafeInteger(fee) || fee < 0) errors.fee = 'Phí không hợp lệ.';
+    if (!Number.isSafeInteger(tax) || tax < 0) errors.tax = 'Thuế không hợp lệ.';
+    const hq = Number.isSafeInteger(held.qty) && held.qty > 0 ? held.qty : 0; const hc = Number.isSafeInteger(held.avgCost) && held.avgCost > 0 ? held.avgCost : null;
+    if (side === 'sell' && !errors.qty && qty > hq) errors.qty = `Chỉ đang có ${hq.toLocaleString('vi-VN')} cổ phiếu để bán.`;
+    if (Object.keys(errors).length) return { ok: false, errors };
+    const value = qty * price;
+    if (!Number.isSafeInteger(value) || value > 1e14) return { ok: false, errors: { qty: 'Giá trị lệnh quá lớn.' } };
+    if (side === 'buy') {
+      const total = value + fee + tax; const newQty = hq + qty;
+      const newAvg = hc === null && hq > 0 ? Math.round(total / qty) : Math.round(((hc || 0) * hq + total) / newQty);
+      return { ok: true, side, value, total, cashDelta: -total, cashAfter: cash - total, short: cash - total < 0, newQty, newAvg, realized: null, errors: {} };
+    }
+    const proceeds = value - fee - tax; const newQty = hq - qty;
+    return { ok: true, side, value, total: proceeds, cashDelta: proceeds, cashAfter: cash + proceeds, short: false, newQty, newAvg: hc, realized: hc === null ? null : proceeds - hc * qty, errors: {} };
   },
   /** Lợi suất lợi nhuận = EPS / giá × 100 (nghịch đảo P/E). null nếu thiếu số. */
   earningsYield(eps, price) { return Number.isSafeInteger(eps) && eps !== 0 && Number.isSafeInteger(price) && price > 0 ? eps / price * 100 : null; },
@@ -5156,6 +5183,8 @@ Pages.accounts = function (view) {
       a.description ? h('div', { class: 'small', text: a.description }) : null,
       h('div', { class: 'ac-actions' },
         C.btn('Giao dịch', () => { Object.assign(App.ui.txnFilter, { q: '', from: '', to: '', type: '', categoryId: '', accountId: a.id, page: 1 }); App.navigate('transactions'); }, { cls: 'btn-sm btn-ghost', icon: 'list' }),
+        inv && a.active ? C.btn('Mua / bán', () => Pages.tradeForm({ accountId: a.id }), { cls: 'btn-sm btn-primary', icon: 'swap' }) : null,
+        inv && a.active ? C.btn('Nộp / rút tiền', () => Forms.openTxn({ preset: { type: 'transfer', toAccountId: a.id, accountId: (st.accounts.find(x => x.active && x.id !== a.id && x.type !== 'investment') || {}).id } }), { cls: 'btn-sm btn-ghost', icon: 'coins' }) : null,
         C.btn(inv ? 'Điều chỉnh tiền mặt' : 'Điều chỉnh', () => Forms.openAdjust(a), { cls: 'btn-sm btn-ghost', icon: 'swap', disabled: !a.active }),
         C.iconBtn('edit', 'Sửa', () => Forms.openAccount(a)),
         C.iconBtn(a.active ? 'eyeOff' : 'eye', a.active ? 'Ngừng hoạt động' : 'Kích hoạt lại', () => Pages.toggleAccount(a)),
@@ -6308,7 +6337,7 @@ Pages.portfolio = function (view) {
   const invAccs = st.accounts.filter(a => a.type === 'investment' && a.active);
   const on = PriceService.enabled();
   view.append(C.pageHead('Danh mục chứng khoán', 'Nhập mã + khối lượng để biết giá trị hiện tại; giá trị được cộng vào Tài sản ròng. Lấy giá tự động là tùy chọn và TẮT sẵn — chỉ danh sách mã được gửi tới nguồn giá.',
-    [C.btn('Dán / thêm danh mục', () => Pages.holdingPaste(), { icon: 'plus', cls: 'btn-primary' }), rows.length ? C.btn('Dán định giá', () => Pages.valuationPaste(), { icon: 'edit' }) : null, on ? C.btn('Cập nhật giá', () => Pages.refreshPrices(true), { icon: 'sync' }) : C.btn('Bật cập nhật giá…', () => Pages.priceConsent(), { icon: 'cloud' })].filter(Boolean)));
+    [invAccs.length ? C.btn('Mua / bán', () => Pages.tradeForm(), { icon: 'swap', cls: 'btn-primary' }) : null, C.btn('Dán / thêm danh mục', () => Pages.holdingPaste(), { icon: 'plus', cls: invAccs.length ? '' : 'btn-primary' }), rows.length ? C.btn('Dán định giá', () => Pages.valuationPaste(), { icon: 'edit' }) : null, on ? C.btn('Cập nhật giá', () => Pages.refreshPrices(true), { icon: 'sync' }) : C.btn('Bật cập nhật giá…', () => Pages.priceConsent(), { icon: 'cloud' })].filter(Boolean)));
   if (!invAccs.length) view.append(C.callout('info', h('span', {}, 'Danh mục cần gắn với một tài khoản loại "Tài khoản đầu tư" (tài khoản chứng khoán của bạn). ', h('a', { href: '#', onclick: e => { e.preventDefault(); Forms.openAccount(); } }, 'Tạo tài khoản'))));
   if (PriceService.needsReconsent()) view.append(C.callout('alert', h('span', {}, 'Nội dung về nguồn giá đã thay đổi — cần bạn đồng ý lại trước khi lấy giá. ', h('a', { href: '#', onclick: e => { e.preventDefault(); Pages.priceConsent(); } }, 'Xem & đồng ý')), 'warn'));
   if (rows.length && st.assets.some(a => a.group === 'securities' && Ledger.assetValue(a, DateUtil.today()) > 0)) view.append(C.callout('alert', 'Bạn có tài sản nhập tay nhóm "Chứng khoán / đầu tư". Nếu đó chính là danh mục này, hãy xóa hoặc đổi tài sản đó để tài sản ròng không bị tính trùng.', 'warn'));
@@ -6336,7 +6365,7 @@ Pages.portfolio = function (view) {
         h('td', { class: 'num', dataset: { label: 'Lãi/lỗ' } }, r.pnl === null ? '—' : C.money(r.pnl, { sign: true, tone: 'auto' })),
         anyTarget ? h('td', { class: 'num', dataset: { label: 'Tỷ trọng' } }, `${Util.fmtPct(d.actual, 1)}${d.target !== null ? ' / ' + Util.fmtPct(d.target, 1) : ''}`, d.flag && allFresh ? h('div', { class: 'tiny warn-text', text: `lệch ${d.diff > 0 ? '+' : ''}${d.diff.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} điểm %` }) : null) : null,
         anyVal ? h('td', { class: 'num', dataset: { label: 'Định giá của bạn' } }, Pages.valCell(r)) : null,
-        h('td', { class: 'actions' }, C.iconBtn('book', 'Ghi quyết định cho mã này', () => Pages.decisionForm({ symbol: r.holding.symbol })), C.iconBtn('plus', 'Ghi lệnh mua', () => Pages.holdingBuy(r.holding)), C.iconBtn('edit', 'Sửa', () => Pages.holdingEdit(r.holding)), C.iconBtn('trash', 'Xóa', () => Pages.holdingDelete(r.holding), 'danger')));
+        h('td', { class: 'actions' }, C.iconBtn('book', 'Ghi quyết định cho mã này', () => Pages.decisionForm({ symbol: r.holding.symbol })), C.iconBtn('plus', 'Ghi lệnh mua', () => Pages.tradeForm({ accountId: r.holding.accountId, symbol: r.holding.symbol, side: 'buy' })), r.holding.qty > 0 ? C.iconBtn('trendDown', 'Ghi lệnh bán', () => Pages.tradeForm({ accountId: r.holding.accountId, symbol: r.holding.symbol, side: 'sell' })) : null, C.iconBtn('edit', 'Sửa', () => Pages.holdingEdit(r.holding)), C.iconBtn('trash', 'Xóa', () => Pages.holdingDelete(r.holding), 'danger')));
     })))), { sub: 'Giá chỉ mang tính tham khảo, từ nguồn công khai không chính thức (có thể trễ/sai). Không phải khuyến nghị đầu tư.' + (anyVal ? ' Cột "Định giá của bạn" là số do chính bạn nhập — FinPilot không tự định giá và không khuyến nghị mua/bán.' : '') }));
   if (anyTarget) {
     const flagged = drift.filter(d => d.flag);
@@ -6498,30 +6527,8 @@ Pages.holdingEdit = function (x) {
   });
   m = Modal.open({ title: 'Sửa ' + x.symbol, body: form, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'hold-form' }, 'Lưu')] });
 };
-Pages.holdingBuy = function (x) {
-  const q = PriceService.quote(x.symbol);
-  const form = h('form', { novalidate: true, id: 'buy-form' }); const fe = F.formError();
-  form.append(h('div', { class: 'form-grid' },
-    F.field('Khối lượng khớp thêm', F.input('qty', '', { inputmode: 'numeric', placeholder: 'VD: 200' }), { name: 'qty', required: true, hint: 'Lệnh mua từ kỳ đầu tư định kỳ hoặc mua thêm.' }),
-    F.field('Giá khớp (đ/cp)', F.money('price', q ? q.price : null), { name: 'price', required: true }),
-    h('div', { class: 'field full' }, F.check('deduct', true, 'Trừ tiền mua khỏi số dư tài khoản chứng khoán'), h('div', { class: 'field-hint', text: 'Giữ chọn để tiền và cổ phiếu không bị tính hai lần trong tài sản ròng. Bỏ chọn chỉ khi bạn không theo dõi tiền mặt trong tài khoản này.' }))), fe);
-  let m;
-  form.addEventListener('submit', async e => {
-    e.preventDefault(); F.clearErrors(form);
-    const add = Portfolio.parseQty(F.val(form, 'qty')); const pr = F.moneyVal(form, 'price');
-    if (!Number.isSafeInteger(add) || add <= 0) return F.showErrors(form, { qty: 'Khối lượng phải là số nguyên dương.' });
-    if (!pr.ok) return F.showErrors(form, { price: pr.error });
-    const nq = x.qty + add; const avg = x.avgCost ? Math.round((x.avgCost * x.qty + pr.value * add) / nq) : pr.value;
-    const deduct = form.elements.deduct && form.elements.deduct.checked; const cost = add * pr.value; const now = Util.nowISO();
-    if (!Number.isSafeInteger(cost) || cost > MAX_AMOUNT) return F.showErrors(form, { qty: 'Giá trị lệnh quá lớn.' });
-    try { await App.commit('Ghi lệnh mua', d => {
-      const i = d.holdings.findIndex(y => y.id === x.id); d.holdings[i] = Model.holding({ ...d.holdings[i], qty: nq, avgCost: avg, updatedAt: now });
-      if (deduct) { const t = Model.transaction({ id: Util.uid('txn'), type: 'adjustment', direction: 'out', date: DateUtil.today(), amount: cost, accountId: x.accountId, payee: `Mua ${x.symbol} × ${Money.num(add)} @ ${Money.num(pr.value)}`, note: 'Tiền chuyển thành cổ phiếu (không phải chi tiêu)', tags: ['chứng khoán'], createdAt: now, updatedAt: now }); const e = Validation.transaction(t, d); if (Object.keys(e).length) throw new AppError(Validation.first(e)); d.transactions.push(t); }
-    }); m.close(); Toast.show(`${x.symbol}: +${Money.num(add)} cp · giá vốn bình quân ${Money.num(avg)} đ`, { type: 'success' }); }
-    catch (err) { fe.textContent = err.message; }
-  });
-  m = Modal.open({ title: 'Ghi lệnh mua ' + x.symbol, body: form, size: 'sm', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'buy-form' }, 'Ghi')] });
-};
+/** Giữ tên cũ: chuyển sang form lệnh mua/bán chung. */
+Pages.holdingBuy = function (x) { Pages.tradeForm({ accountId: x.accountId, symbol: x.symbol, side: 'buy' }); };
 Pages.holdingDelete = async function (x) {
   if (!(await Modal.confirm({ title: `Xóa ${x.symbol} khỏi danh mục?`, message: 'Giá trị sẽ không còn được cộng vào tài sản ròng.', confirmText: 'Xóa', danger: true }))) return;
   try { await App.commit('Xóa mã', d => { d.holdings = d.holdings.filter(y => y.id !== x.id); }, { undoLabel: 'Đã xóa mã' }); Toast.show('Đã xóa ' + x.symbol, { type: 'success', action: { label: 'Hoàn tác', fn: () => App.undo() } }); } catch (e) { Toast.show(e.message, { type: 'error' }); }
@@ -6896,6 +6903,7 @@ Pages.decisionItem = function (d, { compact = false } = {}) {
     compact ? h('div', { class: 'btn-group' }, C.btn('Xem lại & ghi kết quả', () => Pages.decisionClose(d), { cls: 'btn-sm btn-primary btn-touch', icon: 'check' }))
       : h('div', { class: 'btn-group' },
         d.status === 'open' ? C.btn('Xem lại & ghi kết quả', () => Pages.decisionClose(d), { cls: 'btn-sm btn-touch', icon: 'check' }) : C.btn('Sửa kết quả', () => Pages.decisionClose(d), { cls: 'btn-sm btn-ghost btn-touch', icon: 'edit' }),
+        d.status === 'open' && (d.kind === 'buy' || d.kind === 'sell') && d.symbol ? C.btn('Ghi lệnh khớp', () => Pages.tradeForm({ symbol: d.symbol, side: d.kind, accountId: d.fromRef && d.fromRef.startsWith('acc:') ? d.fromRef.slice(4) : '' }), { cls: 'btn-sm btn-ghost btn-touch', icon: 'swap' }) : null,
         C.btn('Xóa', () => Pages.decisionDelete(d), { cls: 'btn-sm btn-ghost btn-touch', icon: 'trash' })));
 };
 Pages.ruleLogItem = function (d) {
@@ -6973,7 +6981,7 @@ Pages.decisionForm = function (pre = {}) {
     if (Object.keys(errs).length) return F.showErrors(form, errs);
     try {
       await App.commit('Ghi quyết định', x => { x.decisions = x.decisions || []; x.decisions.push(rec); });
-      m.close(); Toast.show((d.kind === 'buy' || d.kind === 'sell') ? 'Đã ghi vào nhật ký. Nhật ký không đặt lệnh — khớp lệnh xong thì cập nhật ở Danh mục chứng khoán.' : 'Đã ghi vào nhật ký.', { type: 'success', timeout: 6000 });
+      m.close(); Toast.show((d.kind === 'buy' || d.kind === 'sell') ? 'Đã ghi vào nhật ký. Nhật ký không đặt lệnh — khớp lệnh xong bấm "Ghi lệnh" để cập nhật danh mục và tiền mặt.' : 'Đã ghi vào nhật ký.', { type: 'success', timeout: 8000, action: (d.kind === 'buy' || d.kind === 'sell') && st.accounts.some(a => a.type === 'investment' && a.active) ? { label: 'Ghi lệnh', fn: () => Pages.tradeForm({ symbol: d.symbol, side: d.kind, accountId: d.fromRef.startsWith('acc:') ? d.fromRef.slice(4) : '' }) } : null });
     } catch (er) { fe.textContent = er.message; }
   });
   m = Modal.open({ title: 'Ghi quyết định', body: form, size: 'lg', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'dec-form' }, 'Lưu vào nhật ký')] });
@@ -7071,6 +7079,118 @@ Pages.incomeCard = function (L) {
     h('details', {}, h('summary', { class: 'small' }, `Các khoản sinh dòng tiền (${items.length})`), h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' }, h('thead', {}, h('tr', {}, h('th', {}, 'Khoản'), h('th', { class: 'num' }, 'Lãi suất'), h('th', {}, 'Kỳ trả'), h('th', {}, 'Đáo hạn'), h('th', {}, ''))),
       h('tbody', {}, items.map(it => h('tr', {}, h('td', { class: 'td-main' }, h('div', { class: 'cell-main', text: it.name }), h('div', { class: 'cell-sub', text: it.sub })), h('td', { class: 'num', dataset: { label: 'Lãi suất' } }, Util.fmtPct(it.rate, 2)), h('td', { dataset: { label: 'Kỳ trả' } }, it.freq ? INCOME_FREQ[it.freq].label : '—'), h('td', { dataset: { label: 'Đáo hạn' } }, it.maturity ? DateUtil.toVN(it.maturity) : '—'), h('td', { class: 'actions' }, C.iconBtn('edit', 'Sửa ' + it.name, () => Pages.openItemEdit(it)))))))))),
   { sub: 'Ước tính = giá trị hiện tại × lãi suất × số tháng/12 từ số bạn ghi — không phải số ngân hàng/doanh nghiệp cam kết. Cổ tức dự kiến chưa trừ thuế 5%.' });
+};
+
+/* ==========================================================================
+   LỆNH MUA / BÁN (v1.8.1) — một chỗ nhập lệnh khớp, gắn đúng tài khoản chứng khoán:
+   cập nhật khối lượng + giá vốn, trừ/cộng tiền mặt của tài khoản, (tùy chọn) ghi lý do vào Nhật ký.
+   Không kết nối CTCK, không đặt lệnh thật.
+   ========================================================================== */
+Pages.tradeForm = function (pre = {}) {
+  const st = App.state; const invAccs = st.accounts.filter(a => a.type === 'investment' && a.active);
+  if (!invAccs.length) return Modal.alert({ title: 'Cần tài khoản chứng khoán', message: 'Hãy tạo một tài khoản loại "Tài khoản đầu tư" (tài khoản chứng khoán của bạn), nhập số tiền mặt đang có, rồi quay lại ghi lệnh.' });
+  const accId0 = pre.accountId && invAccs.some(a => a.id === pre.accountId) ? pre.accountId : (pre.symbol && (st.holdings || []).find(x => x.symbol === pre.symbol && invAccs.some(a => a.id === x.accountId)) || {}).accountId || invAccs[0].id;
+  const side0 = pre.side === 'sell' ? 'sell' : 'buy';
+  const cashOf = id => Ledger.current(App.state).balances.get(id) || 0;
+  const heldOf = (id, sym) => (App.state.holdings || []).find(x => x.id === Holdings.id(id, sym)) || null;
+  const priceOf = sym => { const g = LayerData.build(App.state).sym.get(sym); return g && g.price ? g.price : null; };
+  const form = h('form', { novalidate: true, id: 'trade-form' }); const fe = F.formError();
+  const dl = h('datalist', { id: 'trade-syms' });
+  const cashInfo = h('div', { class: 'small' }); const sumBox = h('div', { class: 'dec-panel', 'aria-live': 'polite' });
+  const feePct0 = Number.isFinite(App.prefs.tradeFeePct) ? App.prefs.tradeFeePct : '';
+  const p0 = pre.symbol ? priceOf(pre.symbol) : null;
+  form.append(dl, h('div', { class: 'form-grid' },
+    F.field('Lệnh', F.select('side', [{ value: 'buy', label: 'Mua' }, { value: 'sell', label: 'Bán' }], side0), { name: 'side', required: true }),
+    F.field('Tài khoản chứng khoán', F.select('acc', invAccs.map(a => ({ value: a.id, label: a.name })), accId0), { name: 'acc', required: true }),
+    h('div', { class: 'field full' }, cashInfo),
+    F.field('Mã', F.input('symbol', pre.symbol || '', { maxlength: 10, list: 'trade-syms', placeholder: 'VD: FPT', autocapitalize: 'characters' }), { name: 'symbol', required: true }),
+    F.field('Khối lượng khớp', F.input('qty', pre.qty ? String(pre.qty) : '', { inputmode: 'numeric', placeholder: 'VD: 400' }), { name: 'qty', required: true, hint: 'Lô chẵn sàn HOSE là bội số 100.' }),
+    F.field('Giá khớp', F.input('price', p0 ? Money.num(p0) : '', { inputmode: 'decimal', placeholder: 'VD: 24 hoặc 24.000' }), { name: 'price', required: true, hint: 'Gõ 24 hoặc 24,5 = nghìn đồng; 24500 = đồng.' }),
+    F.field('Phí môi giới (% giá trị)', F.input('feePct', feePct0 === '' ? '' : String(feePct0).replace('.', ','), { inputmode: 'decimal', placeholder: 'Theo biểu phí CTCK, VD: 0,15' }), { name: 'feePct', hint: 'Máy này nhớ mức bạn nhập cho lần sau. Để trống = 0.' }),
+    F.field('Ngày khớp', F.date('date', DateUtil.today()), { name: 'date', required: true }),
+    h('div', { class: 'field full' }, F.check('cash', true, 'Ghi tiền vào/ra tài khoản này'), h('div', { class: 'field-hint', text: 'Giữ chọn để tiền mặt và cổ phiếu không bị tính hai lần. Không phải chi tiêu hay thu nhập.' })),
+    F.field('Lý do (tùy chọn) — lưu vào Nhật ký quyết định', F.textarea('thesis', '', { maxlength: 600, rows: 2, placeholder: 'VD: Giá dưới vùng mua tôi định giá; tỷ trọng ngân hàng còn thấp.' }), { name: 'thesis', full: true }),
+    h('div', { class: 'field full' }, h('div', { class: 'section-label', text: 'Tóm tắt lệnh' }), sumBox)), fe);
+  const val = () => {
+    const side = F.val(form, 'side'); const acc = F.val(form, 'acc'); const sym = F.val(form, 'symbol').trim().toUpperCase();
+    const qty = Portfolio.parseQty(F.val(form, 'qty')); const price = Portfolio.parsePrice(F.val(form, 'price'));
+    const fr = F.val(form, 'feePct').trim(); const feePct = fr === '' ? 0 : Number(fr.replace(',', '.'));
+    const value = Number.isSafeInteger(qty) && Number.isSafeInteger(price) ? qty * price : 0;
+    const fee = Number.isFinite(feePct) && feePct >= 0 && feePct <= 5 ? Math.round(value * feePct / 100) : NaN;
+    const tax = side === 'sell' ? Math.round(value * Portfolio.SELL_TAX) : 0;
+    const held = sym ? heldOf(acc, sym) : null; const cash = cashOf(acc);
+    const r = Portfolio.trade({ side, qty, price, fee: Number.isFinite(fee) ? fee : -1, tax, held: held || {}, cash });
+    return { side, acc, sym, qty, price, feePct, feeRaw: fr, fee, tax, held, cash, r };
+  };
+  const refresh = () => {
+    const v = val(); const syms = (App.state.holdings || []).filter(x => x.accountId === v.acc && (v.side === 'buy' || x.qty > 0)).map(x => x.symbol);
+    dl.replaceChildren(...syms.map(s => h('option', { value: s })));
+    cashInfo.replaceChildren(h('span', { class: 'muted' }, 'Tiền mặt theo sổ: '), C.money(v.cash, { tone: v.cash < 0 ? 'neg' : '' }),
+      v.sym && v.held ? h('span', { class: 'muted', text: ` · đang có ${Money.num(v.held.qty)} ${v.sym}${v.held.avgCost ? ' @ ' + Money.num(v.held.avgCost) : ''}` }) : null);
+    const r = v.r; const rows = [];
+    const line = (k, x, cls) => rows.push(h('div', { class: 'flex between' }, h('span', { class: 'muted', text: k }), typeof x === 'string' ? h('span', { class: cls || '', text: x }) : x));
+    if (r.ok) {
+      line('Giá trị lệnh', C.money(r.value)); line(`Phí (${String(v.feePct).replace('.', ',')}%)`, C.money(v.fee));
+      if (v.side === 'sell') line('Thuế bán 0,1%', C.money(v.tax));
+      line(v.side === 'buy' ? 'Tổng tiền ra' : 'Tiền về (sau phí, thuế)', C.money(r.total));
+      if (form.elements.cash.checked) line('Tiền mặt sau lệnh', C.money(r.cashAfter, { tone: r.cashAfter < 0 ? 'neg' : '' }));
+      line('Khối lượng sau lệnh', Money.num(r.newQty) + ' cp');
+      if (v.side === 'buy') line('Giá vốn bình quân mới (gồm phí)', Money.num(r.newAvg));
+      if (v.side === 'sell' && r.realized !== null) line('Lãi/lỗ đã thực hiện', C.money(r.realized, { sign: true, tone: 'auto' }));
+    }
+    const warn = [];
+    if (r.ok && v.side === 'buy' && form.elements.cash.checked && r.short) warn.push(h('p', { class: 'small warn-text' }, `Tiền mặt theo sổ thiếu ${Money.format(-r.cashAfter)}. Nếu tài khoản thực có tiền, ghi khoản nộp tiền hoặc "Điều chỉnh tiền mặt" trước.`));
+    if (!r.ok && (v.qty || v.price)) warn.push(h('p', { class: 'small warn-text', text: Object.values(r.errors)[0] }));
+    if (v.sym && r.ok) {
+      const checks = DecisionData.check(App.state, { kind: v.side, symbol: v.sym, amount: r.value, price: v.price, fromRef: 'acc:' + v.acc });
+      const c = Decisions.count(checks);
+      if (checks.length) warn.push(h('details', { class: 'small' }, h('summary', {}, c.out ? h('span', { class: 'neg', text: `Chạm ${c.out} ngưỡng bạn đặt` }) : 'Không chạm ngưỡng nào bạn đặt', ' — xem đối chiếu'), Pages.checkList(checks)));
+      const od = (App.state.decisions || []).filter(d => d.status === 'open' && d.symbol === v.sym && d.kind === v.side).sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+      if (od) warn.push(h('p', { class: 'small muted' }, `Nhật ký có quyết định ${DECISION_KINDS[od.kind].toLowerCase()} ${v.sym} ngày ${DateUtil.toVN(od.date)}: "${od.thesis.slice(0, 80)}${od.thesis.length > 80 ? '…' : ''}" — nhớ xem lại khi tới hẹn.`));
+    }
+    sumBox.replaceChildren(...(rows.length ? rows : [h('p', { class: 'small muted', text: 'Nhập mã, khối lượng và giá để xem tóm tắt.' })]), ...warn);
+  };
+  const deb = Util.debounce(refresh, 120);
+  form.addEventListener('input', deb);
+  form.addEventListener('change', e => { if (e.target.name === 'symbol' && !F.val(form, 'price').trim()) { const p = priceOf(F.val(form, 'symbol').trim().toUpperCase()); if (p) form.elements.price.value = Money.num(p); } deb(); });
+  setTimeout(refresh);
+  let m;
+  form.addEventListener('submit', async e => {
+    e.preventDefault(); F.clearErrors(form); const v = val(); const errs = {};
+    if (!Portfolio.SYM_RE.test(v.sym)) errs.symbol = 'Mã gồm 3–10 chữ in hoa/số (VD: FPT, E1VFVN30).';
+    if (v.side === 'sell' && !v.held) errs.symbol = 'Tài khoản này chưa có mã này để bán.';
+    if (!Number.isFinite(v.fee)) errs.feePct = 'Phí từ 0 đến 5%.';
+    const date = F.dateVal(form, 'date'); if (!date) errs.date = 'Ngày không hợp lệ.'; else if (date > DateUtil.today()) errs.date = 'Chỉ ghi lệnh đã khớp (không ghi ngày tương lai).';
+    if (!v.r.ok) Object.assign(errs, v.r.errors.side ? { side: v.r.errors.side } : {}, v.r.errors.qty ? { qty: v.r.errors.qty } : {}, v.r.errors.price ? { price: v.r.errors.price } : {});
+    if (Object.keys(errs).length) return F.showErrors(form, errs);
+    const r = v.r; const withCash = form.elements.cash.checked; const thesis = F.val(form, 'thesis').trim();
+    if (withCash && r.short && !(await Modal.confirm({ title: 'Tiền mặt theo sổ không đủ', message: `Sau lệnh, tiền mặt của tài khoản sẽ âm ${Money.format(-r.cashAfter)}.\n\nNếu thực tế bạn đã nộp tiền, nên ghi khoản nộp tiền (Chuyển tiền) trước để số liệu đúng. Vẫn ghi lệnh?`, confirmText: 'Vẫn ghi' }))) return;
+    if (v.feeRaw !== '' && Number.isFinite(v.feePct)) App.setPref('tradeFeePct', v.feePct);
+    const now = Util.nowISO(); const checks = DecisionData.check(App.state, { kind: v.side, symbol: v.sym, amount: r.value, price: v.price, fromRef: 'acc:' + v.acc });
+    const desc = `${v.side === 'buy' ? 'Mua' : 'Bán'} ${v.sym} × ${Money.num(v.qty)} @ ${Money.num(v.price)}`;
+    try {
+      await App.commit('Ghi lệnh ' + (v.side === 'buy' ? 'mua' : 'bán'), d => {
+        const id = Holdings.id(v.acc, v.sym); const i = d.holdings.findIndex(x => x.id === id);
+        const base = i >= 0 ? d.holdings[i] : { id, accountId: v.acc, symbol: v.sym, createdAt: now };
+        const rec = Model.holding({ ...base, qty: r.newQty, avgCost: r.newAvg, updatedAt: now });
+        const he = Validation.holding(rec, d); if (Object.keys(he).length) throw new AppError(`${v.sym}: ${Validation.first(he)}`);
+        if (i >= 0) d.holdings[i] = rec; else d.holdings.push(rec);
+        if (withCash) {
+          const fees = [v.fee ? `phí ${Money.num(v.fee)}` : '', v.tax ? `thuế ${Money.num(v.tax)}` : ''].filter(Boolean).join(', ');
+          const t = Model.transaction({ id: Util.uid('txn'), type: 'adjustment', direction: v.side === 'buy' ? 'out' : 'in', date, amount: r.total, accountId: v.acc, payee: desc, note: (v.side === 'buy' ? 'Tiền chuyển thành cổ phiếu' : 'Cổ phiếu chuyển thành tiền') + (fees ? ` (đã gồm ${fees})` : '') + (v.side === 'sell' && r.realized !== null ? ` · lãi/lỗ đã thực hiện ${Money.num(r.realized)}` : '') + ' — không phải chi tiêu/thu nhập', tags: ['chứng khoán'], createdAt: now, updatedAt: now });
+          const te = Validation.transaction(t, d); if (Object.keys(te).length) throw new AppError(Validation.first(te)); d.transactions.push(t);
+        }
+        if (thesis) {
+          const dec = Model.decision({ id: Util.uid('dec'), date, kind: v.side, symbol: v.sym, amount: r.value, price: v.price, fromRef: 'acc:' + v.acc, thesis, reviewDate: DateUtil.addDays(date, 90), checks, createdAt: now, updatedAt: now });
+          const de = Validation.decision(dec); if (Object.keys(de).length) throw new AppError(Validation.first(de)); d.decisions = d.decisions || []; d.decisions.push(dec);
+        }
+      });
+      m.close();
+      Toast.show(`${desc} — ${v.side === 'buy' ? 'giá vốn bình quân ' + Money.num(r.newAvg) + ' đ' : (r.realized !== null ? 'lãi/lỗ đã thực hiện ' + Money.format(r.realized, { sign: true }) : 'đã ghi')}${thesis ? ' · đã lưu lý do vào Nhật ký' : ''}`, { type: 'success', timeout: 6000 });
+      if (PriceService.enabled && PriceService.enabled()) Pages.refreshPrices(false);
+    } catch (er) { fe.textContent = er.message; }
+  });
+  m = Modal.open({ title: 'Ghi lệnh mua / bán', body: form, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'trade-form' }, 'Ghi lệnh')] });
 };
 
 /* ==========================================================================
