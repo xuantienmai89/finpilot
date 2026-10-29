@@ -529,6 +529,35 @@ body.privacy .money:hover{filter:none}
 .inc-box summary{font-weight:600;font-size:13.5px}
 .inc-box[open] summary{margin-bottom:4px}
 .inc-box .form-grid{margin-top:6px}
+/* v1.9 — phân tích mã, dự phóng */
+.an-block{border-top:1px solid var(--border);padding-top:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.an-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.an-head h4{margin:0;font-size:14.5px}
+.an-kpis{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+.an-empty ol{margin:4px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.recon{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.recon-in{width:150px;max-width:100%;min-height:36px;padding:6px 10px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text);font:inherit}
+.mp-row{padding:4px 0;overflow-wrap:anywhere}
+.recon input.recon-in{width:170px;flex:0 0 170px}
+.sec-bars{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.sec-bar{display:grid;grid-template-columns:minmax(90px,170px) 1fr 52px;align-items:center;gap:8px}
+.sec-track{height:10px;background:var(--surface-2);border-radius:999px;overflow:hidden}
+.sec-fill{height:100%;background:var(--primary);border-radius:999px}
+.sec-fill.none{background:var(--border-strong)}
+@media (max-width:560px){.card-head{flex-wrap:wrap}.card-head>div:first-child{flex:1 1 100%}.card-head>.btn-group{flex-wrap:wrap}}
+/* v1.9.1 */
+.fresh-line{display:flex;align-items:flex-start;gap:6px;margin:10px 2px 12px;color:var(--text-3)}
+.fresh-line svg{flex:none;margin-top:2px}
+.fresh-line.warn svg{color:var(--amber)}
+.fresh-line .neg{color:var(--red)}
+.nav-group{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--nav-text);opacity:.6;padding:12px 12px 4px;font-weight:600}
+.nav-group:first-child{padding-top:2px}
+.seg-btn.seg-link{border-style:dashed}
+.hold-act{display:inline-flex;flex-direction:column;align-items:center;gap:1px}
+.hold-act small{font-size:10px;line-height:1;color:var(--text-3)}
+@media (max-width:900px){ .bottom-nav .bn-slot{flex:1;display:flex} .bottom-nav .bn-slot a{flex:1} }
+.icon-btn.hold-act{width:auto;min-width:34px;height:auto;padding:4px 5px}
+@media (max-width:900px){.icon-btn.hold-act{width:auto;height:auto;min-width:42px;min-height:40px}}
 
 </style>
 </head>
@@ -568,8 +597,8 @@ body.privacy .money:hover{filter:none}
    FinPilot Offline — CORE: hằng số, tiện ích, tiền tệ, ngày tháng, DOM helpers
    ========================================================================== */
 const APP_NAME = 'FinPilot Offline';
-const APP_VERSION = '1.8.1';
-const SCHEMA_VERSION = 6; // v6 (1.8): nhật ký quyết định (decisions), nguyên tắc viết tay, trần sinh dòng tiền/lỗ, mốc lợi suất, lịch dòng tiền (lãi suất · kỳ trả · đáo hạn), EPS. v5 (1.6): ngân sách tổng có danh sách loại trừ (exclude). v4 v4 (1.5): ngân sách "Tất cả chi tiêu" (categoryId __all__). v3 v3 (FinPilot 1.4): lớp tài sản trên tài khoản/tài sản/mã, cờ thu nhập thụ động, loại lãi suất nợ, nhóm ngoại tệ, kế hoạch lớp
+const APP_VERSION = '1.9.1';
+const SCHEMA_VERSION = 7; // v7 (1.9): lịch sử P/B, P/E theo quý (metrics), hồ sơ ngành (sectors), mã gắn ngành. v6 v6 (1.8): nhật ký quyết định (decisions), nguyên tắc viết tay, trần sinh dòng tiền/lỗ, mốc lợi suất, lịch dòng tiền (lãi suất · kỳ trả · đáo hạn), EPS. v5 (1.6): ngân sách tổng có danh sách loại trừ (exclude). v4 v4 (1.5): ngân sách "Tất cả chi tiêu" (categoryId __all__). v3 v3 (FinPilot 1.4): lớp tài sản trên tài khoản/tài sản/mã, cờ thu nhập thụ động, loại lãi suất nợ, nhóm ngoại tệ, kế hoạch lớp
 const MAX_AMOUNT = 100000000000000; // 100 nghìn tỷ đồng / một khoản
 const TZ = 'Asia/Ho_Chi_Minh';
 const INTEREST_CAT_ID = 'cat_exp_interest';
@@ -599,14 +628,19 @@ const GOAL_MODES = { manual: 'Ghi nhận thủ công', account: 'Theo số dư m
 const GOAL_STATUS = { active: 'Đang thực hiện', paused: 'Tạm dừng', done: 'Hoàn thành' };
 /** Kỳ trả lãi/cổ tức (số tháng mỗi kỳ; "maturity" = trả một lần khi đáo hạn). */
 const INCOME_FREQ = { monthly: { label: 'Hằng tháng', months: 1 }, quarterly: { label: 'Hằng quý', months: 3 }, semiannual: { label: '6 tháng/lần', months: 6 }, annual: { label: 'Hằng năm', months: 12 }, maturity: { label: 'Cuối kỳ (khi đáo hạn)', months: 0 } };
+/** Loại chuỗi số liệu theo quý trong "Phân tích mã". */
+const METRIC_KINDS = { pb: { label: 'P/B', per: 'BVPS', perLabel: 'Giá trị sổ sách/cp (BVPS)', head: 'FINPILOT-PB' }, pe: { label: 'P/E', per: 'EPS', perLabel: 'EPS 4 quý (đ/cp)', head: 'FINPILOT-PE' }, fin: { label: 'Doanh thu & LNST', per: '', perLabel: '', head: 'FINPILOT-KQKD' } };
+/** Hồ sơ ngành (v1.9): vị trí chu kỳ & quan điểm GHI TRONG BÁO CÁO của người dùng (không phải đánh giá của app). */
+const SECTOR_CYCLES = { trough: 'Đáy', recovery: 'Phục hồi', growth: 'Tăng trưởng', peak: 'Đỉnh', decline: 'Suy thoái' };
+const SECTOR_VIEWS = { positive: 'Tích cực', neutral: 'Trung lập', negative: 'Tiêu cực' };
 /** Loại quyết định trong nhật ký. */
 const DECISION_KINDS = { buy: 'Mua', sell: 'Bán', hold: 'Giữ / không làm gì', rule: 'Đổi nguyên tắc', other: 'Khác' };
 const PRIORITIES = { high: 'Cao', medium: 'Trung bình', low: 'Thấp' };
 const FREQUENCIES = { daily: 'ngày', weekly: 'tuần', monthly: 'tháng', yearly: 'năm' };
-const COLLECTIONS = ['categories', 'accounts', 'transactions', 'budgets', 'assets', 'debts', 'goals', 'recurring', 'snapshots', 'allocations', 'commitLog', 'commitNotes', 'holdings', 'decisions'];
+const COLLECTIONS = ['categories', 'accounts', 'transactions', 'budgets', 'assets', 'debts', 'goals', 'recurring', 'snapshots', 'allocations', 'commitLog', 'commitNotes', 'holdings', 'decisions', 'metrics', 'sectors'];
 /** Phiên bản cấu trúc bắt đầu có từng danh sách — file cũ hơn được coi là danh sách rỗng. */
-const COLL_SINCE = { allocations: 2, commitLog: 2, commitNotes: 2, holdings: 2, decisions: 6 };
-const COLL_LABELS = { categories: 'Danh mục', accounts: 'Tài khoản', transactions: 'Giao dịch', budgets: 'Ngân sách', assets: 'Tài sản', debts: 'Khoản nợ', goals: 'Mục tiêu', recurring: 'Giao dịch định kỳ', snapshots: 'Bản chụp tài sản ròng', allocations: 'Phân bổ thu nhập', commitLog: 'Nhật ký cam kết', commitNotes: 'Ghi chú cam kết', holdings: 'Danh mục chứng khoán', decisions: 'Nhật ký quyết định' };
+const COLL_SINCE = { allocations: 2, commitLog: 2, commitNotes: 2, holdings: 2, decisions: 6, metrics: 7, sectors: 7 };
+const COLL_LABELS = { categories: 'Danh mục', accounts: 'Tài khoản', transactions: 'Giao dịch', budgets: 'Ngân sách', assets: 'Tài sản', debts: 'Khoản nợ', goals: 'Mục tiêu', recurring: 'Giao dịch định kỳ', snapshots: 'Bản chụp tài sản ròng', allocations: 'Phân bổ thu nhập', commitLog: 'Nhật ký cam kết', commitNotes: 'Ghi chú cam kết', holdings: 'Danh mục chứng khoán', decisions: 'Nhật ký quyết định', metrics: 'Lịch sử định giá (P/B, P/E)', sectors: 'Hồ sơ ngành' };
 const PALETTE = ['#2563eb', '#0b8f63', '#f97316', '#8b5cf6', '#e11d48', '#0891b2', '#db2777', '#d97706', '#4f46e5', '#65a30d', '#c026d3', '#64748b', '#b91c1c', '#0d9488', '#a16207', '#1d3f8f'];
 const EMOJIS = ['💼', '🎁', '🏪', '📈', '➕', '🍜', '🏠', '🚗', '👨‍👩‍👧', '💊', '📚', '🛍️', '🎬', '🧾', '🏦', '📦', '☕', '✈️', '🐶', '💡', '📱', '🎓', '🏋️', '💰', '🧒', '🎉', '🔧', '⛽', '🛒', '💳', '🎮', '🍼'];
 
@@ -1196,14 +1230,16 @@ const Defaults = {
   },
   /** Kế hoạch lớp tài sản: mọi ngưỡng để trống — FinPilot không đặt sẵn tỷ trọng cho bạn. */
   layerPlan() { return { targets: {}, band: 5, reserveMonths: null, fxGoldMin: null, fxGoldMax: null, noFloatingDebt: false, includeUse: false, cashflowMin: null, lossLimitPct: null, hurdle: null }; },
+  /** Giả định dự phóng 5 năm — mặc định không giả định tăng trưởng nào. */
+  projection() { return { growth: {}, monthlyAdd: null, addLayer: '', rollover: false }; },
   settings() {
-    return { currencySymbol: '₫', defaultAccountId: '', pageSize: 25, savingsRateTarget: 20, emergencyTargetMonths: 6, compactCharts: true, showInsights: true, defaultBudgets: [], disciplineEpoch: 0, layerPlan: Defaults.layerPlan(), principles: [], updatedAt: '' };
+    return { currencySymbol: '₫', defaultAccountId: '', pageSize: 25, savingsRateTarget: 20, emergencyTargetMonths: 6, compactCharts: true, showInsights: true, defaultBudgets: [], disciplineEpoch: 0, layerPlan: Defaults.layerPlan(), principles: [], projection: Defaults.projection(), updatedAt: '' };
   },
   state() {
     return {
       meta: { schemaVersion: SCHEMA_VERSION, appVersion: APP_VERSION, createdAt: Util.nowISO(), revision: 0, updatedAt: '' },
       settings: this.settings(), categories: this.categories(), accounts: [], transactions: [], budgets: [],
-      assets: [], debts: [], goals: [], recurring: [], snapshots: [], allocations: [], commitLog: [], commitNotes: [], holdings: [], decisions: [], tombstones: []
+      assets: [], debts: [], goals: [], recurring: [], snapshots: [], allocations: [], commitLog: [], commitNotes: [], holdings: [], decisions: [], metrics: [], sectors: [], tombstones: []
     };
   }
 };
@@ -1340,7 +1376,7 @@ const Model = {
     const tp = typeof r.targetPct === 'number' && Number.isFinite(r.targetPct) && r.targetPct >= 0 && r.targetPct <= 100 ? Math.round(r.targetPct * 10) / 10 : null;
     return { id: this.s(r.id, 120), accountId: this.s(r.accountId, 80), symbol: this.s(r.symbol, 10).toUpperCase(), qty: r.qty, avgCost: opt(r.avgCost), targetPct: tp, manualPrice: opt(r.manualPrice), manualPriceAt: this.ts(r.manualPriceAt), note: this.s(r.note, 200),
       fairValue: opt(r.fairValue), buyBelow: opt(r.buyBelow), valMethod: Portfolio.VAL_METHODS[r.valMethod] ? r.valMethod : '', valDate: DateUtil.isISO(r.valDate) ? r.valDate : '',
-      layer: Layers.valid(r.layer) ? r.layer : '', valLink: typeof r.valLink === 'string' && /^https:\/\/[^\s"'<>]+$/i.test(r.valLink.trim()) ? r.valLink.trim().slice(0, 300) : '', valNote: this.s(r.valNote, 300),
+      layer: Layers.valid(r.layer) ? r.layer : '', valLink: typeof r.valLink === 'string' && /^https:\/\/[^\s"'<>]+$/i.test(r.valLink.trim()) ? r.valLink.trim().slice(0, 300) : '', valNote: this.s(r.valNote, 300), sector: this.s(r.sector, 60),
       eps: Number.isSafeInteger(r.eps) && Math.abs(r.eps) <= 1e7 && r.eps !== 0 ? r.eps : null, ...this.income(r),
       createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
   },
@@ -1372,7 +1408,16 @@ const Model = {
     if (Number.isInteger(r.disciplineEpoch) && r.disciplineEpoch >= 0) out.disciplineEpoch = r.disciplineEpoch;
     out.layerPlan = this.layerPlan(r.layerPlan);
     out.principles = this.principles(r.principles);
+    out.projection = this.projection(r.projection);
     out.updatedAt = this.ts(r.updatedAt);
+    return out;
+  },
+  projection(p) {
+    const out = Defaults.projection(); if (!Util.isObj(p)) return out;
+    if (Util.isObj(p.growth)) for (const k of Layers.KEYS) { const v = p.growth[k]; if (typeof v === 'number' && Number.isFinite(v) && v >= -50 && v <= 100) out.growth[k] = Math.round(v * 100) / 100; }
+    if (Number.isSafeInteger(p.monthlyAdd) && p.monthlyAdd > 0 && p.monthlyAdd <= MAX_AMOUNT) out.monthlyAdd = p.monthlyAdd;
+    if (Layers.valid(p.addLayer)) out.addLayer = p.addLayer;
+    out.rollover = p.rollover === true;
     return out;
   },
   /** Nguyên tắc viết tay của người dùng (tối đa 30 dòng × 240 ký tự). */
@@ -1392,6 +1437,31 @@ const Model = {
     return { id: this.s(r.id, 120), date: r.date, kind: DECISION_KINDS[r.kind] ? r.kind : 'other', symbol: this.s(r.symbol, 10).toUpperCase(), amount: intOrNull(r.amount), price: Number.isSafeInteger(r.price) && r.price > 0 ? r.price : null,
       fromRef: this.s(r.fromRef, 130), thesis: this.s(r.thesis, 600), wrongIf: this.s(r.wrongIf, 300), reviewDate: DateUtil.isISO(r.reviewDate) ? r.reviewDate : '',
       status: r.status === 'closed' ? 'closed' : 'open', outcome: this.s(r.outcome, 600), outcomeAt: DateUtil.isISO(r.outcomeAt) ? r.outcomeAt : '', checks, changes, createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
+  },
+  /** Số liệu theo quý của một mã do người dùng dán vào (thường do Claude lấy từ nguồn dữ liệu của họ):
+   *  pb/pe: { p: 'YYYYQn', v: hệ số, b: hệ số ngành|null } · fin: { p, r: doanh thu (tỷ đồng), n: LNST (tỷ đồng) }. */
+  /** Hồ sơ ngành do người dùng dán vào (thường là khối tóm tắt từ báo cáo ngành Claude làm). */
+  sector(r) {
+    r = Util.isObj(r) ? r : {};
+    const arr = (v, n) => (Array.isArray(v) ? v : []).slice(0, n);
+    const syms = v => Array.from(new Set(arr(v, 30).map(x => this.s(x, 10).toUpperCase()).filter(x => /^[A-Z0-9]{3,10}$/.test(x))));
+    return { id: this.s(r.id, 60), name: this.s(r.name, 60), cycle: SECTOR_CYCLES[r.cycle] ? r.cycle : '', view: SECTOR_VIEWS[r.view] ? r.view : '', horizon: this.s(r.horizon, 40), summary: this.s(r.summary, 700),
+      kpis: arr(r.kpis, 10).filter(Util.isObj).map(k => ({ name: this.s(k.name, 90), note: this.s(k.note, 180) })).filter(k => k.name),
+      flags: arr(r.flags, 8).map(x => this.s(x, 180)).filter(Boolean), catalysts: arr(r.catalysts, 8).filter(Util.isObj).map(c => ({ date: DateUtil.isISO(c.date) ? c.date : '', text: this.s(c.text, 180) })).filter(c => c.text),
+      mine: syms(r.mine), related: syms(r.related), reviewDate: DateUtil.isISO(r.reviewDate) ? r.reviewDate : '',
+      link: typeof r.link === 'string' && /^https:\/\/[^\s"'<>]+$/i.test(r.link.trim()) ? r.link.trim().slice(0, 300) : '', source: this.s(r.source, 160), asOf: DateUtil.isISO(r.asOf) ? r.asOf : '', createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
+  },
+  /** Chuỗi số theo quý do người dùng dán vào: P/B, P/E ({p, v, b=ngành}) hoặc KQKD ({p, r=doanh thu, n=LNST}, tỷ đồng). */
+  metric(r) {
+    r = Util.isObj(r) ? r : {};
+    const kind = METRIC_KINDS[r.kind] ? r.kind : 'pb'; const fin = kind === 'fin';
+    const num = (v, ok) => (typeof v === 'number' && Number.isFinite(v) && ok(v) ? Math.round(v * 1000) / 1000 : null);
+    const ratio = v => v > 0 && v < 1000; const big = v => Math.abs(v) < 1e7;
+    const pts = (Array.isArray(r.points) ? r.points : []).filter(x => Util.isObj(x) && /^\d{4}Q[1-4]$/.test(x.p)).map(x => fin ? { p: x.p, r: num(x.r, big), n: num(x.n, big) } : { p: x.p, v: num(x.v, ratio), b: num(x.b, ratio) })
+      .filter(x => (fin ? x.r !== null || x.n !== null : x.v !== null));
+    const seen = new Set(); const points = pts.sort((a, b) => (a.p < b.p ? -1 : 1)).filter(x => (seen.has(x.p) ? false : (seen.add(x.p), true))).slice(-160);
+    const ps = METRIC_KINDS[kind].per && Number.isSafeInteger(r.perShare) && r.perShare !== 0 && Math.abs(r.perShare) <= 1e7 && (kind !== 'pb' || r.perShare > 0) ? r.perShare : null;
+    return { id: this.s(r.id, 60), symbol: this.s(r.symbol, 10).toUpperCase(), kind, points, perShare: ps, benchLabel: fin ? '' : this.s(r.benchLabel, 80), source: this.s(r.source, 160), asOf: DateUtil.isISO(r.asOf) ? r.asOf : '', createdAt: this.ts(r.createdAt), updatedAt: this.ts(r.updatedAt) };
   },
   tombstones(arr) {
     if (!Array.isArray(arr)) return [];
@@ -1415,6 +1485,8 @@ const Model = {
       commitNotes: (d.commitNotes || []).map(x => this.note(x)),
       holdings: (d.holdings || []).map(x => this.holding(x)),
       decisions: (d.decisions || []).map(x => this.decision(x)),
+      metrics: (d.metrics || []).map(x => this.metric(x)),
+      sectors: (d.sectors || []).map(x => this.sector(x)),
       tombstones: this.tombstones(d.tombstones)
     };
     if (!ds.categories.some(c => c.id === INTEREST_CAT_ID)) ds.categories.push(Defaults.categories().find(c => c.id === INTEREST_CAT_ID));
@@ -1679,6 +1751,9 @@ const Validation = {
     for (const r of st.recurring) { const e = this.recurring(r, st, { ctx }); if (Object.keys(e).length) add(errors, `Giao dịch định kỳ "${r.name || r.id}": ${this.first(e)}`); }
     for (const x of st.holdings || []) { const e = this.holding(x, st, { ctx }); if (Object.keys(e).length) add(errors, `Danh mục ${x.symbol || x.id}: ${this.first(e)}`); }
     for (const [c, lab] of [['accounts', 'Tài khoản'], ['assets', 'Tài sản'], ['holdings', 'Mã']]) for (const x of st[c] || []) { const e = this.income(x); if (Object.keys(e).length) add(errors, `${lab} "${x.name || x.symbol || x.id}" (lịch dòng tiền): ${this.first(e)}`); }
+    for (const x of st.sectors || []) { if (!x.name || !/^sec_[a-z0-9_]{1,50}$/.test(x.id)) add(errors, `Hồ sơ ngành ${x.name || x.id}: thiếu tên hoặc mã định danh sai.`); }
+    { const sids = new Set((st.sectors || []).map(x => x.id)); for (const x of st.holdings || []) if (x.sector && !sids.has(x.sector)) add(warnings, `Mã ${x.symbol} gắn với hồ sơ ngành đã bị xóa.`); }
+    for (const x of st.metrics || []) { if (!/^[A-Z0-9]{3,10}$/.test(x.symbol) || x.id !== `met_${x.symbol}_${x.kind}`) add(errors, `Lịch sử định giá ${x.symbol || x.id}: mã định danh không khớp.`); else if (!x.points.length) add(errors, `Lịch sử định giá ${x.symbol}: không có số liệu.`); }
     for (const x of st.decisions || []) { const e = this.decision(x); if (Object.keys(e).length) add(errors, `Nhật ký quyết định ${DateUtil.isISO(x.date) ? DateUtil.toVN(x.date) : x.id}: ${this.first(e)}`); }
     if ((st.holdings || []).some(x => x.qty > 0) && st.assets.some(a => a.group === 'securities' && Ledger.assetValue(a, DateUtil.today()) > 0)) add(warnings, 'Vừa có tài sản nhập tay nhóm "Chứng khoán / đầu tư" vừa có danh mục cổ phiếu — nếu là cùng một khoản, tài sản ròng đang bị tính trùng.');
     for (const a of st.allocations || []) { if (!st.transactions.some(t => t.id === a.incomeTxnId)) add(warnings, `Phân bổ ${a.ruleName || ''} ngày ${DateUtil.toVN(a.date)}: khoản thu gốc đã bị xóa.`); }
@@ -2826,6 +2901,230 @@ const Income = {
 };
 
 /* ==========================================================================
+   PHÂN TÍCH MÃ (v1.9) — P/B, P/E, doanh thu & LNST theo quý do NGƯỜI DÙNG dán vào
+   (thường do Claude lấy qua kết nối dữ liệu của họ). App chỉ kiểm tra, thống kê, vẽ.
+   ========================================================================== */
+const Metrics = {
+  WINDOW: 20,
+  quarterOf(iso) { const [y, m] = iso.split('-').map(Number); return `${y}Q${Math.floor((m - 1) / 3) + 1}`; },
+  qIndex(p) { return Number(p.slice(0, 4)) * 4 + Number(p.slice(5)) - 1; },
+  qLabel(p) { return `Q${p.slice(5)}/${p.slice(0, 4)}`; },
+  /** Số kiểu VN/quốc tế: "1,25" "1.25" "7.543,2" "7543.2" "-12,5". */
+  num(raw) {
+    let s = String(raw || '').trim().replace(/\s/g, ''); if (!s) return null;
+    if (!/^-?[\d.,]+$/.test(s)) return null;
+    if (s.includes('.') && s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    else if (s.includes(',')) { if (/^-?\d{1,3}(,\d{3})+$/.test(s) && !/^-?0,/.test(s)) return null; s = s.replace(',', '.'); }
+    else if (/^-?\d{1,3}(\.\d{3}){2,}$/.test(s)) s = s.replace(/\./g, '');
+    const v = Number(s); return Number.isFinite(v) ? v : null;
+  },
+  parsePeriod(raw) {
+    const s = String(raw || '').trim().toUpperCase(); let m;
+    if ((m = s.match(/^(\d{4})[-\s]?Q([1-4])$/))) return `${m[1]}Q${m[2]}`;
+    if ((m = s.match(/^Q([1-4])[\/\-\s](\d{4})$/))) return `${m[2]}Q${m[1]}`;
+    return null;
+  },
+  /**
+   * Đọc một hay nhiều khối FINPILOT-PB / FINPILOT-PE / FINPILOT-KQKD.
+   * → { blocks: [{ kind, symbol, points, perShare, benchLabel, source, asOf, lines }], errors: [{ line, text, msg }] }
+   */
+  parse(text, today) {
+    const blocks = [], errors = []; let cur = null;
+    const curQ = this.quarterOf(today);
+    const heads = Object.entries(METRIC_KINDS).map(([k, o]) => [o.head, k]);
+    const lines = String(text || '').split(/\r?\n/);
+    const close = () => { if (cur) { if (cur.points.length) blocks.push(cur); else errors.push({ line: cur.line, text: cur.head, msg: 'Khối không có dòng số liệu nào' }); cur = null; } };
+    lines.forEach((ln, i) => {
+      const raw = ln.replace(/[`*|]/g, ' ').trim(); if (!raw) return;
+      const up = raw.toUpperCase();
+      const hd = heads.find(([h]) => up.startsWith(h + ' ') || up === h);
+      if (hd) {
+        close(); const sym = up.slice(hd[0].length).trim().split(/\s+/)[0] || '';
+        if (!/^[A-Z0-9]{3,10}$/.test(sym)) { errors.push({ line: i + 1, text: raw, msg: 'Thiếu hoặc sai mã chứng khoán sau tiêu đề' }); cur = null; return; }
+        cur = { kind: hd[1], symbol: sym, points: [], perShare: null, benchLabel: '', source: '', asOf: '', line: i + 1, head: raw, seen: new Set() }; return;
+      }
+      if (!cur) return; // chữ ngoài khối (Claude giải thích thêm) → bỏ qua
+      if (/^HET$|^HẾT$|^END$/.test(up)) { close(); return; }
+      let m;
+      if ((m = raw.match(/^(NGUON|NGUỒN)\s*:\s*(.+)$/i))) { cur.source = m[2].trim().slice(0, 160); return; }
+      if ((m = raw.match(/^(LAY NGAY|LẤY NGÀY|NGAY|NGÀY)\s*:\s*(.+)$/i))) { const d = DateUtil.parseVN(m[2].trim()); if (d && d <= today) cur.asOf = d; else errors.push({ line: i + 1, text: raw, msg: 'Ngày lấy số không hợp lệ' }); return; }
+      if ((m = raw.match(/^(NGANH|NGÀNH)\s*:\s*(.+)$/i))) { cur.benchLabel = m[2].trim().slice(0, 80); return; }
+      if ((m = raw.match(/^(BVPS|EPS)\s*:\s*(.+)$/i))) {
+        const v = this.num(m[2].replace(/(đ|d|vnd|đồng)\s*$/i, '')); const want = METRIC_KINDS[cur.kind].per;
+        if (m[1].toUpperCase() !== want) { errors.push({ line: i + 1, text: raw, msg: `Khối ${METRIC_KINDS[cur.kind].label} dùng ${want || 'không dùng dòng này'}` }); return; }
+        if (v === null || !Number.isFinite(v) || v === 0 || Math.abs(v) > 1e7 || (cur.kind === 'pb' && v <= 0)) { errors.push({ line: i + 1, text: raw, msg: `${want} không hợp lệ (đồng/cổ phiếu)` }); return; }
+        cur.perShare = Math.round(v); return;
+      }
+      if (/^(DON VI|ĐƠN VỊ)\s*:/i.test(raw)) return;
+      const tok = raw.split(/[\s;\t]+/).filter(Boolean);
+      const p = this.parsePeriod(tok[0]) || (tok[1] && this.parsePeriod(tok[0] + ' ' + tok[1]) ? this.parsePeriod(tok.shift() + ' ' + tok[0]) : null);
+      if (!p) { errors.push({ line: i + 1, text: raw, msg: 'Không nhận ra quý (dạng 2026Q2 hoặc Q2/2026)' }); return; }
+      if (p > curQ) { errors.push({ line: i + 1, text: raw, msg: 'Quý ở tương lai' }); return; }
+      if (cur.seen.has(p)) { errors.push({ line: i + 1, text: raw, msg: 'Trùng quý ' + this.qLabel(p) }); return; }
+      const a = this.num(tok[1]), b = tok[2] !== undefined ? this.num(tok[2]) : null;
+      if (cur.kind === 'fin') {
+        if (a === null && b === null) { errors.push({ line: i + 1, text: raw, msg: 'Thiếu doanh thu / LNST' }); return; }
+        if ((a !== null && Math.abs(a) >= 1e7) || (b !== null && Math.abs(b) >= 1e7)) { errors.push({ line: i + 1, text: raw, msg: 'Số quá lớn — đơn vị phải là tỷ đồng' }); return; }
+        cur.points.push({ p, r: a, n: b }); cur.seen.add(p); return;
+      }
+      if (a === null || !(a > 0) || a >= 1000) { errors.push({ line: i + 1, text: raw, msg: `${METRIC_KINDS[cur.kind].label} phải là số dương (VD 1,25)` }); return; }
+      if (b !== null && !(b > 0 && b < 1000)) { errors.push({ line: i + 1, text: raw, msg: 'Số ngành không hợp lệ' }); return; }
+      cur.points.push({ p, v: a, b }); cur.seen.add(p);
+    });
+    close();
+    for (const b of blocks) { b.points.sort((x, y) => (x.p < y.p ? -1 : 1)); delete b.seen; }
+    return { blocks, errors };
+  },
+  /** Hệ số "hôm nay" theo giá mới nhất: P/B = giá / BVPS; P/E = giá / EPS. */
+  live(kind, price, perShare) { return Number.isSafeInteger(price) && price > 0 && Number.isSafeInteger(perShare) && perShare !== 0 && (kind !== 'pb' || perShare > 0) ? price / perShare : null; },
+  /** Thống kê: TB & độ lệch chuẩn 20 quý gần nhất, min/max toàn chuỗi, vị trí của giá trị hiện tại. */
+  stats(points, current = null) {
+    const vs = (points || []).filter(x => Number.isFinite(x.v));
+    if (!vs.length) return null;
+    const win = vs.slice(-this.WINDOW);
+    const mean = win.reduce((s, x) => s + x.v, 0) / win.length;
+    const sd = win.length > 1 ? Math.sqrt(win.reduce((s, x) => s + (x.v - mean) * (x.v - mean), 0) / (win.length - 1)) : 0;
+    let min = vs[0], max = vs[0]; for (const x of vs) { if (x.v < min.v) min = x; if (x.v > max.v) max = x; }
+    const last = vs[vs.length - 1]; const cur = Number.isFinite(current) && current > 0 ? current : last.v;
+    const higher = vs.filter(x => x.v > cur + 1e-9).length;
+    const z = sd > 0 ? (cur - mean) / sd : null;
+    const zone = z === null ? 'na' : z < -1 ? 'below' : z > 1 ? 'above' : 'inside';
+    const bench = vs.filter(x => Number.isFinite(x.b)); const lb = bench.length ? bench[bench.length - 1] : null;
+    return { n: vs.length, nWin: win.length, from: vs[0].p, to: last.p, mean, sd, lo: mean - sd, hi: mean + sd, min, max, last, current: cur, liveUsed: cur !== last.v || current === last.v, cheaperThan: higher / vs.length * 100, z, zone, benchLast: lb };
+  },
+  /** Tăng trưởng 4 quý gần nhất so với 4 quý liền trước (TTM so với TTM năm trước) — cần 8 quý liên tiếp. */
+  growth(points) {
+    const ps = (points || []).slice().sort((a, b) => (a.p < b.p ? -1 : 1)); const out = [];
+    const idx = new Map(ps.map(x => [this.qIndex(x.p), x]));
+    for (const x of ps) {
+      const k = this.qIndex(x.p); const win = []; for (let j = 7; j >= 0; j--) win.push(idx.get(k - j));
+      if (win.some(w => !w)) { out.push({ p: x.p, rev: null, np: null, ttmRev: null, ttmNp: null }); continue; }
+      const sum = (arr, f) => (arr.every(w => Number.isFinite(w[f])) ? arr.reduce((s, w) => s + w[f], 0) : null);
+      const r1 = sum(win.slice(4), 'r'), r0 = sum(win.slice(0, 4), 'r'), n1 = sum(win.slice(4), 'n'), n0 = sum(win.slice(0, 4), 'n');
+      out.push({ p: x.p, ttmRev: r1, ttmNp: n1, rev: r1 !== null && r0 > 0 ? (r1 / r0 - 1) * 100 : null, np: n1 !== null && n0 > 0 ? (n1 / n0 - 1) * 100 : null });
+    }
+    return out;
+  },
+  /** Câu lệnh để người dùng dán vào Claude (đã nối nguồn dữ liệu như TCB MCP). */
+  prompt(kind, symbol, fromYear = 2012) {
+    const K = METRIC_KINDS[kind]; const sym = String(symbol || '').toUpperCase();
+    const common = ['Quy tắc:', '- Mỗi quý một dòng, tăng dần theo thời gian. Quý nào không có dữ liệu thì BỎ dòng đó — không tự điền, không nội suy, không ước đoán.', '- Dùng dấu chấm thập phân, không dùng dấu phân cách hàng nghìn.', '- Không thêm bảng, markdown, nhận xét hay khuyến nghị. Chỉ trả về khối văn bản.', '- Nếu không lấy được từ công cụ dữ liệu, trả lời "KHONG CO DU LIEU" thay vì tự nghĩ ra số.'];
+    if (kind === 'fin') return [`Dùng kết nối dữ liệu chứng khoán của bạn (ví dụ TCB MCP), lấy kết quả kinh doanh THEO QUÝ của mã ${sym} từ ${fromYear} đến quý gần nhất: doanh thu (với ngân hàng: tổng thu nhập hoạt động) và lợi nhuận sau thuế, đơn vị TỶ ĐỒNG.`, 'Trả về DUY NHẤT khối văn bản đúng định dạng:', '', `${K.head} ${sym}`, 'NGUON: <tên nguồn + tên công cụ đã gọi>', 'LAY NGAY: <YYYY-MM-DD>', 'DON VI: ty dong', 'YYYYQn <doanh thu> <LNST>', '...', 'HET', ''].concat(common).join('\n');
+    return [`Dùng kết nối dữ liệu chứng khoán của bạn (ví dụ TCB MCP), lấy ${K.label} CUỐI MỖI QUÝ của mã ${sym} từ ${fromYear} đến quý gần nhất (giá đóng cửa ngày cuối quý / ${kind === 'pb' ? 'giá trị sổ sách mỗi cổ phiếu của quý đó' : 'EPS 4 quý gần nhất tại quý đó'}). Nếu có, kèm ${K.label} trung bình ngành cùng quý ở cột thứ hai.`, 'Trả về DUY NHẤT khối văn bản đúng định dạng:', '', `${K.head} ${sym}`, 'NGUON: <tên nguồn + tên công cụ đã gọi>', 'LAY NGAY: <YYYY-MM-DD>', `${K.per}: <${K.perLabel} của quý gần nhất, đồng, số nguyên>`, 'NGANH: <tên nhóm ngành dùng cho cột 2, bỏ dòng này nếu không có>', `YYYYQn <${K.label}> [<${K.label} ngành>]`, '...', 'HET', ''].concat(common).join('\n');
+  }
+};
+
+/* ==========================================================================
+   HỒ SƠ NGÀNH (v1.9) — khối tóm tắt FINPILOT-NGANH người dùng dán vào sau khi chạy
+   skill nghiên cứu ngành trong Claude. App chỉ lưu, nhắc hạn xem lại, gắn với mã.
+   Quan điểm là CỦA BÁO CÁO người dùng — app không biến thành tín hiệu mua/bán.
+   ========================================================================== */
+const Sectors = {
+  STALE_DAYS: 180,
+  noAccent(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D'); },
+  /** Mã định danh từ tên: "Thủy điện" → "sec_thuy_dien". */
+  slug(name) { const t = this.noAccent(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 50); return t ? 'sec_' + t : ''; },
+  CYCLE_IN: { DAY: 'trough', 'PHUC HOI': 'recovery', 'TANG TRUONG': 'growth', DINH: 'peak', 'SUY THOAI': 'decline' },
+  VIEW_IN: { 'TICH CUC': 'positive', 'TRUNG LAP': 'neutral', 'TIEU CUC': 'negative' },
+  syms(v) { return Array.from(new Set(String(v || '').toUpperCase().split(/[\s,;]+/).filter(x => /^[A-Z0-9]{3,10}$/.test(x)))); },
+  /**
+   * Đọc khối "FINPILOT-NGANH <tên ngành>" … "HET". Chữ ngoài khối (báo cáo đầy đủ của Claude) bị bỏ qua.
+   * Khóa: NGUON, LAY NGAY, CHU KY, QUAN DIEM (… · khung thời gian), TOM TAT, MA CUA TOI, MA LIEN QUAN,
+   * KPI (tên | ghi chú), CO DO, CATALYST (ngày | nội dung), XEM LAI, LINK.
+   */
+  parse(text, today) {
+    const blocks = [], errors = []; let cur = null;
+    const err = (i, raw, msg) => { if (errors.length < 100) errors.push({ line: i + 1, text: String(raw).slice(0, 80), msg }); };
+    String(text || '').split(/\r?\n/).forEach((ln, i) => {
+      const raw = ln.replace(/[`*]/g, '').replace(/^\s*[-•]\s+/, '').trim(); if (!raw) return;
+      const up = this.noAccent(raw).toUpperCase();
+      const hm = up.match(/^FINPILOT-NGANH\b\s*(.*)$/);
+      if (hm) { const name = raw.slice(raw.length - hm[1].length).trim().replace(/^[:\-–]\s*/, ''); if (!name) { err(i, raw, 'Thiếu tên ngành sau FINPILOT-NGANH'); cur = null; return; } cur = { name: name.slice(0, 60), source: '', asOf: '', cycle: '', view: '', horizon: '', summary: '', mine: [], related: [], kpis: [], flags: [], catalysts: [], reviewDate: '', link: '' }; blocks.push(cur); return; }
+      if (!cur) return;
+      if (/^(HET|END)$/.test(up)) { cur = null; return; }
+      const m = raw.match(/^([^:]{2,16}):\s*(.*)$/); if (!m) { if (cur.summary && !/^[A-Z ]{2,16}:/.test(up)) { cur.summary = (cur.summary + ' ' + raw).slice(0, 700); return; } err(i, raw, 'Không nhận ra dòng (dạng KHÓA: nội dung)'); return; }
+      const key = this.noAccent(m[1]).toUpperCase().replace(/\s+/g, ' ').trim(); const val = m[2].trim();
+      const date = v => { const d = DateUtil.parseVN(v); return d || null; };
+      if (key === 'NGUON') cur.source = val.slice(0, 160);
+      else if (key === 'LAY NGAY' || key === 'NGAY') { const d = date(val); if (!d || d > today) err(i, raw, 'Ngày lấy số không hợp lệ'); else cur.asOf = d; }
+      else if (key === 'CHU KY') { const c = this.CYCLE_IN[this.noAccent(val).toUpperCase().replace(/\s+/g, ' ').trim()]; if (!c) err(i, raw, 'Chu kỳ phải là: Đáy / Phục hồi / Tăng trưởng / Đỉnh / Suy thoái'); else cur.cycle = c; }
+      else if (key === 'QUAN DIEM') { const [v0, ...rest] = val.split(/\s*[·,;|(]\s*/); const v = this.VIEW_IN[this.noAccent(v0).toUpperCase().trim()]; if (!v) err(i, raw, 'Quan điểm phải là: Tích cực / Trung lập / Tiêu cực'); else { cur.view = v; cur.horizon = rest.join(' ').replace(/\)$/, '').slice(0, 40); } }
+      else if (key === 'TOM TAT') cur.summary = val.slice(0, 700);
+      else if (key === 'MA CUA TOI') cur.mine = this.syms(val);
+      else if (key === 'MA LIEN QUAN') cur.related = this.syms(val);
+      else if (key === 'KPI') { const [n, ...note] = val.split('|'); if (n.trim() && cur.kpis.length < 10) cur.kpis.push({ name: n.trim().slice(0, 90), note: note.join('|').trim().slice(0, 180) }); }
+      else if (key === 'CO DO') { if (val && cur.flags.length < 8) cur.flags.push(val.slice(0, 180)); }
+      else if (key === 'CATALYST') { const [a, ...b] = val.split('|'); const d = date(a.trim()); if (cur.catalysts.length < 8) cur.catalysts.push(d ? { date: d, text: b.join('|').trim().slice(0, 180) || a } : { date: '', text: val.slice(0, 180) }); }
+      else if (key === 'XEM LAI') { const d = date(val); if (!d || d < today) err(i, raw, 'Ngày xem lại không hợp lệ (phải từ hôm nay trở đi)'); else cur.reviewDate = d; }
+      else if (key === 'LINK') { if (/^https:\/\/[^\s"'<>]+$/i.test(val)) cur.link = val.slice(0, 300); else err(i, raw, 'Liên kết phải bắt đầu bằng https://'); }
+      else err(i, raw, `Không biết khóa "${m[1]}"`);
+    });
+    return { blocks: blocks.filter(b => b.cycle || b.view || b.kpis.length || b.summary), errors };
+  },
+  /** Hồ sơ đến hạn xem lại (theo ngày hẹn) hoặc đã cũ quá STALE_DAYS ngày. */
+  due(list, today) {
+    return (list || []).filter(s => (s.reviewDate && s.reviewDate <= today) || (s.asOf && DateUtil.diffDays(s.asOf, today) > this.STALE_DAYS) || (!s.asOf && !s.reviewDate));
+  },
+  /** Tỷ trọng danh mục theo ngành. rows: [{ sector, value }] → [{ id, value, pct }] (id '' = chưa gán). */
+  weights(rows) {
+    const tot = (rows || []).reduce((s, r) => s + Math.max(0, r.value || 0), 0); const by = new Map();
+    for (const r of rows || []) by.set(r.sector || '', (by.get(r.sector || '') || 0) + Math.max(0, r.value || 0));
+    return Array.from(by.entries()).map(([id, value]) => ({ id, value, pct: tot > 0 ? value / tot * 100 : null })).sort((a, b) => b.value - a.value);
+  },
+  /** Câu lệnh để chạy skill nghiên cứu ngành trong Claude và nhận lại khối tóm tắt cho FinPilot. */
+  /** depth: 'quick' → skill /vn-nganh; 'deep' → skill /deep-research (nhiều nguồn, trích nguồn kỹ, lâu hơn). */
+  prompt(name, mine = [], horizon = '6–12 tháng', depth = 'quick') {
+    const n = String(name || '').trim(); const ms = (mine || []).join(', ');
+    const head = depth === 'deep'
+      ? [`/deep-research Nghiên cứu chuyên sâu ngành ${n} tại Việt Nam, góc nhà đầu tư cá nhân (vĩ mô + đầu tư, không phải thẩm định tín dụng), khung thời gian ${horizon}.${ms ? ` Các mã tôi đang nắm thuộc ngành này: ${ms}.` : ''}`,
+        'Báo cáo theo đủ 8 bước: phạm vi & phân ngành; quy mô & tăng trưởng; chuỗi giá trị; 5 áp lực cạnh tranh; chu kỳ & chính sách; ánh xạ mã niêm yết (P/E, P/B so với ngành và lịch sử); KPI theo dõi & cờ đỏ; kết luận kèm phản biện (lập luận mạnh nhất của phía ngược lại).',
+        'Ưu tiên nguồn gốc: Tổng cục Thống kê, bộ ngành, NHNN, hiệp hội, BCTC doanh nghiệp, báo cáo CTCK. Mọi con số ghi nguồn và ngày; không bịa số; số chưa xác minh ghi rõ.',
+        'Khối tóm tắt dưới đây phải nằm ở CUỐI báo cáo VÀ được chép lại nguyên văn trong tin nhắn cuối cùng gửi tôi.', '']
+      : [`/vn-nganh Nghiên cứu ngành ${n} tại Việt Nam, góc nhà đầu tư cá nhân, khung thời gian ${horizon}.${ms ? ` Các mã tôi đang nắm thuộc ngành này: ${ms}.` : ''}`,
+        'Làm đủ 8 bước: phạm vi & phân ngành; quy mô & tăng trưởng; chuỗi giá trị; 5 áp lực cạnh tranh; chu kỳ & chính sách; ánh xạ mã niêm yết; KPI theo dõi & cờ đỏ; kết luận kèm phản biện. Nếu không có skill vn-nganh, vẫn làm đúng 8 bước này.',
+        'Mọi con số ghi nguồn và ngày; không bịa số; số chưa xác minh ghi rõ.', ''];
+    return head.concat([
+      'Cuối câu trả lời, thêm DUY NHẤT một khối tóm tắt cho app FinPilot, đúng định dạng (không bảng, không markdown trong khối):', '',
+      `FINPILOT-NGANH ${n}`, 'NGUON: <nguồn chính đã dùng>', 'LAY NGAY: <YYYY-MM-DD>', 'CHU KY: <Đáy | Phục hồi | Tăng trưởng | Đỉnh | Suy thoái>', `QUAN DIEM: <Tích cực | Trung lập | Tiêu cực> · ${horizon}`,
+      'TOM TAT: <2–3 câu: khâu tạo giá trị, động lực chính, rủi ro lớn nhất>', `MA CUA TOI: ${ms || '<mã tôi đang nắm thuộc ngành, nếu có>'}`, 'MA LIEN QUAN: <các mã niêm yết tiêu biểu trong ngành>',
+      'KPI: <tên chỉ số dẫn dắt> | <vì sao quan trọng, nguồn theo dõi>', '(5–8 dòng KPI)', 'CO DO: <dấu hiệu cảnh báo đặc thù ngành>', '(3–5 dòng CO DO)', 'CATALYST: <YYYY-MM-DD> | <sự kiện>', 'XEM LAI: <YYYY-MM-DD, thường 3 tháng sau>', 'HET', '',
+      'Trong khối: không viết lời khuyên mua/bán mã cụ thể; chỉ mô tả ngành.']).join('\n');
+  }
+};
+
+/* ==========================================================================
+   DỰ PHÓNG 5 NĂM (v1.9) — chỉ theo GIẢ ĐỊNH người dùng nhập. Không có giả định → đi ngang.
+   ========================================================================== */
+const Projection = {
+  /** byLayer: { layer: giá trị hiện tại } · growth: { layer: %/năm } · monthlyAdd → cộng vào addLayer mỗi năm (×12, giữa năm không tính lãi). */
+  assets({ byLayer, growth = {}, monthlyAdd = null, addLayer = '', years = 5 }) {
+    const keys = Object.keys(byLayer); const rows = [];
+    let cur = { ...byLayer };
+    rows.push({ year: 0, by: { ...cur }, total: keys.reduce((s, k) => s + Math.max(0, cur[k]), 0) });
+    for (let y = 1; y <= years; y++) {
+      const nx = {};
+      for (const k of keys) { const g = Number.isFinite(growth[k]) ? growth[k] : 0; nx[k] = Math.round(Math.max(0, cur[k]) * (1 + g / 100)); }
+      if (monthlyAdd > 0 && addLayer && Object.prototype.hasOwnProperty.call(nx, addLayer)) nx[addLayer] += monthlyAdd * 12;
+      cur = nx; rows.push({ year: y, by: { ...cur }, total: keys.reduce((s, k) => s + cur[k], 0) });
+    }
+    return rows;
+  },
+  /** Dòng tiền thụ động theo năm dương lịch, theo loại, từ lịch đã ghi. rollover: coi như tái tục khi đáo hạn (cùng lãi suất). */
+  income(items, today, years = 5, rollover = false) {
+    const y0 = Number(today.slice(0, 4)); const to = `${y0 + years - 1}-12-31`;
+    const its = (items || []).map(it => (rollover && it.maturity ? { ...it, maturity: '' } : it));
+    const sc = Income.schedule(its, today, to);
+    const TYPE = { account: 'Lãi tiền gửi', asset: 'Trái tức / tiền thuê', holding: 'Cổ tức' };
+    const out = []; for (let i = 0; i < years; i++) out.push({ year: y0 + i, total: 0, by: {} });
+    for (const e of sc.events) {
+      if (e.type !== 'income') continue; const it = its.find(x => x.key === e.key); const t = TYPE[it ? it.kind : ''] || 'Khác';
+      const row = out[Number(e.date.slice(0, 4)) - y0]; if (!row) continue; row.by[t] = (row.by[t] || 0) + e.amount; row.total += e.amount;
+    }
+    return { rows: out, missing: sc.missing.length, types: Object.values(TYPE) };
+  }
+};
+
+/* ==========================================================================
    NHẬT KÝ QUYẾT ĐỊNH (v1.8) — app CHỈ đối chiếu với nguyên tắc người dùng tự đặt
    và ghi lại sự thật tại thời điểm quyết định. Không chặn, không khuyến nghị.
    ========================================================================== */
@@ -2885,7 +3184,7 @@ const Decisions = {
         const stale = target.valStale ? ' · định giá cần cập nhật' : '';
         const mos = (target.fair - price) / target.fair * 100;
         if (kind === 'buy') {
-          const lim = target.buyBelow > 0 ? target.buyBelow : target.fair; const nm = target.buyBelow > 0 ? 'vùng mua' : 'giá trị hợp lý';
+          const lim = target.buyBelow > 0 ? target.buyBelow : target.fair; const nm = target.buyBelow > 0 ? 'ngưỡng mua' : 'giá trị hợp lý';
           out.push({ id: 'val', status: price > lim ? 'out' : 'ok', label: `Giá so với ${nm} của bạn`, detail: `Giá ${this.vnd(price)} ${price > lim ? 'cao hơn' : 'không cao hơn'} ${nm} ${this.vnd(lim)} · biên an toàn ${this.pc(mos)}${stale}` });
         } else out.push({ id: 'val', status: 'info', label: 'Giá so với giá trị hợp lý của bạn', detail: `Giá ${this.vnd(price)} · giá trị hợp lý ${this.vnd(target.fair)} · biên an toàn ${this.pc(mos)}${stale}` });
       }
@@ -2894,6 +3193,17 @@ const Decisions = {
         out.push(ey === null ? { id: 'hurdle', status: 'nodata', label: `Lợi suất lợi nhuận ≥ mốc ${plan.hurdle}% của bạn`, detail: 'Chưa có EPS của mã này.' }
           : { id: 'hurdle', status: ey + 1e-9 >= plan.hurdle ? 'ok' : 'out', label: `Lợi suất lợi nhuận ≥ mốc ${plan.hurdle}% của bạn`, detail: `EPS/giá = ${this.pc(ey)} (P/E ${(Math.round(price / target.eps * 10) / 10).toLocaleString('vi-VN')})` });
       }
+    }
+    for (const hx of target.hist || []) {
+      const st = hx.stats; if (!st || !(kind === 'buy' || kind === 'sell')) continue;
+      const f = x => (Math.round(x * 100) / 100).toLocaleString('vi-VN');
+      const zt = { below: 'dưới vùng ±1 độ lệch chuẩn', inside: 'trong vùng ±1 độ lệch chuẩn', above: 'trên vùng ±1 độ lệch chuẩn', na: 'chưa đủ số để tính độ lệch' }[st.zone];
+      out.push({ id: 'hist_' + hx.kind, status: 'info', label: `${hx.label} so với lịch sử của chính mã`, detail: `${hx.label} ${st.liveUsed ? 'hôm nay' : 'quý gần nhất'} ${f(st.current)} — ${zt} của ${st.nWin} quý gần nhất (${f(st.lo)}–${f(st.hi)}); thấp hơn ${Math.round(st.cheaperThan)}% số quý từ ${Metrics.qLabel(st.from)}` });
+    }
+    const sec = target.sector;
+    if (sec && (kind === 'buy' || kind === 'sell' || kind === 'hold')) {
+      const parts = [sec.cycle ? `chu kỳ ${SECTOR_CYCLES[sec.cycle]}` : '', sec.view ? `quan điểm trong báo cáo: ${SECTOR_VIEWS[sec.view]}${sec.horizon ? ' · ' + sec.horizon : ''}` : ''].filter(Boolean).join('; ');
+      out.push({ id: 'sector', status: sec.due ? 'nodata' : 'info', label: `Hồ sơ ngành của bạn: ${sec.name}`, detail: `${parts || 'chưa ghi chu kỳ/quan điểm'} — báo cáo ngày ${sec.asOf ? DateUtil.toVN(sec.asOf) : '—'}${sec.due ? ' · đã quá hạn xem lại, nên cập nhật trước khi dựa vào' : ''}` });
     }
     return out;
   },
@@ -3012,6 +3322,24 @@ const Brief = {
     if (rc.length) {
       L.push('## Đổi nguyên tắc gần đây');
       for (const r of rc) L.push(`- ${this.date(r.date)}: ${r.changes.map(c => `${this.safe(c.label)}${c.from || c.to ? ` (${this.safe(c.from || '—')} → ${this.safe(c.to || '—')})` : ''}`).join('; ')}${N && r.reason ? ` — lý do: ${this.safe(r.reason)}` : ''}`);
+      L.push('');
+    }
+    const ms = s.metrics || [];
+    if (ms.length) {
+      L.push('## Lịch sử định giá theo quý (số tôi dán vào, nguồn ghi kèm)');
+      const f = x => (Math.round(x * 100) / 100).toLocaleString('vi-VN');
+      for (const m of ms) L.push(`- ${this.safe(m.symbol)} ${this.safe(m.label)}: ${m.liveUsed ? 'hôm nay' : 'quý gần nhất'} ${f(m.current)} · TB ${m.nWin} quý ${f(m.mean)} ± ${f(m.sd)} · thấp hơn ${Math.round(m.cheaperThan)}% số quý từ ${this.safe(m.from)} · min ${f(m.min)} / max ${f(m.max)}${m.bench ? ` · ngành ${f(m.bench)}` : ''} (nguồn: ${this.safe(m.source || 'không ghi')}, lấy ngày ${this.date(m.asOf)})`);
+      for (const g of s.growth || []) L.push(`- ${this.safe(g.symbol)} kết quả kinh doanh 4 quý gần nhất (đến ${this.safe(g.to)}) so với 4 quý trước: doanh thu ${Number.isFinite(g.rev) ? (g.rev > 0 ? '+' : '') + this.pct(g.rev) : '—'}, LNST ${Number.isFinite(g.np) ? (g.np > 0 ? '+' : '') + this.pct(g.np) : '—'}`);
+      L.push('');
+    }
+    const sc = s.sectors || [];
+    if (sc.length) {
+      L.push('## Hồ sơ ngành (nghiên cứu của tôi, không phải khuyến nghị của app)');
+      for (const x of sc) {
+        L.push(`- ${this.safe(x.name)}: ${x.cycle ? 'chu kỳ ' + this.safe(SECTOR_CYCLES[x.cycle]) : 'chưa ghi chu kỳ'}${x.view ? ' · quan điểm trong báo cáo: ' + this.safe(SECTOR_VIEWS[x.view]) + (x.horizon ? ' (' + this.safe(x.horizon) + ')' : '') : ''} · báo cáo ngày ${this.date(x.asOf)}${x.due ? ' · ĐÃ QUÁ HẠN xem lại' : ''}${x.mine.length ? ` · mã của tôi: ${x.mine.map(m => this.safe(m)).join(', ')}${Number.isFinite(x.weight) ? ` (${this.pct(x.weight)} danh mục)` : ''}` : ''}`);
+        if (x.kpis.length) L.push(`  - KPI theo dõi: ${x.kpis.map(k => this.safe(k)).join('; ')}`);
+        if (x.flags.length) L.push(`  - Cờ đỏ: ${x.flags.map(k => this.safe(k)).join('; ')}`);
+      }
       L.push('');
     }
     L.push('---');
@@ -3633,10 +3961,32 @@ const BriefData = {
       income: { year: L.income.year, items: L.income.items, expectedYear: L.income.expectedYear, expectedYearPct: a.base > 0 ? L.income.expectedYear / a.base * 100 : null, receivedYTD: L.income.receivedYTD,
         receivedVsExpected: L.income.expectedToDate > 0 ? L.income.receivedYTD / L.income.expectedToDate * 100 : null, upcoming: L.income.upcoming.length, maturities: L.income.maturities.length, missing: L.income.missing.length },
       decisions: (st.decisions || []).filter(d => d.status === 'open' && d.kind !== 'rule').sort((x, y) => (x.date < y.date ? 1 : -1)).slice(0, 15).map(d => { const c = Decisions.count(d.checks); return { date: d.date, kindLabel: DECISION_KINDS[d.kind], symbol: d.symbol, reviewDate: d.reviewDate, due: !!d.reviewDate && d.reviewDate <= today, out: c.out, nodata: c.nodata, thesis: d.thesis, wrongIf: d.wrongIf }; }),
+      metrics: (st.metrics || []).filter(m => m.kind !== 'fin').map(m => { const x = MetricData.stats(st, m); return x ? { symbol: m.symbol, label: METRIC_KINDS[m.kind].label, current: x.current, liveUsed: x.liveUsed, mean: x.mean, sd: x.sd, nWin: x.nWin, cheaperThan: x.cheaperThan, from: Metrics.qLabel(x.from), min: x.min.v, max: x.max.v, bench: x.benchLast ? x.benchLast.b : null, source: m.source, asOf: m.asOf } : null; }).filter(Boolean),
+      sectors: (() => { const w = new Map(SectorData.weights(st).map(x => [x.id, x.pct])); const due = new Set(Sectors.due(st.sectors || [], today).map(x => x.id)); return (st.sectors || []).map(x => ({ name: x.name, cycle: x.cycle, view: x.view, horizon: x.horizon, asOf: x.asOf, due: due.has(x.id), mine: SectorData.symbolsOf(st, x.id), weight: w.get(x.id), kpis: x.kpis.map(k => k.name), flags: x.flags })); })(),
+      growth: (st.metrics || []).filter(m => m.kind === 'fin').map(m => { const g = Metrics.growth(m.points).filter(x => x.rev !== null || x.np !== null).slice(-1)[0]; return g ? { symbol: m.symbol, to: Metrics.qLabel(g.p), rev: g.rev, np: g.np } : null; }).filter(Boolean),
       ruleChanges: (st.decisions || []).filter(d => d.kind === 'rule').sort((x, y) => ((x.createdAt || x.date) < (y.createdAt || y.date) ? 1 : -1)).slice(0, 5).map(d => ({ date: d.date, changes: d.changes, reason: d.thesis }))
     };
   },
   build(st, opts) { return Brief.render(this.collect(st), opts); }
+};
+
+/* --------------------------- Phân tích mã: lấy chuỗi số & thống kê với giá hiện tại --------------------------- */
+const MetricData = {
+  id(symbol, kind) { return `met_${String(symbol).toUpperCase()}_${kind}`; },
+  get(st, symbol, kind) { return (st.metrics || []).find(m => m.id === this.id(symbol, kind)) || null; },
+  price(st, symbol) { const g = LayerData.build(st).sym.get(symbol); return g && g.price ? g.price : null; },
+  /** perShare: BVPS (P/B) hoặc EPS (P/E). Với P/E, nếu khối không có EPS thì dùng EPS bạn nhập ở mã. */
+  perShare(st, m) { if (m.perShare) return m.perShare; if (m.kind === 'pe') { const h = (st.holdings || []).find(x => x.symbol === m.symbol && x.eps); return h ? h.eps : null; } return null; },
+  stats(st, m, price) { const px = price === undefined ? this.price(st, m.symbol) : price; return Metrics.stats(m.points, Metrics.live(m.kind, px, this.perShare(st, m))); },
+  symbols(st) { return Array.from(new Set((st.holdings || []).filter(x => x.qty > 0).map(x => x.symbol).concat((st.metrics || []).map(m => m.symbol)))).sort(); }
+};
+
+/* --------------------------- Hồ sơ ngành: gắn mã, tỷ trọng theo ngành --------------------------- */
+const SectorData = {
+  /** Ngành của một mã (gộp mọi tài khoản): lấy theo bản ghi đầu tiên có gắn ngành. */
+  sectorOf(st, symbol) { const h = (st.holdings || []).find(x => x.symbol === symbol && x.sector); return h ? (st.sectors || []).find(s => s.id === h.sector) || null : null; },
+  symbolsOf(st, id) { return Array.from(new Set((st.holdings || []).filter(x => x.sector === id && x.qty > 0).map(x => x.symbol))).sort(); },
+  weights(st) { const ids = new Set((st.sectors || []).map(s => s.id)); return Sectors.weights(Holdings.rows(st).filter(r => r.holding.qty > 0).map(r => ({ sector: ids.has(r.holding.sector) ? r.holding.sector : '', value: r.value }))); }
 };
 
 /* --------------------------- Nhật ký quyết định: dựng đầu vào đối chiếu từ dữ liệu --------------------------- */
@@ -3652,7 +4002,9 @@ const DecisionData = {
     const rec = g ? g.rec : (st.holdings || []).find(x => x.symbol === sym) || null;
     const today = DateUtil.today(); const val = rec ? Portfolio.valuation(rec, g ? g.price : null, today) : null;
     const target = { symbol: sym, layer: Layers.resolve('holding', rec || {}, {}).layer, cashflow: !!(rec && rec.incomeRate > 0), value: g ? g.value : 0, pfTotal: Holdings.total(st),
-      lossPct: g ? g.lossPct : null, fair: rec && rec.fairValue ? rec.fairValue : null, buyBelow: rec && rec.buyBelow ? rec.buyBelow : null, valStale: !!(val && val.stale), eps: rec ? rec.eps : null, targetPct: rec ? rec.targetPct : null, price: g ? g.price : null };
+      lossPct: g ? g.lossPct : null, fair: rec && rec.fairValue ? rec.fairValue : null, buyBelow: rec && rec.buyBelow ? rec.buyBelow : null, valStale: !!(val && val.stale), eps: rec ? rec.eps : null, targetPct: rec ? rec.targetPct : null, price: g ? g.price : null,
+      sector: (() => { const sx = SectorData.sectorOf(st, sym); return sx ? { name: sx.name, cycle: sx.cycle, view: sx.view, horizon: sx.horizon, asOf: sx.asOf, due: Sectors.due([sx], today).length > 0 } : null; })(),
+      hist: ['pb', 'pe'].map(k => { const m = MetricData.get(st, sym, k); const px = Number.isSafeInteger(draft.price) && draft.price > 0 ? draft.price : (g ? g.price : null); return m ? { kind: k, label: METRIC_KINDS[k].label, stats: MetricData.stats(st, m, px) } : null; }).filter(Boolean) };
     const ref = draft.fromRef || 'new'; const it = ref === 'new' ? null : L.items.find(i => i.key === ref);
     const source = it ? { layer: it.layer, cashflow: !!it.cashflow, newMoney: false, name: it.name } : { layer: '', cashflow: false, newMoney: true, name: 'Tiền mới (chưa có trong FinPilot)' };
     return { agg: L.agg, plan: L.plan, spend: L.spend, draft: { kind: draft.kind, amount: draft.amount, price: draft.price }, target, source };
@@ -4235,7 +4587,7 @@ const Charts = {
     const dec = Math.min(3, Math.max(0, Math.ceil(-Math.log10(step / unit) - 1e-9)));
     return v => (v < 0 ? '−' : '') + (Math.abs(v) / unit).toLocaleString('vi-VN', { minimumFractionDigits: dec, maximumFractionDigits: dec }) + (v === 0 ? '' : suf);
   },
-  bars(container, { labels, series, height = 240, stacked = false, emptyText = null, tipLabels = null }) {
+  bars(container, { labels, series, height = 240, stacked = false, emptyText = null, tipLabels = null, fmt = null }) {
     const total = series.reduce((s, se) => s + se.values.reduce((a, v) => a + Math.abs(v || 0), 0), 0);
     if (!labels.length || total === 0) return this.empty(container, emptyText);
     const W = this.width(container), H = height, padL = 56, padR = 8, padT = 10, padB = 26;
@@ -4248,8 +4600,8 @@ const Charts = {
     const sc = this.niceScale(vmin, vmax, 4);
     const y = v => padT + ih - (v - sc.min) / (sc.max - sc.min) * ih;
     const svg = hs('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: 'chart-svg', role: 'img' });
-    const fa = this.axisFormatter(sc.ticks);
-    for (const t of sc.ticks) svg.append(hs('line', { x1: padL, x2: W - padR, y1: y(t), y2: y(t), class: 'grid-line' + (t === 0 ? ' zero' : '') }), hs('text', { x: padL - 7, y: y(t) + 4, 'text-anchor': 'end', class: 'axis-label money' }, fa(t)));
+    const fa = fmt ? fmt : this.axisFormatter(sc.ticks);
+    for (const t of sc.ticks) svg.append(hs('line', { x1: padL, x2: W - padR, y1: y(t), y2: y(t), class: 'grid-line' + (t === 0 ? ' zero' : '') }), hs('text', { x: padL - 7, y: y(t) + 4, 'text-anchor': 'end', class: 'axis-label' + (fmt ? '' : ' money') }, fa(t)));
     const n = labels.length, band = iw / n, groupW = Math.min(band * 0.74, 64), barW = stacked ? groupW : groupW / series.length;
     const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(iw / 52))));
     labels.forEach((lab, i) => {
@@ -4263,7 +4615,7 @@ const Charts = {
         svg.append(hs('rect', { x: x + 1, y: yTop, width: Math.max(barW - 2, 1.5), height: Math.max(yBot - yTop, 1), rx: Math.min(3, barW / 4), style: `fill:${color}` }));
       });
       if (i % every === 0) svg.append(hs('text', { x: padL + band * i + band / 2, y: H - 8, 'text-anchor': 'middle', class: 'axis-label' }, lab));
-      const tip = [(tipLabels ? tipLabels[i] : lab)].concat(series.map(se => `${se.name}: ${Money.format(se.values[i] || 0)}`)).join('\n');
+      const tip = [(tipLabels ? tipLabels[i] : lab)].concat(series.map(se => `${se.name}: ${(fmt || (v => Money.format(v)))(se.values[i] || 0)}`)).join('\n');
       const r = hs('rect', { x: padL + band * i, y: padT, width: band, height: ih, class: 'band' }); r.dataset.tip = tip; svg.append(r);
     });
     container.replaceChildren(svg, series.length > 1 || series[0].legend ? this.legend(series) : '');
@@ -4478,7 +4830,9 @@ const Forms = {
     const grid = h('div', { class: 'form-grid' });
     const seg = h('div', { class: 'segmented', role: 'tablist', 'aria-label': 'Loại giao dịch' });
     const types = ['expense', 'income', 'transfer', 'debt_payment', 'borrow', 'adjustment'];
-    const renderSeg = () => seg.replaceChildren(...types.map(k => h('button', { type: 'button', class: 'seg-btn' + (k === type ? ' active' : ''), role: 'tab', 'aria-selected': String(k === type), onclick: () => { if (k === type) return; this.captureRaw(form, raw); type = k; renderSeg(); this.txnFields(grid, type, raw, { original: txn }); } }, TXN_TYPES[k].label)));
+    const canTrade = !editing && typeof Pages !== 'undefined' && Pages.tradeForm && st.accounts.some(a => a.active && a.type === 'investment');
+    const tradeTab = canTrade ? h('button', { type: 'button', class: 'seg-btn seg-link', 'data-trade': '1', title: 'Ghi lệnh mua/bán cổ phiếu (mở form riêng)', onclick: () => { m.close(); Pages.tradeForm(); } }, 'Mua/bán CK') : null;
+    const renderSeg = () => seg.replaceChildren(...types.map(k => h('button', { type: 'button', class: 'seg-btn' + (k === type ? ' active' : ''), role: 'tab', 'aria-selected': String(k === type), onclick: () => { if (k === type) return; this.captureRaw(form, raw); type = k; renderSeg(); this.txnFields(grid, type, raw, { original: txn }); } }, TXN_TYPES[k].label)), ...(tradeTab ? [tradeTab] : []));
     renderSeg();
     const fe = F.formError();
     if (txn && txn.recurringId) form.append(C.callout('repeat', 'Giao dịch được tạo từ lịch định kỳ. Sửa ở đây chỉ thay đổi giao dịch này.'), h('div', { style: { height: '10px' } }));
@@ -4988,17 +5342,20 @@ Pages.dashboard = function (view) {
   const due = Recurring.due(st);
   if (due.length) view.append(h('div', { class: 'banner warn' }, Icon('repeat'), h('div', { class: 'b-body' }, h('div', { class: 'b-title', text: `${due.length} giao dịch định kỳ đến hạn chờ xác nhận` }), h('div', { class: 'small', text: due.slice(0, 3).map(d => `${DateUtil.shortVN(d.date)} · ${d.rule.name}`).join(' — ') + (due.length > 3 ? '…' : '') })), h('a', { class: 'btn btn-sm', href: '#/recurring' }, 'Xem & xác nhận')));
 
-  const hero = Pages.disciplineHero ? Pages.disciplineHero(st) : null; if (hero) view.append(hero);
-  const setup = Pages.setupCard ? Pages.setupCard(st) : null; if (setup) view.append(h('div', { class: 'mb-12' }, setup));
-  const jdue = Decisions.due(st.decisions || [], DateUtil.today());
-  if (jdue.length) view.append(h('div', { class: 'mb-12' }, C.callout('clock', h('span', {}, `${jdue.length} quyết định đến hạn xem lại (${jdue.slice(0, 3).map(d => (DECISION_KINDS[d.kind] + ' ' + (d.symbol || '')).trim()).join(', ')}${jdue.length > 3 ? '…' : ''}). `, h('a', { href: '#/journal' }, 'Đọc lại lý do & ghi kết quả →')))));
   view.append(C.sectionTitle('Hiện tại', `tính đến ${DateUtil.toVN(cur.asOf)}`));
   view.append(h('div', { class: 'kpi-grid' },
     C.kpi({ label: 'Tài sản ròng', value: C.money(cur.netWorth), sub: 'Tổng tài sản − Tổng nợ', icon: 'shield', featured: true }),
-    C.kpi({ label: 'Tổng số dư tài khoản', value: C.money(cur.cash), sub: `${st.accounts.filter(a => a.active).length} tài khoản đang dùng`, icon: 'wallet' }),
-    C.kpi({ label: 'Tổng tài sản', value: C.money(cur.totalAssets), sub: `Tài khoản ${Money.compact(cur.cash)} + tài sản khác ${Money.compact(cur.otherAssets)}`, icon: 'building' }),
+    C.kpi({ label: 'Tiền trong tài khoản', value: C.money(cur.cash), sub: `${st.accounts.filter(a => a.active).length} tài khoản đang dùng${cur.portfolio ? ' · chưa gồm cổ phiếu' : ''}`, icon: 'wallet' }),
+    C.kpi({ label: 'Tổng tài sản', value: C.money(cur.totalAssets), sub: `Tiền ${Money.compact(cur.cash)}${cur.portfolio ? ` + cổ phiếu ${Money.compact(cur.portfolio)}` : ''} + tài sản khác ${Money.compact(cur.otherAssets - (cur.portfolio || 0))}`, icon: 'building' }),
     C.kpi({ label: 'Tổng nợ phải trả', value: C.money(cur.liabilities), sub: `${st.debts.filter(d => (cur.debtBalances.get(d.id) || 0) > 0).length} khoản còn dư nợ`, icon: 'coins', tone: cur.liabilities > 0 ? 'red' : '' })));
 
+  const fr = Pages.freshness ? Pages.freshness(st) : null; if (fr) view.append(fr);
+  const sdue = (st.sectors || []).length ? Sectors.due(st.sectors, DateUtil.today()) : [];
+  if (sdue.length) view.append(h('div', { class: 'mb-12' }, C.callout('clock', h('span', {}, `Hồ sơ ngành đến hạn xem lại: ${sdue.map(s => s.name).join(', ')}. `, h('a', { href: '#/portfolio' }, 'Cập nhật với Claude →')))));
+  const jdue = Decisions.due(st.decisions || [], DateUtil.today());
+  if (jdue.length) view.append(h('div', { class: 'mb-12' }, C.callout('clock', h('span', {}, `${jdue.length} quyết định đến hạn xem lại (${jdue.slice(0, 3).map(d => (DECISION_KINDS[d.kind] + ' ' + (d.symbol || '')).trim()).join(', ')}${jdue.length > 3 ? '…' : ''}). `, h('a', { href: '#/journal' }, 'Đọc lại lý do & ghi kết quả →')))));
+  const hero = Pages.disciplineHero ? Pages.disciplineHero(st) : null; if (hero) view.append(hero);
+  const setup = Pages.setupCard ? Pages.setupCard(st) : null; if (setup) view.append(h('div', { class: 'mb-12' }, setup));
   view.append(C.sectionTitle('Trong kỳ', p.label));
   const bm = DateUtil.monthKey(p.to < today ? p.to : (p.from > today ? p.from : today));
   const bu = Budget.usage(st, bm);
@@ -5161,7 +5518,7 @@ Pages.accounts = function (view) {
   view.append(C.pageHead('Tài khoản & số dư', 'Số dư hiện tại = số dư ban đầu + biến động trong sổ giao dịch (tính đến hôm nay). Muốn khớp số dư thực tế, dùng "Điều chỉnh số dư".', [C.btn('Thêm tài khoản', () => Forms.openAccount(), { icon: 'plus', cls: 'btn-primary' })]));
   if (!st.accounts.length) { view.append(C.card(null, C.empty('wallet', 'Chưa có tài khoản', 'Tạo tài khoản tiền mặt, ngân hàng, ví điện tử, tiết kiệm hoặc đầu tư.', [C.btn('Tạo tài khoản', () => Forms.openAccount(), { cls: 'btn-primary', icon: 'plus' })]))); return; }
   view.append(h('div', { class: 'kpi-grid mb-12' },
-    C.kpi({ label: 'Tổng số dư', value: C.money(cur.cash), icon: 'wallet', featured: true, sub: `${st.accounts.length} tài khoản${cur.portfolio ? ` · chưa gồm cổ phiếu ${Money.compact(cur.portfolio)}` : ''}` }),
+    C.kpi({ label: cur.portfolio ? 'Tổng giá trị tài khoản' : 'Tổng số dư', value: C.money(cur.cash + (cur.portfolio || 0)), icon: 'wallet', featured: true, sub: cur.portfolio ? `Tiền ${Money.compact(cur.cash)} + cổ phiếu ${Money.compact(cur.portfolio)} · ${st.accounts.length} tài khoản` : `${st.accounts.length} tài khoản` }),
     C.kpi({ label: 'Thanh khoản', value: C.money(cur.liquid), icon: 'coins', sub: 'Tiền mặt, ngân hàng, ví, tiết kiệm' }),
     C.kpi({ label: 'Tài khoản đầu tư', value: C.money((cur.byType.investment || 0) + (cur.portfolio || 0)), icon: 'trendUp', sub: cur.portfolio ? `Tiền mặt ${Money.compact(cur.byType.investment || 0)} · cổ phiếu ${Money.compact(cur.portfolio)}` : null }),
     C.kpi({ label: 'Khác', value: C.money(cur.byType.other || 0), icon: 'more' })));
@@ -6349,7 +6706,7 @@ Pages.portfolio = function (view) {
     C.kpi({ label: 'Lãi/lỗ so với giá vốn', value: cost ? C.money(pnl, { sign: true, tone: 'auto' }) : '—', sub: cost ? `Giá vốn ${Money.compact(cost)} · chưa gồm phí, thuế` : 'Nhập giá vốn để theo dõi', icon: 'trendUp' }),
     C.kpi({ label: 'Nguồn giá', value: on ? 'Đang bật' : 'Tắt', sub: on ? (fetched ? 'Lần lấy gần nhất ' + DateUtil.dateTimeVN(fetched) : 'Chưa lấy giá') : 'Đang dùng giá nhập tay / giá vốn', icon: on ? 'cloud' : 'cloudOff' }),
     vt.n ? C.kpi({ label: 'So với định giá của bạn', value: `${Util.fmtPct(vt.ratio * 100, 0)} giá trị hợp lý`, sub: `${vt.n} mã · thị trường ${Money.compact(vt.market)} / định giá ${Money.compact(vt.fair)}${vt.stale ? ` · ${vt.stale} định giá cần cập nhật` : ''}`, icon: 'target' }) : null));
-  if (!rows.length) { view.append(C.card(null, C.empty('layers', 'Chưa có mã nào', 'Dán từ app công ty chứng khoán: mỗi dòng "MÃ KHỐI_LƯỢNG GIÁ_VỐN", VD: FPT 1000 95.5', [C.btn('Dán / thêm danh mục', () => Pages.holdingPaste(), { icon: 'plus', cls: 'btn-primary' })]))); return; }
+  if (!rows.length) { view.append(C.card(null, C.empty('layers', 'Chưa có mã nào', 'Dán từ app công ty chứng khoán: mỗi dòng "MÃ KHỐI_LƯỢNG GIÁ_VỐN", VD: FPT 1000 95.5', [C.btn('Dán / thêm danh mục', () => Pages.holdingPaste(), { icon: 'plus', cls: 'btn-primary' })]))); view.append(h('div', { class: 'mt-16' }, Pages.analysisCard(st))); return; }
   const drift = Portfolio.drift(rows.map(r => ({ key: r.holding.id, value: r.value, targetPct: r.holding.targetPct })));
   const dmap = new Map(drift.map(d => [d.key, d])); const anyTarget = drift.some(d => d.target !== null);
   const allFresh = rows.every(r => r.fresh === 'fresh' || r.fresh === 'manual' || r.fresh === 'cost' || r.holding.qty === 0);
@@ -6365,8 +6722,10 @@ Pages.portfolio = function (view) {
         h('td', { class: 'num', dataset: { label: 'Lãi/lỗ' } }, r.pnl === null ? '—' : C.money(r.pnl, { sign: true, tone: 'auto' })),
         anyTarget ? h('td', { class: 'num', dataset: { label: 'Tỷ trọng' } }, `${Util.fmtPct(d.actual, 1)}${d.target !== null ? ' / ' + Util.fmtPct(d.target, 1) : ''}`, d.flag && allFresh ? h('div', { class: 'tiny warn-text', text: `lệch ${d.diff > 0 ? '+' : ''}${d.diff.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} điểm %` }) : null) : null,
         anyVal ? h('td', { class: 'num', dataset: { label: 'Định giá của bạn' } }, Pages.valCell(r)) : null,
-        h('td', { class: 'actions' }, C.iconBtn('book', 'Ghi quyết định cho mã này', () => Pages.decisionForm({ symbol: r.holding.symbol })), C.iconBtn('plus', 'Ghi lệnh mua', () => Pages.tradeForm({ accountId: r.holding.accountId, symbol: r.holding.symbol, side: 'buy' })), r.holding.qty > 0 ? C.iconBtn('trendDown', 'Ghi lệnh bán', () => Pages.tradeForm({ accountId: r.holding.accountId, symbol: r.holding.symbol, side: 'sell' })) : null, C.iconBtn('edit', 'Sửa', () => Pages.holdingEdit(r.holding)), C.iconBtn('trash', 'Xóa', () => Pages.holdingDelete(r.holding), 'danger')));
+        h('td', { class: 'actions' }, Pages.holdAct('plus', 'Ghi lệnh mua', 'Mua', () => Pages.tradeForm({ accountId: r.holding.accountId, symbol: r.holding.symbol, side: 'buy' })), r.holding.qty > 0 ? Pages.holdAct('trendDown', 'Ghi lệnh bán', 'Bán', () => Pages.tradeForm({ accountId: r.holding.accountId, symbol: r.holding.symbol, side: 'sell' })) : null, Pages.holdAct('book', 'Ghi quyết định cho mã này', 'Lý do', () => Pages.decisionForm({ symbol: r.holding.symbol })), Pages.holdAct('edit', 'Sửa', 'Sửa', () => Pages.holdingEdit(r.holding)), Pages.holdAct('trash', 'Xóa', 'Xóa', () => Pages.holdingDelete(r.holding), 'danger')));
     })))), { sub: 'Giá chỉ mang tính tham khảo, từ nguồn công khai không chính thức (có thể trễ/sai). Không phải khuyến nghị đầu tư.' + (anyVal ? ' Cột "Định giá của bạn" là số do chính bạn nhập — FinPilot không tự định giá và không khuyến nghị mua/bán.' : '') }));
+  view.append(h('div', { class: 'mt-16' }, Pages.sectorCard(st)));
+  view.append(h('div', { class: 'mt-16' }, Pages.analysisCard(st)));
   if (anyTarget) {
     const flagged = drift.filter(d => d.flag);
     view.append(C.card('Tỷ trọng', h('div', { class: 'small' }, !allFresh ? 'Có giá cũ — chưa đánh giá độ lệch. Hãy cập nhật giá.' : flagged.length ? `${flagged.length} mã đang lệch so với tỷ trọng bạn đặt (ngưỡng 5/25: 5 điểm % hoặc 25% của tỷ trọng mục tiêu). Cân nhắc dồn các kỳ đầu tư định kỳ tới vào phần đang thiếu tỷ trọng thay vì bán.` : 'Tỷ trọng đang nằm trong dải cho phép so với mục tiêu bạn đặt.'), { sub: 'Đây là so sánh với chính tỷ trọng bạn tự đặt — không phải lời khuyên mua/bán.' }));
@@ -6384,11 +6743,11 @@ Pages.valCell = function (r) {
   if (!v) return h('div', { class: 'val-cell' }, Pages.eyLine(r), h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => Pages.holdingEdit(r.holding) }, 'Thêm định giá'));
   const pct = x => Util.fmtPct(Math.abs(x) * 100, 1);
   const line = v.price === null ? 'Chưa có giá thị trường để so' : v.mos >= 0 ? `Biên an toàn ${pct(v.mos)}` : `Giá cao hơn định giá ${pct(v.price / v.fair - 1)}`;
-  const zone = { buy: C.badge('≤ vùng mua bạn đặt', 'green'), below: C.badge('Dưới giá trị hợp lý', 'blue'), above: C.badge('Trên giá trị hợp lý', 'amber') }[v.zone] || null;
+  const zone = { buy: C.badge('≤ ngưỡng mua bạn đặt', 'green'), below: C.badge('Dưới giá trị hợp lý', 'blue'), above: C.badge('Trên giá trị hợp lý', 'amber') }[v.zone] || null;
   const x = r.holding;
   return h('div', { class: 'val-cell' },
     h('div', { class: 'cell-main', text: Money.num(v.fair) }),
-    h('div', { class: 'tiny muted', text: line + (v.buyBelow ? ` · vùng mua ≤ ${Money.num(v.buyBelow)}` : '') }),
+    h('div', { class: 'tiny muted', text: line + (v.buyBelow ? ` · ngưỡng mua của bạn ≤ ${Money.num(v.buyBelow)}` : '') }),
     zone ? h('div', {}, zone) : null,
     Pages.eyLine(r),
     h('div', { class: 'tiny ' + (v.stale ? 'warn-text' : 'muted') }, (v.method ? Portfolio.VAL_METHODS[v.method] + ' · ' : '') + (x.valDate ? DateUtil.toVN(x.valDate) : 'chưa có ngày') + (v.stale ? ` — ${v.reason}, nên định giá lại` : ''),
@@ -6500,6 +6859,7 @@ Pages.holdingEdit = function (x) {
     F.field('Ngày định giá', F.date('valDate', x.valDate || (x.fairValue ? '' : DateUtil.today())), { name: 'valDate', hint: 'Báo "nên định giá lại" khi quá 180 ngày hoặc đã có BCTC quý mới.' }),
     F.field('Liên kết báo cáo (https://…)', F.input('valLink', x.valLink, { inputmode: 'url', placeholder: 'https://' }), { name: 'valLink', full: true }),
     F.field('Ghi chú định giá', F.textarea('valNote', x.valNote, { maxlength: 300 }), { name: 'valNote', full: true }),
+    F.field('Ngành (hồ sơ ngành của bạn)', F.select('sector', [{ value: '', label: (App.state.sectors || []).length ? '— Chưa gán —' : '— Chưa có hồ sơ ngành —' }].concat((App.state.sectors || []).map(s => ({ value: s.id, label: s.name }))), x.sector || ''), { name: 'sector', hint: 'Tạo hồ sơ ngành ở thẻ "Hồ sơ ngành của bạn" (trang Danh mục).' }),
     F.field('EPS 4 quý gần nhất (đ/cp)', F.input('eps', x.eps === null || x.eps === undefined ? '' : Money.num(x.eps), { inputmode: 'numeric', placeholder: 'VD: 3.300 (âm nếu lỗ)' }), { name: 'eps', hint: 'Lấy từ app CTCK của bạn. App tính lợi suất lợi nhuận = EPS / giá để so với mốc bạn đặt (nghịch đảo P/E).' }),
     inc.el), fe);
   let m;
@@ -6519,7 +6879,7 @@ Pages.holdingEdit = function (x) {
     if (Object.keys(errs).length) return F.showErrors(form, errs);
     const now = Util.nowISO();
     const rec = Model.holding({ ...x, qty, avgCost: ac.value, manualPrice: mp.value, manualPriceAt: mp.value && mp.value !== x.manualPrice ? now : x.manualPriceAt, targetPct: tp,
-      fairValue: fv.value, buyBelow: fv.value ? bb.value : null, valMethod: F.val(form, 'valMethod'), valDate: fv.value ? vd || '' : '', valLink: vl, valNote: F.val(form, 'valNote'), eps, ...ir.values, updatedAt: now });
+      fairValue: fv.value, buyBelow: fv.value ? bb.value : null, valMethod: F.val(form, 'valMethod'), valDate: fv.value ? vd || '' : '', valLink: vl, valNote: F.val(form, 'valNote'), eps, sector: F.val(form, 'sector'), ...ir.values, updatedAt: now });
     const ve = Validation.holding(rec, App.state, { strict: true }); const vk = ['fairValue', 'buyBelow', 'valDate'].filter(k => ve[k]);
     if (vk.length) return F.showErrors(form, Object.fromEntries(vk.map(k => [k, ve[k]])));
     try { await App.commit('Sửa danh mục', d => { const i = d.holdings.findIndex(y => y.id === x.id); if (i < 0) throw new AppError('Mã không còn tồn tại.'); d.holdings[i] = rec; }); m.close(); }
@@ -6533,6 +6893,9 @@ Pages.holdingDelete = async function (x) {
   if (!(await Modal.confirm({ title: `Xóa ${x.symbol} khỏi danh mục?`, message: 'Giá trị sẽ không còn được cộng vào tài sản ròng.', confirmText: 'Xóa', danger: true }))) return;
   try { await App.commit('Xóa mã', d => { d.holdings = d.holdings.filter(y => y.id !== x.id); }, { undoLabel: 'Đã xóa mã' }); Toast.show('Đã xóa ' + x.symbol, { type: 'success', action: { label: 'Hoàn tác', fn: () => App.undo() } }); } catch (e) { Toast.show(e.message, { type: 'error' }); }
 };
+
+/** v1.9.1 — nút thao tác trên thẻ mã: có chữ ngắn dưới icon (không phải đoán mũi tên = Bán). */
+Pages.holdAct = function (icon, label, short, onclick, cls = '') { return h('button', { class: 'icon-btn sm hold-act ' + cls, type: 'button', title: label, 'aria-label': label, onclick }, Icon(icon, 16), h('small', { 'aria-hidden': 'true', text: short })); };
 
 /* ==========================================================================
    QUỸ & LỚP TÀI SẢN (v1.4) — mỗi khoản tiền nằm ở đúng một lớp.
@@ -6603,6 +6966,7 @@ Pages.layers = function (view) {
   if (stale.length) V.append(C.card('Cập nhật nhanh', Pages.layerItemTable(stale, { showLayer: false, update: true }), { sub: 'Các khoản có số liệu cũ, cũ nhất trước. Vàng tính theo giá MUA vào; ngoại tệ theo tỷ giá mua của ngân hàng.' }));
 
   V.append(Pages.incomeCard(L));
+  const pjc = Pages.projectionCard(L); if (pjc) V.append(pjc);
 
   // Thu nhập thụ động
   const P = L.passive; const hasHold = (st.holdings || []).some(x => x.qty > 0);
@@ -6832,6 +7196,22 @@ Pages.setupCard = function (st) {
     C.btn('Ẩn', async () => { App.setPref('setupHidden', true); App.render(); Toast.show('Đã ẩn checklist trên thiết bị này. Hiện lại trong Sao lưu & dữ liệu.', { type: 'info' }); }, { cls: 'btn-sm btn-ghost btn-touch' })) });
 };
 
+/** v1.9.1 — Dòng "độ tươi dữ liệu" ngay dưới Hiện tại: đồng bộ/sao lưu lần cuối và ngày cập nhật tài sản nhập tay. */
+Pages.freshness = function (st) {
+  const today = DateUtil.today(); const ago = iso => { if (!iso) return null; const d = DateUtil.diffDays(DateUtil.isoDateVN(iso), today); return d <= 0 ? 'hôm nay' : `${d} ngày trước`; };
+  const age = iso => iso ? DateUtil.diffDays(DateUtil.isoDateVN(iso), today) : Infinity;
+  const items = []; let warn = false;
+  const sync = typeof SyncService !== 'undefined' && SyncService.isEnabled();
+  if (sync) { const last = SyncService.cfg.lastSyncAt; const a = age(last); if (a > 7) warn = true; items.push(h('span', { class: a > 7 ? 'neg' : '' }, 'Đồng bộ Drive: ', h('b', {}, ago(last) || 'chưa có'))); }
+  else { const last = App.prefs.lastBackupAt; const a = age(last); if (a > 30) warn = true; items.push(h('span', { class: a > 30 ? 'neg' : '' }, 'Sao lưu: ', h('b', {}, last ? ago(last) : 'chưa có'), a > 30 ? ' — ' : '', a > 30 ? h('a', { href: '#/data' }, 'sao lưu ngay') : '')); }
+  let oldest = null;
+  for (const as of st.assets || []) { const l = Ledger.assetLatest(as); if (!l || !(l.value > 0)) continue; if (!oldest || l.date < oldest) oldest = l.date; }
+  if (oldest) { const d = DateUtil.diffDays(oldest, today); const stale = d > 90; if (stale) warn = true; items.push(h('span', { class: stale ? 'neg' : '' }, 'Tài sản nhập tay cập nhật: ', h('b', {}, DateUtil.toVN(oldest)), stale ? ' — ' : '', stale ? h('a', { href: '#/assets' }, 'định giá lại') : '')); }
+  if (!items.length) return null;
+  const out = []; items.forEach((x, i) => { if (i) out.push(h('span', { class: 'muted', 'aria-hidden': 'true', text: ' · ' })); out.push(x); });
+  return h('div', { class: 'fresh-line small' + (warn ? ' warn' : '') }, Icon(warn ? 'alert' : 'clock', 14), h('span', {}, ...out));
+};
+
 /* ==========================================================================
    NHẬT KÝ QUYẾT ĐỊNH (v1.8) — ghi VÌ SAO trước khi làm; app đối chiếu với nguyên tắc
    CỦA BẠN và lưu lại sự thật lúc đó. Không chặn, không khuyến nghị, không đặt lệnh.
@@ -7021,12 +7401,24 @@ Pages.decisionClose = function (d) {
   m = Modal.open({ title: 'Xem lại quyết định', body: form, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), d.status === 'open' ? h('button', { class: 'btn', type: 'button', onclick: () => save('snooze') }, 'Dời hẹn') : null, h('button', { class: 'btn btn-primary', type: 'submit', form: 'decc-form' }, d.status === 'open' ? 'Đóng & lưu kết quả' : 'Lưu')].filter(Boolean) });
 };
 
+/** Mẫu cách viết nguyên tắc — trung lập, để người dùng tự sửa con số theo khẩu vị. */
+Pages.PRINCIPLE_SAMPLES = [
+  'Giữ quỹ dự phòng [số] tháng chi tiêu ở nơi rút được ngay; không dùng quỹ này để đầu tư.',
+  'Tài sản sinh dòng tiền (tiền gửi, trái phiếu, cổ phiếu trả cổ tức tiền) chiếm ít nhất [số]% tài sản.',
+  'Không vay ký quỹ (margin) và không vay để đầu tư.',
+  'Mỗi mã không quá [số]% danh mục; mỗi ngành không quá [số]%.',
+  'Chỉ mua khi giá dưới vùng mua tôi đã tự định giá; ghi lý do vào Nhật ký trước khi đặt lệnh.',
+  'Khi một mã lỗ quá [số]% giá vốn, đọc lại lý do mua trong Nhật ký trước khi quyết định giữ hay bán.',
+  'Không mua bán theo tin đồn hoặc lời mời gọi; chờ đọc báo cáo tài chính.',
+  'Mỗi quý xem lại danh mục và các nguyên tắc này một lần.'
+];
 /** Nguyên tắc viết tay: mỗi dòng một nguyên tắc; đổi phải kèm lý do (ghi vào nhật ký). */
 Pages.principlesForm = function () {
   const st = App.state; const old = st.settings.principles || [];
   const form = h('form', { novalidate: true, id: 'pr-form' }); const fe = F.formError();
   form.append(h('div', { class: 'form-grid' },
     F.field('Mỗi dòng một nguyên tắc (tối đa 30 dòng)', F.textarea('lines', old.map(p => p.text).join('\n'), { rows: 8, maxlength: 7500, placeholder: 'Không vay ký quỹ (margin)\nMỗi mã tối đa 25% danh mục\nChỉ mua khi giá dưới vùng mua tôi đã định giá\nKhông bán vì tin đồn — chờ đọc BCTC' }), { name: 'lines', full: true, hint: 'Viết bằng lời của bạn. Không ghi tên/số tài khoản. Các ngưỡng đo được (tỷ trọng, quỹ dự phòng, ngưỡng lỗ, mốc lợi suất) đặt ở trang Quỹ & lớp tài sản.' }),
+    h('div', { class: 'field full' }, C.btn('Chèn vài mẫu để sửa theo ý bạn', () => { const ta = form.elements.lines; const add = Pages.PRINCIPLE_SAMPLES.filter(x => !ta.value.includes(x)); ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + add.join('\n'); ta.focus(); }, { cls: 'btn-sm btn-ghost', icon: 'plus' }), h('div', { class: 'field-hint', text: 'Mẫu chỉ để gợi cách viết — sửa, xóa tùy bạn. Đây không phải lời khuyên đầu tư.' })),
     F.field('Vì sao thay đổi?', F.textarea('reason', '', { maxlength: 600, rows: 2 }), { name: 'reason', full: true, hint: 'Bắt buộc khi có thay đổi — lưu vào nhật ký.' })), fe);
   let m;
   form.addEventListener('submit', async e => {
@@ -7069,6 +7461,7 @@ Pages.incomeCard = function (L) {
   const tbl = (rows, head) => h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' }, h('thead', {}, h('tr', {}, h('th', {}, 'Ngày'), h('th', {}, 'Khoản'), h('th', { class: 'num' }, head))), h('tbody', {}, rows.map(row))));
   const items = L.items.filter(i => i.cashflow && i.value > 0);
   return C.card('Lịch dòng tiền thụ động', h('div', { class: 'stack-16' },
+    Pages.incomeYears ? Pages.incomeYears(L) : null,
     h('div', { class: 'kpi-grid' },
       C.kpi({ label: `Dự kiến năm ${I.year}`, value: C.money(I.expectedYear), icon: 'calendar', sub: `Theo lịch ${I.items} khoản bạn ghi${I.missing.length ? ` · ${I.missing.length} khoản chưa có ngày trả` : ''}` }),
       C.kpi({ label: 'Đã nhận từ đầu năm', value: C.money(I.receivedYTD), icon: 'trendUp', sub: I.expectedToDate > 0 ? `Lịch dự kiến tới hôm nay: ${Money.compact(I.expectedToDate)}` : 'Giao dịch thu nhập thụ động đã ghi' }),
@@ -7126,7 +7519,7 @@ Pages.tradeForm = function (pre = {}) {
     const v = val(); const syms = (App.state.holdings || []).filter(x => x.accountId === v.acc && (v.side === 'buy' || x.qty > 0)).map(x => x.symbol);
     dl.replaceChildren(...syms.map(s => h('option', { value: s })));
     cashInfo.replaceChildren(h('span', { class: 'muted' }, 'Tiền mặt theo sổ: '), C.money(v.cash, { tone: v.cash < 0 ? 'neg' : '' }),
-      v.sym && v.held ? h('span', { class: 'muted', text: ` · đang có ${Money.num(v.held.qty)} ${v.sym}${v.held.avgCost ? ' @ ' + Money.num(v.held.avgCost) : ''}` }) : null);
+      v.sym && v.held ? h('span', { class: 'muted', text: ` · đang có ${Money.num(v.held.qty)} ${v.sym}${v.held.avgCost ? ' @ ' + Money.num(v.held.avgCost) : ''}` }) : '');
     const r = v.r; const rows = [];
     const line = (k, x, cls) => rows.push(h('div', { class: 'flex between' }, h('span', { class: 'muted', text: k }), typeof x === 'string' ? h('span', { class: cls || '', text: x }) : x));
     if (r.ok) {
@@ -7194,6 +7587,345 @@ Pages.tradeForm = function (pre = {}) {
 };
 
 /* ==========================================================================
+   PHÂN TÍCH MÃ (v1.9) — P/B, P/E (kèm ngành), doanh thu & LNST theo quý.
+   Nguồn: người dùng nhờ Claude (đã nối TCBS) lấy theo câu lệnh của app, rồi dán vào.
+   App chỉ kiểm tra, thống kê, vẽ và giúp đối chiếu — không tự lấy số, không khuyến nghị.
+   + DỰ PHÓNG 5 NĂM theo giả định của người dùng (tài sản theo lớp, dòng tiền thụ động).
+   ========================================================================== */
+const AN_COLORS = { main: 'var(--primary)', bench: 'var(--amber)', mean: 'var(--muted)', band: 'var(--primary-100)', rev: 'var(--l-defensive)', np: 'var(--green)', g1: 'var(--l-defensive)', g2: 'var(--green)' };
+const f2 = (x, d = 2) => (x === null || x === undefined || !Number.isFinite(x) ? '—' : x.toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: 0 }));
+
+/** Thang chia cho số lẻ (hệ số 0,8–1,6…): bước 1/2/2,5/5 × 10^k, giữ số thập phân. */
+Charts.decScale = function (min, max, count = 4) {
+  if (!(max > min)) { const c = Number.isFinite(min) ? min : 0; min = c - 1; max = c + 1; }
+  const raw = (max - min) / count; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const nr = raw / mag;
+  const step = (nr <= 1 ? 1 : nr <= 2 ? 2 : nr <= 2.5 ? 2.5 : nr <= 5 ? 5 : 10) * mag;
+  const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step; const ticks = [];
+  for (let v = lo, i = 0; v <= hi + step / 2 && i < 30; v += step, i++) ticks.push(Math.round(v * 1e6) / 1e6);
+  return { min: lo, max: hi, ticks };
+};
+/**
+ * Biểu đồ đường cho hệ số / phần trăm. series: [{ name, color, values (null = trống), dash }]
+ * band: { lo, hi } (vùng ±1σ) · hline: { v, label } (đường trung bình) · marker: { v, label } (giá trị hôm nay, vẽ ở cuối trục).
+ */
+Charts.ratio = function (container, { labels, series, band = null, hline = null, marker = null, fmt = v => f2(v), height = 240, emptyText = null }) {
+  const all = []; for (const se of series) for (const v of se.values) if (v !== null && Number.isFinite(v)) all.push(v);
+  if (band) all.push(band.lo, band.hi); if (hline) all.push(hline.v); if (marker) all.push(marker.v);
+  if (labels.length < 2 || !all.length) return this.empty(container, emptyText);
+  const W = this.width(container), H = height, padL = 46, padR = marker ? 54 : 12, padT = 12, padB = 26; const iw = W - padL - padR, ih = H - padT - padB;
+  let mn = Math.min(...all), mx = Math.max(...all); const pad = (mx - mn) * 0.08 || Math.abs(mx) * 0.1 || 1; mn -= pad; mx += pad; if (Math.min(...all) >= 0 && mn < 0) mn = 0;
+  const sc = this.decScale(mn, mx, 4); const n = labels.length;
+  const x = i => padL + i * iw / (n - 1); const y = v => padT + ih - (v - sc.min) / (sc.max - sc.min) * ih;
+  const svg = hs('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: 'chart-svg', role: 'img' });
+  for (const t of sc.ticks) svg.append(hs('line', { x1: padL, x2: W - padR, y1: y(t), y2: y(t), class: 'grid-line' + (t === 0 ? ' zero' : '') }), hs('text', { x: padL - 6, y: y(t) + 4, 'text-anchor': 'end', class: 'axis-label' }, fmt(t)));
+  if (band && Number.isFinite(band.lo) && Number.isFinite(band.hi)) svg.append(hs('rect', { x: padL, y: y(band.hi), width: iw, height: Math.max(1, y(band.lo) - y(band.hi)), style: `fill:${AN_COLORS.band};opacity:.55` }));
+  if (hline && Number.isFinite(hline.v)) { svg.append(hs('line', { x1: padL, x2: W - padR, y1: y(hline.v), y2: y(hline.v), style: `stroke:${AN_COLORS.mean};stroke-width:1.5;stroke-dasharray:5 4` })); svg.append(hs('text', { x: padL + 4, y: y(hline.v) - 4, class: 'axis-label' }, hline.label)); }
+  for (const se of series) {
+    let d = '', pen = false;
+    se.values.forEach((v, i) => { if (v === null || !Number.isFinite(v)) { pen = false; return; } d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1) + ' '; pen = true; });
+    if (d) svg.append(hs('path', { d, class: 'line', style: `stroke:${se.color};${se.dash ? 'stroke-dasharray:4 3;' : ''}` }));
+  }
+  if (marker && Number.isFinite(marker.v)) { const mx2 = W - padR + 8; svg.append(hs('circle', { cx: mx2, cy: y(marker.v), r: 4.5, style: `fill:${AN_COLORS.main}` }), hs('text', { x: mx2 + 7, y: y(marker.v) + 4, class: 'axis-label' }, marker.label)); }
+  const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(iw / 48))));
+  labels.forEach((lab, i) => {
+    if ((i % every === 0 && (n - 1 - i >= every * 0.75 || i === n - 1)) || i === n - 1) svg.append(hs('text', { x: x(i), y: H - 8, 'text-anchor': i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle', class: 'axis-label' }, lab));
+    const bw = iw / (n - 1); const r = hs('rect', { x: x(i) - bw / 2, y: padT, width: bw, height: ih, class: 'band' });
+    r.dataset.tip = [labels[i]].concat(series.map(se => `${se.name}: ${se.values[i] === null ? '—' : fmt(se.values[i])}`)).join('\n'); svg.append(r);
+  });
+  container.replaceChildren(svg, series.length > 1 || band || hline ? this.legend(series.concat(band ? [{ name: 'Vùng ±1 độ lệch chuẩn', color: AN_COLORS.band }] : [])) : '');
+};
+
+/** Ô đối chiếu nhanh: gõ số trên TCInvest → app hiện chênh lệch. Không lưu. */
+Pages.reconcile = function (label, ours, fmt = v => f2(v)) {
+  const inp = h('input', { type: 'text', inputmode: 'decimal', placeholder: 'Số trên TCInvest', 'aria-label': `${label} trên TCInvest`, class: 'recon-in' });
+  const out = h('span', { class: 'small muted' });
+  inp.addEventListener('input', () => {
+    const v = Metrics.num(inp.value); if (v === null || !Number.isFinite(ours)) { out.textContent = ''; return; }
+    const diff = ours !== 0 ? (ours - v) / Math.abs(v) * 100 : null; const ok = diff !== null && Math.abs(diff) <= 3;
+    out.className = 'small ' + (ok ? 'pos' : 'warn-text');
+    out.textContent = diff === null ? '' : ok ? `Khớp (lệch ${f2(diff, 1)}%)` : `Lệch ${f2(diff, 1)}% — kiểm tra ngày lấy số, cách tính (4 quý gần nhất? BVPS quý nào?)`;
+  });
+  return h('div', { class: 'recon' }, h('span', { class: 'small' }, `Đối chiếu ${label}: app `, h('b', { text: fmt(ours) }), ' · '), inp, out);
+};
+
+Pages.analysisCard = function (st) {
+  const syms = MetricData.symbols(st);
+  const sel = syms.includes(Pages._anSym) ? Pages._anSym : syms[0];
+  const head = { sub: 'Số do bạn nhờ Claude lấy (qua kết nối dữ liệu của bạn) rồi dán vào. App kiểm tra, thống kê và vẽ — không tự lấy số, không khuyến nghị.',
+    actions: [C.btn('Câu lệnh cho Claude', () => Pages.metricPrompt(sel), { icon: 'copy', cls: 'btn-sm btn-touch' }), C.btn('Dán kết quả', () => Pages.metricPaste(sel), { icon: 'plus', cls: 'btn-sm btn-primary btn-touch' })] };
+  if (!sel) return C.card('Phân tích mã: P/B, P/E, kết quả kinh doanh', C.empty('chart', 'Chưa có mã nào', 'Thêm mã vào danh mục, hoặc bấm "Câu lệnh cho Claude" để lấy số cho một mã bất kỳ.'), head);
+  const chips = h('div', { class: 'chip-row', role: 'tablist', 'aria-label': 'Chọn mã' }, syms.map(s => h('button', { type: 'button', class: 'chip-btn' + (s === sel ? ' active' : ''), role: 'tab', 'aria-selected': String(s === sel), onclick: () => { Pages._anSym = s; App.render(); } }, s)));
+  const ms = ['pb', 'pe', 'fin'].map(k => MetricData.get(st, sel, k)).filter(Boolean);
+  const body = h('div', { class: 'stack-16' }, chips);
+  if (!ms.length) body.append(h('div', { class: 'an-empty' },
+    h('p', { class: 'small' }, h('b', {}, `Chưa có số liệu cho ${sel}. `), 'Ba bước:'),
+    h('ol', { class: 'small' }, h('li', {}, 'Bấm "Câu lệnh cho Claude", chọn loại (P/B, P/E hoặc kết quả kinh doanh), bấm Sao chép.'),
+      h('li', {}, 'Dán vào Claude ở cuộc trò chuyện đã nối TCBS (bài 6). Claude hỏi quyền dùng công cụ thì bấm cho phép.'),
+      h('li', {}, 'Sao chép nguyên câu trả lời của Claude, bấm "Dán kết quả" ở đây. App tự lọc phần chữ thừa và báo dòng nào sai.'))));
+  for (const m of ms) body.append(m.kind === 'fin' ? Pages.finBlock(st, m) : Pages.ratioBlock(st, m));
+  return C.card(`Phân tích mã: ${sel}`, body, head);
+};
+
+Pages.ratioBlock = function (st, m) {
+  const K = METRIC_KINDS[m.kind]; const s = MetricData.stats(st, m); if (!s) return h('div');
+  const price = MetricData.price(st, m.symbol); const ps = MetricData.perShare(st, m);
+  const zone = { below: ['Dưới vùng −1σ', 'green'], inside: ['Trong vùng ±1σ', 'blue'], above: ['Trên vùng +1σ', 'amber'], na: ['Chưa đủ dữ liệu', ''] }[s.zone];
+  const labels = m.points.map(p => Metrics.qLabel(p.p)); const hasB = m.points.some(p => Number.isFinite(p.b));
+  const c1 = h('div', { class: 'chart-box' });
+  const hd = (st.settings.layerPlan || {}).hurdle; const isPE = m.kind === 'pe';
+  const ey = isPE && s.current > 0 ? 100 / s.current : null; const eyB = isPE && s.benchLast && s.benchLast.b > 0 ? 100 / s.benchLast.b : null;
+  lateRender(() => Charts.safe(c1, () => Charts.ratio(c1, { labels, series: [{ name: `${K.label} ${m.symbol}`, color: AN_COLORS.main, values: m.points.map(p => p.v) }].concat(hasB ? [{ name: `${K.label} ${m.benchLabel || 'ngành'}`, color: AN_COLORS.bench, values: m.points.map(p => (Number.isFinite(p.b) ? p.b : null)), dash: true }] : []),
+    band: s.nWin >= 8 ? { lo: s.lo, hi: s.hi } : null, hline: { v: s.mean, label: `TB ${s.nWin} quý ${f2(s.mean)}` }, marker: s.liveUsed ? { v: s.current, label: 'Nay ' + f2(s.current) } : null })));
+  return h('section', { class: 'an-block' },
+    h('div', { class: 'an-head' }, h('h4', { text: `${K.label} theo quý` }), h('div', { class: 'btn-group' }, C.iconBtn('trash', `Xóa chuỗi ${K.label} ${m.symbol}`, () => Pages.metricDelete(m), 'danger'))),
+    h('div', { class: 'kpi-grid an-kpis' },
+      C.kpi({ label: `${K.label} ${s.liveUsed ? 'hôm nay' : 'quý gần nhất'}`, value: f2(s.current), featured: true, sub: s.liveUsed ? `Giá ${Money.num(price)} / ${K.per} ${Money.num(ps)}` : `${Metrics.qLabel(s.to)} — thiếu ${K.per} hoặc giá để tính theo hôm nay` }),
+      C.kpi({ label: `Trung bình ${s.nWin} quý gần nhất`, value: f2(s.mean), sub: s.nWin >= 8 ? `Vùng ±1σ: ${f2(s.lo)} – ${f2(s.hi)}` : 'Dưới 8 quý — chưa tính độ lệch chuẩn' }),
+      C.kpi({ label: 'Vị trí so với lịch sử của mã', value: h('span', {}, C.badge(zone[0], zone[1])), sub: `Thấp hơn ${Math.round(s.cheaperThan)}% số quý từ ${Metrics.qLabel(s.from)}` }),
+      isPE ? C.kpi({ label: 'Lợi suất lợi nhuận (1/P/E)', value: ey === null ? '—' : f2(ey, 1) + '%', sub: [eyB !== null ? `ngành ${f2(eyB, 1)}%` : '', Number.isFinite(hd) ? `mốc của bạn ${f2(hd)}%` : 'đặt mốc ở Quỹ & lớp tài sản'].filter(Boolean).join(' · ') })
+        : C.kpi({ label: 'Cao nhất / thấp nhất', value: `${f2(s.max.v)} / ${f2(s.min.v)}`, sub: `${Metrics.qLabel(s.max.p)} / ${Metrics.qLabel(s.min.p)}` })),
+    c1,
+    h('p', { class: 'tiny muted' }, `Nguồn: ${m.source || 'chưa ghi'} · lấy ngày ${m.asOf ? DateUtil.toVN(m.asOf) : '—'} · ${s.n} quý (${Metrics.qLabel(s.from)} – ${Metrics.qLabel(s.to)}).${hasB && s.benchLast ? ` Ngành (${m.benchLabel || 'theo nguồn'}) quý gần nhất: ${f2(s.benchLast.b)}.` : ''} Đây là mô tả lịch sử của chính mã, không phải khuyến nghị.`),
+    Pages.reconcile(K.label + (s.liveUsed ? ' hôm nay' : ' quý gần nhất'), s.current),
+    h('details', {}, h('summary', { class: 'small' }, `Bảng số (${m.points.length} quý)`), h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' },
+      h('thead', {}, h('tr', {}, h('th', {}, 'Quý'), h('th', { class: 'num' }, K.label), hasB ? h('th', { class: 'num' }, 'Ngành') : null)),
+      h('tbody', {}, m.points.slice().reverse().map(p => h('tr', {}, h('td', { dataset: { label: 'Quý' } }, Metrics.qLabel(p.p)), h('td', { class: 'num', dataset: { label: K.label } }, f2(p.v)), hasB ? h('td', { class: 'num', dataset: { label: 'Ngành' } }, f2(p.b)) : null)))))));
+};
+
+Pages.finBlock = function (st, m) {
+  const g = Metrics.growth(m.points); const labels = m.points.map(p => Metrics.qLabel(p.p));
+  const c1 = h('div', { class: 'chart-box' }), c2 = h('div', { class: 'chart-box' });
+  const ty = v => f2(v, 0);
+  lateRender(() => {
+    Charts.safe(c1, () => Charts.bars(c1, { labels, series: [{ name: 'Doanh thu (tỷ đ)', color: AN_COLORS.rev, values: m.points.map(p => p.r || 0) }, { name: 'LNST (tỷ đ)', color: AN_COLORS.np, values: m.points.map(p => p.n || 0) }], fmt: ty, emptyText: 'Chưa có số' }));
+    const gg = g.filter(x => x.rev !== null || x.np !== null);
+    if (gg.length >= 2) Charts.safe(c2, () => Charts.ratio(c2, { labels: gg.map(x => Metrics.qLabel(x.p)), series: [{ name: 'Doanh thu', color: AN_COLORS.g1, values: gg.map(x => x.rev) }, { name: 'LNST', color: AN_COLORS.g2, values: gg.map(x => x.np) }], hline: { v: 0, label: '0%' }, fmt: v => f2(v, 0) + '%', height: 200 }));
+    else c2.replaceChildren(h('p', { class: 'small muted', text: 'Cần ít nhất 9 quý liên tiếp để vẽ tăng trưởng 4 quý so với 4 quý trước.' }));
+  });
+  const last = m.points[m.points.length - 1]; const lg = g.filter(x => x.rev !== null || x.np !== null).slice(-1)[0];
+  const rows = m.points.slice(-8).reverse(); const gm = new Map(g.map(x => [x.p, x]));
+  return h('section', { class: 'an-block' },
+    h('div', { class: 'an-head' }, h('h4', { text: 'Doanh thu & lợi nhuận sau thuế theo quý (tỷ đồng)' }), h('div', { class: 'btn-group' }, C.iconBtn('trash', `Xóa kết quả kinh doanh ${m.symbol}`, () => Pages.metricDelete(m), 'danger'))),
+    h('div', { class: 'kpi-grid an-kpis' },
+      C.kpi({ label: `Doanh thu ${Metrics.qLabel(last.p)}`, value: last.r === null ? '—' : f2(last.r, 0) + ' tỷ', featured: true, sub: 'Ngân hàng: tổng thu nhập hoạt động' }),
+      C.kpi({ label: `LNST ${Metrics.qLabel(last.p)}`, value: last.n === null ? '—' : f2(last.n, 0) + ' tỷ', sub: '' }),
+      C.kpi({ label: '4 quý gần nhất so với 4 quý trước', value: lg ? `DT ${lg.rev === null ? '—' : (lg.rev > 0 ? '+' : '') + f2(lg.rev, 1) + '%'}` : '—', sub: lg ? `LNST ${lg.np === null ? '—' : (lg.np > 0 ? '+' : '') + f2(lg.np, 1) + '%'} · tới ${Metrics.qLabel(lg.p)}` : 'Cần 8 quý liên tiếp' })),
+    c1, h('div', { class: 'section-label', text: 'Tăng trưởng 4 quý gần nhất so với 4 quý trước (%)' }), c2,
+    h('p', { class: 'tiny muted', text: `Nguồn: ${m.source || 'chưa ghi'} · lấy ngày ${m.asOf ? DateUtil.toVN(m.asOf) : '—'} · ${m.points.length} quý.` }),
+    Pages.reconcile(`doanh thu ${Metrics.qLabel(last.p)} (tỷ)`, last.r, v => f2(v, 0)), Pages.reconcile(`LNST ${Metrics.qLabel(last.p)} (tỷ)`, last.n, v => f2(v, 0)),
+    h('details', {}, h('summary', { class: 'small' }, 'Bảng 8 quý gần nhất'), h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' },
+      h('thead', {}, h('tr', {}, h('th', {}, 'Quý'), h('th', { class: 'num' }, 'Doanh thu'), h('th', { class: 'num' }, 'LNST'), h('th', { class: 'num' }, 'TT DT 4Q'), h('th', { class: 'num' }, 'TT LNST 4Q'))),
+      h('tbody', {}, rows.map(p => { const x = gm.get(p.p) || {}; const pc = v => (v === null || v === undefined ? '—' : (v > 0 ? '+' : '') + f2(v, 1) + '%'); return h('tr', {}, h('td', { dataset: { label: 'Quý' } }, Metrics.qLabel(p.p)), h('td', { class: 'num', dataset: { label: 'Doanh thu' } }, f2(p.r, 0)), h('td', { class: 'num', dataset: { label: 'LNST' } }, f2(p.n, 0)), h('td', { class: 'num', dataset: { label: 'TT DT 4Q' } }, pc(x.rev)), h('td', { class: 'num', dataset: { label: 'TT LNST 4Q' } }, pc(x.np))); }))))));
+};
+
+Pages.metricPrompt = function (sym0) {
+  const st = App.state; const syms = MetricData.symbols(st);
+  const form = h('form', { novalidate: true, id: 'mp-form' });
+  const ta = h('textarea', { class: 'brief-text', readonly: true, rows: 12, 'aria-label': 'Câu lệnh cho Claude' });
+  form.append(h('div', { class: 'form-grid' },
+    F.field('Mã', F.input('sym', sym0 || '', { maxlength: 10, list: 'mp-syms', autocapitalize: 'characters', placeholder: 'VD: ACB' }), { name: 'sym', required: true }),
+    F.field('Loại số liệu', F.select('kind', [{ value: 'pb', label: 'P/B theo quý (kèm P/B ngành)' }, { value: 'pe', label: 'P/E theo quý (kèm P/E ngành)' }, { value: 'fin', label: 'Doanh thu & LNST theo quý' }], 'pb'), { name: 'kind' }),
+    F.field('Từ năm', F.input('from', '2012', { inputmode: 'numeric', maxlength: 4 }), { name: 'from' }),
+    h('datalist', { id: 'mp-syms' }, syms.map(s => h('option', { value: s }))),
+    h('div', { class: 'field full' }, C.callout('info', h('div', { class: 'small' }, 'Dán câu lệnh vào Claude ở cuộc trò chuyện ', h('b', {}, 'đã nối TCBS'), ' (bài 6 khóa học). Câu lệnh chỉ chứa mã chứng khoán, không có dữ liệu cá nhân. Claude được dặn không tự điền số khi thiếu và không khuyến nghị.'))),
+    h('div', { class: 'field full' }, ta)));
+  const draw = () => { const s = F.val(form, 'sym').trim().toUpperCase(); const y = Number(F.val(form, 'from')); ta.value = Portfolio.SYM_RE.test(s) ? Metrics.prompt(F.val(form, 'kind'), s, y >= 2000 && y <= Number(DateUtil.today().slice(0, 4)) ? y : 2012) : 'Nhập mã hợp lệ (VD: ACB).'; };
+  form.addEventListener('input', draw); form.addEventListener('change', draw); draw();
+  const copy = async () => { try { await navigator.clipboard.writeText(ta.value); Toast.show('Đã sao chép câu lệnh. Dán vào Claude (cuộc trò chuyện đã nối TCBS).', { type: 'success' }); } catch (e) { ta.focus(); ta.select(); Toast.show('Không tự sao chép được — đã chọn sẵn, nhấn giữ/Ctrl+C.', { type: 'warn' }); } };
+  let m; m = Modal.open({ title: 'Câu lệnh cho Claude', body: form, size: 'lg', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Đóng'), h('button', { class: 'btn', type: 'button', onclick: () => { m.close(); Pages.metricPaste(F.val(form, 'sym').trim().toUpperCase()); } }, 'Dán kết quả…'), h('button', { class: 'btn btn-primary', type: 'button', onclick: copy }, 'Sao chép')] });
+};
+
+Pages.metricPaste = function (sym0) {
+  const ta = h('textarea', { rows: 10, 'aria-label': 'Kết quả Claude trả về', placeholder: 'Dán NGUYÊN câu trả lời của Claude vào đây (có thể kèm chữ giải thích — app tự bỏ qua).\n\nFINPILOT-PB ACB\nNGUON: …\nLAY NGAY: 2026-10-29\nBVPS: 19850\n2025Q4 1.22 1.40\n…\nHET' });
+  const prev = h('div', { class: 'small' }); let parsed = { blocks: [], errors: [] };
+  const run = () => {
+    parsed = Metrics.parse(ta.value, DateUtil.today()); const st = App.state;
+    prev.replaceChildren(
+      ...parsed.blocks.map(b => { const old = MetricData.get(st, b.symbol, b.kind); const K = METRIC_KINDS[b.kind];
+        return h('div', { class: 'mp-row' }, C.badge(`${b.symbol} · ${K.label}`, 'blue'), ` ${b.points.length} quý (${Metrics.qLabel(b.points[0].p)} – ${Metrics.qLabel(b.points[b.points.length - 1].p)})`, b.perShare ? ` · ${K.per} ${Money.num(b.perShare)}` : (K.per ? ` · chưa có ${K.per}` : ''), b.source ? ` · nguồn: ${b.source}` : ' · chưa ghi nguồn', old ? h('span', { class: 'muted' }, ` — gộp với ${old.points.length} quý đã có (quý trùng lấy số mới)`) : null); }),
+      parsed.errors.length ? h('div', { class: 'warn-text' }, h('b', {}, `${parsed.errors.length} dòng không nhận:`), h('ul', {}, parsed.errors.slice(0, 12).map(e => h('li', {}, `Dòng ${e.line}: ${e.msg} — "${e.text}"`)))) : null,
+      !parsed.blocks.length && ta.value.trim() ? h('p', { class: 'warn-text', text: 'Chưa thấy khối nào bắt đầu bằng FINPILOT-PB / FINPILOT-PE / FINPILOT-KQKD. Hãy dùng đúng câu lệnh của app.' }) : null);
+  };
+  ta.addEventListener('input', Util.debounce(run, 150));
+  const body = h('div', { class: 'stack-16' }, ta, prev, h('p', { class: 'tiny muted', text: 'App không tự tạo số. Đối chiếu vài con số với TCInvest trước khi dùng cho quyết định.' }));
+  let m;
+  const save = async () => {
+    run(); if (!parsed.blocks.length) { Toast.show('Chưa có khối hợp lệ để lưu.', { type: 'warn' }); return; }
+    const now = Util.nowISO();
+    try {
+      await App.commit('Lưu lịch sử định giá', d => {
+        d.metrics = d.metrics || [];
+        for (const b of parsed.blocks) {
+          const id = MetricData.id(b.symbol, b.kind); const i = d.metrics.findIndex(x => x.id === id); const old = i >= 0 ? d.metrics[i] : null;
+          const map = new Map((old ? old.points : []).map(p => [p.p, p])); for (const p of b.points) map.set(p.p, p);
+          const rec = Model.metric({ id, symbol: b.symbol, kind: b.kind, points: Array.from(map.values()), perShare: b.perShare || (old ? old.perShare : null), benchLabel: b.benchLabel || (old ? old.benchLabel : ''), source: b.source || (old ? old.source : ''), asOf: b.asOf || DateUtil.today(), createdAt: old ? old.createdAt : now, updatedAt: now });
+          if (!rec.points.length) throw new AppError(`${b.symbol}: không có số hợp lệ.`);
+          if (i >= 0) d.metrics[i] = rec; else d.metrics.push(rec);
+        }
+      });
+      Pages._anSym = parsed.blocks[0].symbol; m.close();
+      Toast.show(`Đã lưu ${parsed.blocks.length} chuỗi số (${parsed.blocks.map(b => `${b.symbol} ${METRIC_KINDS[b.kind].label}`).join(', ')}).`, { type: 'success' });
+      if (App.route !== 'portfolio') App.navigate('portfolio');
+    } catch (e) { Toast.show(e.message, { type: 'error' }); }
+  };
+  m = Modal.open({ title: 'Dán kết quả từ Claude' + (sym0 ? ` (${sym0})` : ''), body, size: 'lg', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'button', onclick: save }, 'Lưu')] });
+};
+
+Pages.metricDelete = async function (m) {
+  if (!(await Modal.confirm({ title: `Xóa ${METRIC_KINDS[m.kind].label} của ${m.symbol}?`, message: `${m.points.length} quý số liệu sẽ bị xóa. Muốn có lại thì nhờ Claude lấy lại và dán vào.`, confirmText: 'Xóa', danger: true }))) return;
+  try { await App.commit('Xóa lịch sử định giá', d => { d.metrics = (d.metrics || []).filter(x => x.id !== m.id); }, { undoLabel: 'Đã xóa chuỗi số' }); Toast.show('Đã xóa.', { type: 'success', action: { label: 'Hoàn tác', fn: () => App.undo() } }); }
+  catch (e) { Toast.show(e.message, { type: 'error' }); }
+};
+
+/* --------------------------- Dự phóng 5 năm (trang Quỹ & lớp tài sản) --------------------------- */
+Pages.projectionCard = function (L) {
+  const st = App.state; const pj = st.settings.projection || Defaults.projection(); const a = L.agg;
+  const keys = Layers.KEYS.filter(k => (a.includeUse || k !== 'use') && a.by[k].n && a.by[k].value > 0);
+  if (!keys.length) return null;
+  const view = Pages._pjView === 'def' ? 'def' : 'all';
+  const shown = view === 'def' ? keys.filter(k => k === 'reserve' || k === 'defensive' || k === 'income') : keys;
+  const byLayer = {}; for (const k of shown) byLayer[k] = Math.max(0, a.by[k].value);
+  const rows = Projection.assets({ byLayer, growth: pj.growth, monthlyAdd: shown.includes(pj.addLayer) ? pj.monthlyAdd : null, addLayer: pj.addLayer, years: 5 });
+  const y0 = Number(L.today.slice(0, 4)); const anyG = Object.keys(pj.growth || {}).length > 0 || pj.monthlyAdd > 0;
+  const c1 = h('div', { class: 'chart-box' });
+  lateRender(() => Charts.safe(c1, () => Charts.bars(c1, { labels: rows.map(r => (r.year === 0 ? 'Nay' : String(y0 + r.year))), series: shown.map(k => ({ name: Layers.LABELS[k], color: LAYER_COLORS[k], values: rows.map(r => r.by[k]) })), stacked: true, emptyText: 'Chưa có tài sản' })));
+  const chips = h('div', { class: 'chip-row', role: 'tablist', 'aria-label': 'Phạm vi dự phóng' }, [['all', 'Toàn bộ tài sản tính tỷ trọng'], ['def', 'Lớp phòng thủ (dự phòng, phòng thủ, thu nhập cố định)']].map(([k, l]) => h('button', { type: 'button', class: 'chip-btn' + (k === view ? ' active' : ''), role: 'tab', 'aria-selected': String(k === view), onclick: () => { Pages._pjView = k; App.render(); } }, l)));
+  const assum = shown.map(k => `${Layers.LABELS[k]} ${Number.isFinite(pj.growth[k]) ? f2(pj.growth[k], 1) + '%' : '0%'}`).join(' · ') + (pj.monthlyAdd > 0 && pj.addLayer ? ` · góp thêm ${Money.compact(pj.monthlyAdd)}/tháng vào ${Layers.LABELS[pj.addLayer]}` : '');
+  return C.card('Dự phóng 5 năm — theo giả định của bạn', h('div', { class: 'stack-16' }, chips,
+    !anyG ? C.callout('info', 'Bạn chưa đặt giả định nên các cột đi ngang. Bấm "Giả định" để nhập mức tăng/năm cho từng lớp (VD lãi tiết kiệm cho lớp thu nhập cố định) và số tiền góp thêm mỗi tháng.') : null,
+    c1, h('p', { class: 'small muted', text: `Giả định/năm: ${assum}. Năm ${y0 + 5}: ${Money.compact(rows[5].total)} (nay ${Money.compact(rows[0].total)}).` })),
+  { sub: 'Phép tính lãi kép theo số bạn đặt — không phải dự báo của app. Không tính thuế, lạm phát, rủi ro giảm giá.', actions: C.btn('Giả định', () => Pages.projectionForm(), { icon: 'settings', cls: 'btn-sm btn-touch' }) });
+};
+Pages.projectionForm = function () {
+  const st = App.state; const pj = st.settings.projection || Defaults.projection();
+  const form = h('form', { novalidate: true, id: 'pj-form' }); const fe = F.formError();
+  const num = v => (v === null || v === undefined ? '' : String(v).replace('.', ','));
+  form.append(h('div', { class: 'form-grid' },
+    h('div', { class: 'field full' }, h('div', { class: 'section-label', text: 'Mức tăng giả định mỗi năm (%)' }), h('div', { class: 'field-hint', text: 'Để trống = 0 (đi ngang). Ví dụ: lãi tiết kiệm bạn đang nhận cho lớp Thu nhập cố định. App không gợi ý con số.' })),
+    ...Layers.KEYS.map(k => F.field(Layers.LABELS[k], F.input('g_' + k, num(pj.growth[k]), { inputmode: 'decimal', placeholder: '0' }), { name: 'g_' + k })),
+    F.field('Góp thêm mỗi tháng', F.money('monthlyAdd', pj.monthlyAdd), { name: 'monthlyAdd' }),
+    F.field('Vào lớp', F.select('addLayer', [{ value: '', label: '— Không góp —' }].concat(Layers.KEYS.map(k => ({ value: k, label: Layers.LABELS[k] }))), pj.addLayer || ''), { name: 'addLayer' }),
+    h('div', { class: 'field full' }, F.check('rollover', pj.rollover, 'Lịch dòng tiền 5 năm: coi tiền gửi/trái phiếu đáo hạn được tái tục cùng lãi suất'))), fe);
+  let m;
+  form.addEventListener('submit', async e => {
+    e.preventDefault(); F.clearErrors(form); const errs = {}; const growth = {};
+    for (const k of Layers.KEYS) { const raw = F.val(form, 'g_' + k).trim(); if (!raw) continue; const v = Number(raw.replace(',', '.')); if (!Number.isFinite(v) || v < -50 || v > 100) errs['g_' + k] = 'Từ −50 đến 100.'; else growth[k] = v; }
+    const ma = F.moneyVal(form, 'monthlyAdd', { allowEmpty: true }); if (!ma.ok) errs.monthlyAdd = ma.error;
+    if (ma.ok && ma.value && !F.val(form, 'addLayer')) errs.addLayer = 'Chọn lớp nhận tiền góp thêm.';
+    if (Object.keys(errs).length) return F.showErrors(form, errs);
+    const projection = Model.projection({ growth, monthlyAdd: ma.value || null, addLayer: F.val(form, 'addLayer'), rollover: form.elements.rollover.checked });
+    try { await App.commit('Đặt giả định dự phóng', d => { d.settings = { ...d.settings, projection, updatedAt: Util.nowISO() }; }); m.close(); Toast.show('Đã lưu giả định.', { type: 'success' }); } catch (er) { fe.textContent = er.message; }
+  });
+  m = Modal.open({ title: 'Giả định dự phóng 5 năm', body: form, size: 'md', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'submit', form: 'pj-form' }, 'Lưu')] });
+};
+/** Dòng tiền thụ động 5 năm theo loại + mức che phủ chi tiêu (chèn vào thẻ Lịch dòng tiền). */
+Pages.incomeYears = function (L) {
+  const st = App.state; const pj = st.settings.projection || Defaults.projection();
+  const items = L.items.filter(i => i.value > 0 && i.cashflow).map(i => ({ key: i.key, name: i.name, kind: i.kind, value: i.value, rate: i.rate, freq: i.freq, start: i.start, maturity: i.maturity }));
+  if (!items.length) return null;
+  const P = Projection.income(items, L.today, 5, pj.rollover); const c = h('div', { class: 'chart-box' });
+  const colors = { 'Lãi tiền gửi': 'var(--l-income)', 'Trái tức / tiền thuê': 'var(--l-defensive)', 'Cổ tức': 'var(--l-growth)' };
+  lateRender(() => Charts.safe(c, () => Charts.bars(c, { labels: P.rows.map(r => String(r.year) + (r.year === Number(L.today.slice(0, 4)) ? ' (còn lại)' : '')), series: P.types.map(t => ({ name: t, color: colors[t], values: P.rows.map(r => r.by[t] || 0) })), stacked: true, emptyText: 'Chưa có khoản có ngày trả' })));
+  const spendY = L.spend > 0 ? L.spend * 12 : null; const y1 = P.rows[1] ? P.rows[1] : null;
+  return h('div', {}, h('div', { class: 'section-label', text: 'Dòng tiền thụ động 5 năm theo loại (ước tính)' }), c,
+    h('p', { class: 'small muted' }, `${pj.rollover ? 'Giả định tái tục khi đáo hạn. ' : 'Đáo hạn thì thôi tính lãi (đổi trong "Giả định" ở thẻ Dự phóng). '}${P.missing ? `${P.missing} khoản chưa có ngày trả không được vẽ. ` : ''}`,
+      spendY && y1 ? `Năm ${y1.year}: ${Money.compact(y1.total)} ≈ ${f2(y1.total / spendY * 100, 0)}% chi tiêu một năm (theo chi bình quân 3 tháng gần nhất).` : ''));
+};
+
+/* --------------------------- Hồ sơ ngành (nghiên cứu của bạn, qua skill trong Claude) --------------------------- */
+const SEC_VIEW_TONE = { positive: 'green', neutral: 'blue', negative: 'amber' };
+Pages.sectorCard = function (st) {
+  const today = DateUtil.today(); const secs = (st.sectors || []).slice().sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  const w = SectorData.weights(st); const wm = new Map(w.map(x => [x.id, x])); const due = new Set(Sectors.due(secs, today).map(x => x.id));
+  const head = { sub: 'Tóm tắt từ báo cáo ngành bạn nhờ Claude làm (skill nghiên cứu ngành). Chu kỳ và quan điểm là CỦA BÁO CÁO, ghi kèm ngày và nguồn — app không biến thành tín hiệu mua/bán.',
+    actions: [C.btn('Câu lệnh cho Claude', () => Pages.sectorPrompt(), { icon: 'copy', cls: 'btn-sm btn-touch' }), C.btn('Dán kết quả', () => Pages.sectorPaste(), { icon: 'plus', cls: 'btn-sm btn-primary btn-touch' })] };
+  if (!secs.length) return C.card('Hồ sơ ngành của bạn', h('div', { class: 'an-empty' },
+    h('p', { class: 'small' }, h('b', {}, 'Chưa có hồ sơ ngành. '), 'Ba bước:'),
+    h('ol', { class: 'small' }, h('li', {}, 'Bấm "Câu lệnh cho Claude", gõ tên ngành (VD Thủy điện), chọn các mã bạn đang nắm thuộc ngành đó, bấm Sao chép.'),
+      h('li', {}, 'Dán vào Claude (nơi có skill nghiên cứu ngành, nối thêm TCBS càng tốt). Claude làm báo cáo 8 bước và thêm một khối tóm tắt FINPILOT-NGANH ở cuối.'),
+      h('li', {}, 'Sao chép nguyên câu trả lời, bấm "Dán kết quả". App lưu hồ sơ, gắn ngành cho các mã của bạn và nhắc khi tới hạn xem lại.'))), head);
+  const unassigned = wm.get('');
+  const bars = h('div', { class: 'sec-bars' }, w.map(x => { const s = secs.find(y => y.id === x.id); return h('div', { class: 'sec-bar' }, h('span', { class: 'small', text: s ? s.name : 'Chưa gán ngành' }), h('div', { class: 'sec-track' }, h('div', { class: 'sec-fill' + (s ? '' : ' none'), style: { width: Math.max(2, x.pct || 0) + '%' } })), h('span', { class: 'small num', text: Util.fmtPct(x.pct, 1) })); }));
+  const list = h('div', { class: 'log-list' }, secs.map(s => {
+    const mine = SectorData.symbolsOf(st, s.id); const isDue = due.has(s.id); const wx = wm.get(s.id);
+    const nextCat = s.catalysts.filter(c => c.date && c.date >= today).sort((a, b) => (a.date < b.date ? -1 : 1))[0];
+    return h('article', { class: 'dec-item' + (isDue ? ' due' : '') },
+      h('div', { class: 'dec-head' }, h('div', {}, h('b', { text: s.name }), ' ', s.cycle ? C.badge('Chu kỳ: ' + SECTOR_CYCLES[s.cycle], 'blue') : null, ' ', s.view ? C.badge('Báo cáo: ' + SECTOR_VIEWS[s.view] + (s.horizon ? ' · ' + s.horizon : ''), SEC_VIEW_TONE[s.view]) : null),
+        h('div', { class: 'small muted', text: `Báo cáo ngày ${s.asOf ? DateUtil.toVN(s.asOf) : '—'}${s.reviewDate ? ` · xem lại ${DateUtil.toVN(s.reviewDate)}` : ''}${isDue ? ' (đến hạn)' : ''}` })),
+      h('div', { class: 'small' }, 'Mã của bạn: ', mine.length ? mine.join(', ') : h('span', { class: 'muted', text: 'chưa gắn mã nào' }), wx && wx.pct !== null ? h('span', { class: 'muted', text: ` · ${Util.fmtPct(wx.pct, 1)} danh mục` }) : null, s.related.length ? h('span', { class: 'muted', text: ` · mã liên quan trong báo cáo: ${s.related.slice(0, 8).join(', ')}` }) : null),
+      s.summary ? h('p', { class: 'dec-thesis small', text: s.summary }) : null,
+      s.kpis.length ? h('details', { open: isDue }, h('summary', { class: 'small' }, `KPI cần theo dõi (${s.kpis.length})`), h('ul', { class: 'chg-list small' }, s.kpis.map(k => h('li', {}, h('b', { text: k.name }), k.note ? h('span', { class: 'muted', text: ' — ' + k.note }) : null)))) : null,
+      s.flags.length ? h('details', { open: isDue }, h('summary', { class: 'small' }, `Cờ đỏ cần soát (${s.flags.length})`), h('ul', { class: 'chg-list small' }, s.flags.map(f => h('li', { text: f })))) : null,
+      nextCat ? h('p', { class: 'small' }, h('b', {}, 'Mốc sắp tới: '), `${DateUtil.toVN(nextCat.date)} — ${nextCat.text}`) : null,
+      h('p', { class: 'tiny muted', text: `Nguồn: ${s.source || 'chưa ghi'}. Đây là nghiên cứu của bạn, không phải khuyến nghị của app.` }),
+      h('div', { class: 'btn-group' }, C.btn(isDue ? 'Cập nhật hồ sơ' : 'Làm lại báo cáo', () => Pages.sectorPrompt(s.id), { cls: 'btn-sm btn-touch' + (isDue ? ' btn-primary' : ''), icon: 'sync' }),
+        s.link ? h('a', { class: 'btn btn-sm btn-ghost btn-touch', href: s.link, target: '_blank', rel: 'noopener noreferrer' }, Icon('link', 16), ' Báo cáo đầy đủ') : null,
+        C.btn('Xóa', () => Pages.sectorDelete(s), { cls: 'btn-sm btn-ghost btn-touch', icon: 'trash' })));
+  }));
+  return C.card('Hồ sơ ngành của bạn', h('div', { class: 'stack-16' }, h('div', {}, h('div', { class: 'section-label', text: 'Tỷ trọng danh mục theo ngành' }), bars, unassigned && unassigned.value > 0 ? h('p', { class: 'tiny muted', text: 'Gắn ngành cho mã ở nút Sửa mã, hoặc qua dòng "MÃ CỦA TÔI" trong khối tóm tắt.' }) : null), list), head);
+};
+Pages.sectorPrompt = function (id) {
+  const st = App.state; const s0 = id ? (st.sectors || []).find(x => x.id === id) : null;
+  const syms = Array.from(new Set((st.holdings || []).filter(x => x.qty > 0).map(x => x.symbol))).sort();
+  const pre = new Set(s0 ? SectorData.symbolsOf(st, s0.id) : []);
+  const form = h('form', { novalidate: true, id: 'sp-form' });
+  const ta = h('textarea', { class: 'brief-text', readonly: true, rows: 12, 'aria-label': 'Câu lệnh nghiên cứu ngành' });
+  const boxes = h('div', { class: 'chip-row' }, syms.map(s => h('label', { class: 'check' }, h('input', { type: 'checkbox', name: 'sym_' + s, checked: pre.has(s) }), s)));
+  form.append(h('div', { class: 'form-grid' },
+    F.field('Tên ngành / tiểu ngành', F.input('name', s0 ? s0.name : '', { maxlength: 60, placeholder: 'VD: Thủy điện, Ngân hàng, BĐS khu công nghiệp', list: 'sp-names' }), { name: 'name', required: true }),
+    h('datalist', { id: 'sp-names' }, (st.sectors || []).map(s => h('option', { value: s.name }))),
+    F.field('Khung thời gian', F.input('horizon', s0 && s0.horizon ? s0.horizon : '6–12 tháng', { maxlength: 30 }), { name: 'horizon' }),
+    F.field('Mức nghiên cứu', F.select('depth', [{ value: 'quick', label: 'Nhanh — skill /vn-nganh (vài phút)' }, { value: 'deep', label: 'Sâu — skill /deep-research (nhiều nguồn, lâu hơn)' }], Pages._secDepth === 'deep' ? 'deep' : 'quick'), { name: 'depth', hint: 'Sâu: Claude chia nhiều hướng tìm nguồn song song rồi viết báo cáo có trích nguồn; hợp khi mới vào ngành hoặc ngành vừa đổi chu kỳ.' }),
+    syms.length ? h('div', { class: 'field full' }, h('label', {}, 'Mã bạn đang nắm thuộc ngành này'), boxes) : null,
+    h('div', { class: 'field full' }, C.callout('info', h('div', { class: 'small' }, 'Dán vào Claude nơi đã cài skill nghiên cứu ngành (', h('code', {}, '/vn-nganh'), ' hoặc ', h('code', {}, '/deep-research'), '). Câu lệnh chỉ có tên ngành và mã — không có số tiền hay thông tin tài khoản. Báo cáo dài nên lưu ở Claude (Docs); app chỉ giữ phần tóm tắt.'))),
+    h('div', { class: 'field full' }, ta)));
+  const draw = () => { const n = F.val(form, 'name').trim(); const ms = syms.filter(s => form.elements['sym_' + s] && form.elements['sym_' + s].checked); const dp = F.val(form, 'depth') === 'deep' ? 'deep' : 'quick'; Pages._secDepth = dp; ta.value = n ? Sectors.prompt(n, ms, F.val(form, 'horizon').trim() || '6–12 tháng', dp) : 'Nhập tên ngành.'; };
+  form.addEventListener('input', draw); form.addEventListener('change', draw); draw();
+  const copy = async () => { if (!F.val(form, 'name').trim()) return Toast.show('Nhập tên ngành trước.', { type: 'warn' }); try { await navigator.clipboard.writeText(ta.value); Toast.show('Đã sao chép. Dán vào Claude, chờ báo cáo xong rồi sao chép nguyên câu trả lời.', { type: 'success' }); } catch (e) { ta.focus(); ta.select(); Toast.show('Không tự sao chép được — đã chọn sẵn, nhấn giữ/Ctrl+C.', { type: 'warn' }); } };
+  let m; m = Modal.open({ title: 'Nghiên cứu ngành với Claude', body: form, size: 'lg', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Đóng'), h('button', { class: 'btn', type: 'button', onclick: () => { m.close(); Pages.sectorPaste(); } }, 'Dán kết quả…'), h('button', { class: 'btn btn-primary', type: 'button', onclick: copy }, 'Sao chép')] });
+};
+Pages.sectorPaste = function () {
+  const ta = h('textarea', { rows: 10, 'aria-label': 'Câu trả lời của Claude (báo cáo ngành)', placeholder: 'Dán NGUYÊN câu trả lời của Claude — app chỉ đọc khối "FINPILOT-NGANH …" ở cuối, phần báo cáo bỏ qua.' });
+  const prev = h('div', { class: 'small' }); let parsed = { blocks: [], errors: [] };
+  const run = () => {
+    const st = App.state; parsed = Sectors.parse(ta.value, DateUtil.today());
+    const held = new Set((st.holdings || []).filter(x => x.qty > 0).map(x => x.symbol));
+    prev.replaceChildren(...parsed.blocks.map(b => { const old = (st.sectors || []).find(s => s.id === Sectors.slug(b.name)); const mine = b.mine.filter(x => held.has(x)), miss = b.mine.filter(x => !held.has(x));
+      return h('div', { class: 'mp-row' }, C.badge(b.name, 'blue'), ` ${b.cycle ? 'chu kỳ ' + SECTOR_CYCLES[b.cycle] : 'chưa có chu kỳ'} · ${b.view ? 'quan điểm báo cáo ' + SECTOR_VIEWS[b.view] : 'chưa có quan điểm'} · ${b.kpis.length} KPI · ${b.flags.length} cờ đỏ${b.reviewDate ? ' · xem lại ' + DateUtil.toVN(b.reviewDate) : ''}`,
+        mine.length ? h('div', {}, `Sẽ gắn ngành cho: ${mine.join(', ')}`) : null, miss.length ? h('div', { class: 'muted' }, `Không có trong danh mục (bỏ qua): ${miss.join(', ')}`) : null, old ? h('div', { class: 'muted' }, `Thay hồ sơ cũ ngày ${old.asOf ? DateUtil.toVN(old.asOf) : '—'}`) : null); }),
+      parsed.errors.length ? h('div', { class: 'warn-text' }, h('b', {}, `${parsed.errors.length} dòng trong khối không nhận:`), h('ul', {}, parsed.errors.slice(0, 10).map(e => h('li', {}, `Dòng ${e.line}: ${e.msg} — "${e.text}"`)))) : null,
+      !parsed.blocks.length && ta.value.trim() ? h('p', { class: 'warn-text', text: 'Chưa thấy khối "FINPILOT-NGANH <tên ngành>". Hãy dùng câu lệnh của app để Claude thêm khối này ở cuối.' }) : null);
+  };
+  ta.addEventListener('input', Util.debounce(run, 150));
+  let m;
+  const save = async () => {
+    run(); if (!parsed.blocks.length) return Toast.show('Chưa có khối hợp lệ để lưu.', { type: 'warn' });
+    const now = Util.nowISO(); let tagged = 0;
+    try {
+      await App.commit('Lưu hồ sơ ngành', d => {
+        d.sectors = d.sectors || [];
+        for (const b of parsed.blocks) {
+          const id = Sectors.slug(b.name); if (!id) throw new AppError('Tên ngành không hợp lệ.');
+          const i = d.sectors.findIndex(x => x.id === id); const old = i >= 0 ? d.sectors[i] : null;
+          const rec = Model.sector({ ...b, id, asOf: b.asOf || DateUtil.today(), reviewDate: b.reviewDate || DateUtil.addDays(DateUtil.today(), 90), createdAt: old ? old.createdAt : now, updatedAt: now });
+          if (i >= 0) d.sectors[i] = rec; else d.sectors.push(rec);
+          d.holdings = d.holdings.map(x => (b.mine.includes(x.symbol) && x.sector !== id ? (tagged++, Model.holding({ ...x, sector: id, updatedAt: now })) : x));
+        }
+      });
+      m.close(); Toast.show(`Đã lưu ${parsed.blocks.length} hồ sơ ngành${tagged ? `, gắn ngành cho ${tagged} mã` : ''}.`, { type: 'success' });
+      if (App.route !== 'portfolio') App.navigate('portfolio');
+    } catch (e) { Toast.show(e.message, { type: 'error' }); }
+  };
+  m = Modal.open({ title: 'Dán báo cáo ngành từ Claude', body: h('div', { class: 'stack-16' }, ta, prev), size: 'lg', footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Hủy'), h('button', { class: 'btn btn-primary', type: 'button', onclick: save }, 'Lưu')] });
+};
+Pages.sectorDelete = async function (s) {
+  if (!(await Modal.confirm({ title: `Xóa hồ sơ ngành ${s.name}?`, message: 'Các mã đang gắn ngành này sẽ về "Chưa gán ngành".', confirmText: 'Xóa', danger: true }))) return;
+  const now = Util.nowISO();
+  try { await App.commit('Xóa hồ sơ ngành', d => { d.sectors = (d.sectors || []).filter(x => x.id !== s.id); d.holdings = d.holdings.map(x => (x.sector === s.id ? Model.holding({ ...x, sector: '', updatedAt: now }) : x)); }, { undoLabel: 'Đã xóa hồ sơ ngành' }); Toast.show('Đã xóa.', { type: 'success', action: { label: 'Hoàn tác', fn: () => App.undo() } }); }
+  catch (e) { Toast.show(e.message, { type: 'error' }); }
+};
+
+/* ==========================================================================
    APP — khởi tạo, điều hướng, ghi dữ liệu (commit), hoàn tác, đồng bộ
    ========================================================================== */
 const ROUTES = {
@@ -7212,6 +7944,13 @@ const ROUTES = {
   data: { title: 'Sao lưu & dữ liệu', icon: 'database' },
   settings: { title: 'Cài đặt', icon: 'settings' }
 };
+/** v1.9.1 — menu chia nhóm theo nhịp dùng (chỉ đổi cách xếp, không đổi đường dẫn). */
+const NAV_GROUPS = [
+  ['Hằng ngày', ['dashboard', 'transactions', 'budgets', 'recurring']],
+  ['Tiền & tài sản', ['accounts', 'assets', 'layers', 'goals']],
+  ['Đầu tư', ['portfolio', 'journal', 'discipline']],
+  ['Phân tích & hệ thống', ['reports', 'data', 'settings']]
+];
 const PREFS_KEY = 'finpilot.offline.prefs' + Profiles.suffix();
 
 const App = {
@@ -7410,14 +8149,26 @@ const App = {
   buildShell() {
     const brand = document.querySelector('.brand'); brand.prepend(LogoMark(30));
     const nav = document.getElementById('nav');
-    nav.replaceChildren(...Object.entries(ROUTES).map(([k, r]) => h('a', { href: '#/' + k, dataset: { route: k } }, Icon(r.icon), h('span', {}, r.title))));
+    const link = k => h('a', { href: '#/' + k, dataset: { route: k } }, Icon(ROUTES[k].icon), h('span', {}, ROUTES[k].title));
+    const seen = new Set(); const items = [];
+    for (const [g, keys] of NAV_GROUPS) { items.push(h('div', { class: 'nav-group', text: g })); for (const k of keys) if (ROUTES[k]) { items.push(link(k)); seen.add(k); } }
+    for (const k of Object.keys(ROUTES)) if (!seen.has(k)) items.push(link(k));
+    nav.replaceChildren(...items);
     const bn = document.getElementById('bottom-nav');
     const bItem = (k, label, icon) => h('a', { href: '#/' + k, dataset: { route: k } }, Icon(icon, 22), label);
-    bn.replaceChildren(bItem('dashboard', 'Tổng quan', 'dashboard'), bItem('transactions', 'Giao dịch', 'list'), h('button', { class: 'bn-add', type: 'button', 'aria-label': 'Thêm giao dịch', onclick: () => Forms.openTxn() }, Icon('plus', 26)), bItem('budgets', 'Ngân sách', 'pie'), h('button', { type: 'button', onclick: () => this.toggleNav(true) }, Icon('menu', 22), 'Thêm'));
+    bn.replaceChildren(bItem('dashboard', 'Tổng quan', 'dashboard'), bItem('transactions', 'Giao dịch', 'list'), h('button', { class: 'bn-add', type: 'button', 'aria-label': 'Thêm giao dịch', onclick: () => Forms.openTxn() }, Icon('plus', 26)), h('span', { id: 'bn-slot4', class: 'bn-slot' }), h('button', { type: 'button', onclick: () => this.toggleNav(true) }, Icon('menu', 22), 'Thêm'));
+    this.bnSlot4();
     document.getElementById('btn-menu').replaceChildren(Icon('menu'));
     document.getElementById('btn-add').replaceChildren(Icon('plus', 16), h('span', {}, 'Giao dịch'));
     const sel = document.getElementById('period-select');
     sel.replaceChildren(...Object.entries(Period.OPTIONS).map(([v, l]) => h('option', { value: v }, l)));
+  },
+  /** Ô thứ 4 thanh dưới: "Danh mục" khi hồ sơ đang nắm cổ phiếu, ngược lại "Ngân sách". */
+  bnSlot4() {
+    const el = document.getElementById('bn-slot4'); if (!el) return;
+    const inv = !!(this.state && (this.state.holdings || []).some(x => x.qty > 0));
+    const key = inv ? 'portfolio' : 'budgets'; if (el.dataset.k === key) return; el.dataset.k = key;
+    el.replaceChildren(h('a', { href: '#/' + key, dataset: { route: key } }, Icon(inv ? 'layers' : 'pie', 22), inv ? 'Danh mục' : 'Ngân sách'));
   },
   bindGlobal() {
     document.getElementById('btn-menu').addEventListener('click', () => this.toggleNav());
@@ -7472,6 +8223,7 @@ const App = {
     const pc = document.getElementById('period-ctl'); pc.style.display = r.period ? '' : 'none';
     const p = this.period(); const sel = document.getElementById('period-select'); sel.value = p.key;
     document.getElementById('page-sub').textContent = r.period ? p.range : '';
+    this.bnSlot4();
     for (const a of document.querySelectorAll('[data-route]')) a.classList.toggle('active', a.dataset.route === this.route);
     const due = this.state ? Recurring.due(this.state).length : 0;
     const navRec = document.querySelector('#nav [data-route=recurring]');
@@ -7546,7 +8298,7 @@ window.FinPilot = Object.freeze({
   totals: (from, to) => Ledger.totals(App.state, from, to),
   current: () => { const c = Ledger.current(App.state); return { cash: c.cash, totalAssets: c.totalAssets, liabilities: c.liabilities, netWorth: c.netWorth, balances: Object.fromEntries(c.balances), debts: Object.fromEntries(c.debtBalances) }; },
   integrity: () => Validation.integrity(App.state),
-  _internal: { App, Ledger, Validation, MergeService, ImportExport, Recurring, DateUtil, Money, SyncService, StorageService, Discipline, TrustedClock, CommitLog, Alloc, Model, Goals, Holdings: typeof Holdings !== 'undefined' ? Holdings : null, PriceService: typeof PriceService !== 'undefined' ? PriceService : null, Pages, Portfolio, Layers, LayerData: typeof LayerData !== 'undefined' ? LayerData : null, Decisions, Income }
+  _internal: { App, Ledger, Validation, MergeService, ImportExport, Recurring, DateUtil, Money, SyncService, StorageService, Discipline, TrustedClock, CommitLog, Alloc, Model, Goals, Holdings: typeof Holdings !== 'undefined' ? Holdings : null, PriceService: typeof PriceService !== 'undefined' ? PriceService : null, Pages, Portfolio, Layers, LayerData: typeof LayerData !== 'undefined' ? LayerData : null, Decisions, Income, Metrics, Projection, MetricData: typeof MetricData !== 'undefined' ? MetricData : null, Sectors, SectorData: typeof SectorData !== 'undefined' ? SectorData : null }
 });
 
 installTouchIcon();
