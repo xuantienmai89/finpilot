@@ -629,7 +629,7 @@ body.privacy .money:hover{filter:none}
    FinPilot Offline — CORE: hằng số, tiện ích, tiền tệ, ngày tháng, DOM helpers
    ========================================================================== */
 const APP_NAME = 'FinPilot Offline';
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.11.0';
 const SCHEMA_VERSION = 7; // v7 (1.9): lịch sử P/B, P/E theo quý (metrics), hồ sơ ngành (sectors), mã gắn ngành. v6 v6 (1.8): nhật ký quyết định (decisions), nguyên tắc viết tay, trần sinh dòng tiền/lỗ, mốc lợi suất, lịch dòng tiền (lãi suất · kỳ trả · đáo hạn), EPS. v5 (1.6): ngân sách tổng có danh sách loại trừ (exclude). v4 v4 (1.5): ngân sách "Tất cả chi tiêu" (categoryId __all__). v3 v3 (FinPilot 1.4): lớp tài sản trên tài khoản/tài sản/mã, cờ thu nhập thụ động, loại lãi suất nợ, nhóm ngoại tệ, kế hoạch lớp
 const MAX_AMOUNT = 100000000000000; // 100 nghìn tỷ đồng / một khoản
 const TZ = 'Asia/Ho_Chi_Minh';
@@ -637,6 +637,7 @@ const INTEREST_CAT_ID = 'cat_exp_interest';
 /** Ngân sách tổng: hạn mức cho TẤT CẢ chi tiêu trong tháng (mọi danh mục). */
 const BUDGET_ALL = '__all__';
 const BUDGET_ALL_LABEL = 'Tất cả chi tiêu';
+const BUDGET_CARRY_CAP = 1.5; // hạn mức sau khi cộng phần dư tháng trước không vượt quá 1,5 lần hạn mức gốc
 /** Danh mục gợi ý loại khỏi ngân sách tổng khi tạo mới (chi phí nhà ở thường cố định, theo dõi riêng). */
 const BUDGET_ALL_DEFAULT_EXCLUDE = ['cat_exp_housing'];
 const TOMBSTONE_TTL_DAYS = 400;
@@ -695,6 +696,7 @@ const Util = {
   sum(arr, f) { let s = 0; for (const x of arr) s += f ? f(x) : x; return s; },
   pct(a, b) { return b > 0 ? a / b * 100 : null; },
   fmtPct(p, digits = 1) {
+    if (p === Infinity) return '>100%';
     if (p === null || p === undefined || !Number.isFinite(p)) return '—';
     return p.toLocaleString('vi-VN', { maximumFractionDigits: digits }) + '%';
   },
@@ -1267,7 +1269,7 @@ const Defaults = {
   /** Giả định dự phóng 5 năm — mặc định không giả định tăng trưởng nào. */
   projection() { return { growth: {}, monthlyAdd: null, addLayer: '', rollover: false }; },
   settings() {
-    return { currencySymbol: '₫', defaultAccountId: '', pageSize: 25, savingsRateTarget: 20, emergencyTargetMonths: 6, compactCharts: true, showInsights: true, defaultBudgets: [], disciplineEpoch: 0, layerPlan: Defaults.layerPlan(), principles: [], projection: Defaults.projection(), updatedAt: '' };
+    return { currencySymbol: '₫', defaultAccountId: '', pageSize: 25, savingsRateTarget: 20, emergencyTargetMonths: 6, compactCharts: true, showInsights: true, budgetCarryOver: true, defaultBudgets: [], disciplineEpoch: 0, layerPlan: Defaults.layerPlan(), principles: [], projection: Defaults.projection(), updatedAt: '' };
   },
   state() {
     return {
@@ -1438,6 +1440,7 @@ const Model = {
     if (Number.isFinite(r.emergencyTargetMonths) && r.emergencyTargetMonths >= 1 && r.emergencyTargetMonths <= 36) out.emergencyTargetMonths = r.emergencyTargetMonths;
     if (typeof r.compactCharts === 'boolean') out.compactCharts = r.compactCharts;
     if (typeof r.showInsights === 'boolean') out.showInsights = r.showInsights;
+    if (typeof r.budgetCarryOver === 'boolean') out.budgetCarryOver = r.budgetCarryOver;
     if (Array.isArray(r.defaultBudgets)) out.defaultBudgets = r.defaultBudgets.filter(Util.isObj).map(x => { const cid = this.s(x.categoryId, 80); return cid === BUDGET_ALL ? { categoryId: cid, limit: x.limit, exclude: this.excludeList(x.exclude) } : { categoryId: cid, limit: x.limit }; }).filter(x => Validation.amt(x.limit));
     if (Number.isInteger(r.disciplineEpoch) && r.disciplineEpoch >= 0) out.disciplineEpoch = r.disciplineEpoch;
     out.layerPlan = this.layerPlan(r.layerPlan);
@@ -1856,15 +1859,17 @@ const Ledger = {
     }
     return b;
   },
+  /** Chi "Trả lãi vay" trả từ tài khoản nhưng KHÔNG gắn khoản nợ nào (ghi trước khi có tính năng gắn). */
+  unlinkedInterest(st) { return memo(st, 'unlInt', () => st.transactions.filter(t => t.type === 'expense' && t.categoryId === INTEREST_CAT_ID && !t.debtId && t.accountId).sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0)); },
   debtStats(st) {
     return memo(st, 'dstats', () => {
       const m = new Map();
-      for (const d of st.debts) m.set(d.id, { principalPaid: 0, interestPaid: 0, borrowed: 0, charged: 0, count: 0, lastPayment: '' });
+      for (const d of st.debts) m.set(d.id, { principalPaid: 0, interestPaid: 0, interestCharged: 0, borrowed: 0, charged: 0, count: 0, lastPayment: '' });
       for (const t of st.transactions) {
         const s = m.get(t.debtId); if (!s) continue;
         if (t.type === 'debt_payment') { s.principalPaid += t.principal; s.interestPaid += t.interest; s.count++; if (t.date > s.lastPayment) s.lastPayment = t.date; }
         else if (t.type === 'borrow') s.borrowed += t.amount;
-        else if (t.type === 'expense') s.charged += t.amount;
+        else if (t.type === 'expense') { s.charged += t.amount; if (t.categoryId === INTEREST_CAT_ID) s.interestCharged += t.amount; }
       }
       return m;
     });
@@ -1980,6 +1985,19 @@ const Budget = {
   status(pct) { if (pct === null) return 'ok'; if (pct > 100) return 'over'; if (pct >= 100) return 'full'; if (pct >= 80) return 'warn'; return 'ok'; },
   allLabel(names) { return BUDGET_ALL_LABEL + (names && names.length ? ` (trừ ${names.join(', ')})` : ''); },
   STATUS: { ok: { label: 'Trong hạn mức', tone: 'green' }, warn: { label: 'Đã dùng ≥ 80%', tone: 'amber' }, full: { label: 'Đã dùng hết', tone: 'amber' }, over: { label: 'Vượt hạn mức', tone: 'red' } },
+  // Chênh lệch của tháng trước (cùng danh mục / cùng ngân sách tổng) chuyển sang tháng này:
+  // > 0 = phần chi VƯỢT → trừ vào hạn mức; < 0 = phần DƯ chưa tiêu → cộng thêm vào hạn mức.
+  // Tính theo hạn mức THỰC của tháng trước (đã điều chỉnh kỳ trước nữa) nên vượt/dư sẽ dồn tiếp qua các tháng.
+  // Hạn mức sau điều chỉnh nằm trong [0, BUDGET_CARRY_CAP × hạn mức gốc] — phần dư vượt trần không được cộng.
+  adjLimit(base, carry) { return Math.min(Math.max(0, base - carry), Math.round(base * BUDGET_CARRY_CAP)); },
+  carry(st, month, categoryId) {
+    if (st.settings.budgetCarryOver === false) return 0;
+    const pm = DateUtil.addMonthKey(month, -1);
+    if (!st.budgets.some(b => b.month === pm && b.categoryId === categoryId)) return 0;
+    const pu = this.usage(st, pm);
+    const r = categoryId === BUDGET_ALL ? pu.all : pu.rows.find(x => x.budget.categoryId === categoryId);
+    return r ? r.spent - r.limit : 0;
+  },
   usage(st, month) {
     return memo(st, 'bud:' + month, () => {
       const spent = Ledger.byCategory(st, 'expense', DateUtil.monthStart(month), DateUtil.monthEnd(month));
@@ -1987,8 +2005,9 @@ const Budget = {
       const allB = st.budgets.find(b => b.month === month && b.categoryId === BUDGET_ALL) || null;
       const rows = st.budgets.filter(b => b.month === month && b.categoryId !== BUDGET_ALL).map(b => {
         const s = (spent.get(b.categoryId) || { amount: 0 }).amount;
-        const pct = b.limit > 0 ? s / b.limit * 100 : null;
-        return { budget: b, cat: cats.get(b.categoryId), limit: b.limit, spent: s, remaining: b.limit - s, pct, status: this.status(pct) };
+        const carry = this.carry(st, month, b.categoryId); const lim = this.adjLimit(b.limit, carry);
+        const pct = lim > 0 ? s / lim * 100 : carry > 0 ? (s > 0 ? Infinity : 100) : null;
+        return { budget: b, cat: cats.get(b.categoryId), limit: lim, baseLimit: b.limit, carry, spent: s, remaining: lim - s, pct, status: this.status(pct) };
       }).sort((a, b) => (b.pct || 0) - (a.pct || 0));
       const budgeted = new Set(rows.map(r => r.budget.categoryId));
       const unbudgeted = [];
@@ -1999,15 +2018,17 @@ const Budget = {
       const ex = new Set(allB ? (allB.exclude || []).filter(id => cats.has(id)) : []);
       let rawTotal = 0, totalSpent = 0, excludedSpent = 0;
       for (const [cid, v] of spent) { rawTotal += v.amount; if (ex.has(cid)) excludedSpent += v.amount; else totalSpent += v.amount; }
-      const mk = (lim, s) => { const p = lim > 0 ? s / lim * 100 : null; return { limit: lim, spent: s, remaining: lim - s, pct: p, status: this.status(p) }; };
+      const mk = (lim, s) => { const p = lim > 0 ? s / lim * 100 : lim === 0 && s > 0 ? Infinity : null; return { limit: lim, spent: s, remaining: lim - s, pct: p, status: this.status(p) }; };
       const exNames = Array.from(ex).map(id => cats.get(id).name);
-      const all = allB ? { budget: allB, ...mk(allB.limit, totalSpent), exclude: Array.from(ex), excludeNames: exNames, excludedSpent, label: this.allLabel(exNames), short: exNames.length ? `tổng, trừ ${exNames.join(', ')}` : 'tất cả chi tiêu' } : null;
+      const allCarry = allB ? this.carry(st, month, BUDGET_ALL) : 0;
+      const all = allB ? { budget: allB, ...mk(this.adjLimit(allB.limit, allCarry), totalSpent), baseLimit: allB.limit, carry: allCarry, exclude: Array.from(ex), excludeNames: exNames, excludedSpent, label: this.allLabel(exNames), short: exNames.length ? `tổng, trừ ${exNames.join(', ')}` : 'tất cả chi tiêu' } : null;
       // Hạn mức riêng của các danh mục nằm TRONG phạm vi ngân sách tổng (để so sánh với hạn mức tổng).
       const inScopeLimit = Util.sum(rows.filter(r => !ex.has(r.budget.categoryId)), r => r.limit);
       const catPart = rows.length ? mk(limit, used) : null;
       // Số "đầu bảng" dùng ở Tổng quan / Báo cáo: ưu tiên ngân sách tổng nếu có.
       const headline = all ? { ...mk(all.limit, totalSpent), scope: 'all' } : catPart ? { ...catPart, scope: 'categories' } : null;
-      return { month, rows, unbudgeted, all, headline, totalSpent, rawTotal, excluded: ex, inScopeLimit, limit, spent: used, remaining: limit - used, pct: limit > 0 ? used / limit * 100 : null, overCount: rows.filter(r => r.status === 'over').length, allOver: !!(all && all.status === 'over') };
+      const carry = Util.sum(rows, r => r.carry) + allCarry;
+      return { month, rows, unbudgeted, all, headline, carry, totalSpent, rawTotal, excluded: ex, inScopeLimit, limit, spent: used, remaining: limit - used, pct: limit > 0 ? used / limit * 100 : null, overCount: rows.filter(r => r.status === 'over').length, allOver: !!(all && all.status === 'over') };
     });
   }
 };
@@ -4675,7 +4696,7 @@ const C = {
     return h('div', { class: 'empty' }, h('div', { class: 'e-icon' }, Icon(icon, 24)), h('h3', { text: title }), text ? h('p', { text }) : null, actions ? h('div', { class: 'btn-group', style: { justifyContent: 'center' } }, actions) : null);
   },
   progress(pct, tone = '', lg = false) {
-    const w = pct === null || !Number.isFinite(pct) ? 0 : Math.max(0, Math.min(100, pct));
+    const w = pct === Infinity ? 100 : pct === null || !Number.isFinite(pct) ? 0 : Math.max(0, Math.min(100, pct));
     return h('div', { class: 'progress ' + tone + (lg ? ' lg' : ''), role: 'progressbar', 'aria-valuenow': Math.round(w), 'aria-valuemin': 0, 'aria-valuemax': 100 }, h('span', { style: { width: w + '%' } }));
   },
   callout(icon, content, tone = '') { return h('div', { class: 'callout ' + tone }, Icon(icon, 18), h('div', {}, content)); },
@@ -4907,7 +4928,16 @@ const Forms = {
         const src = [{ value: '', label: '— Chọn nguồn thanh toán —' }, { group: 'Tài khoản', options: this.accountOptions(st, { includeIds: inc }).map(o => ({ value: 'acc:' + o.value, label: o.label })) }, { group: 'Ghi nợ (thẻ tín dụng / trả sau)', options: this.debtOptions(st, { includeIds: original && original.debtId ? [original.debtId] : [] }).map(o => ({ value: 'debt:' + o.value, label: o.label })) }];
         const cur = raw.accountId && !raw.accountId.includes(':') ? 'acc:' + raw.accountId : raw.accountId;
         add(F.field('Thanh toán bằng', F.select('accountId', src, cur), { required: true, name: 'accountId', hint: 'Chọn thẻ tín dụng nếu chi bằng thẻ: chi phí được ghi nhận, dư nợ thẻ tăng.' }));
-        add(F.field('Danh mục', F.select('categoryId', [{ value: '', label: '— Chọn danh mục —' }].concat(this.categoryOptions(st, 'expense', original ? [original.categoryId] : [])), raw.categoryId), { required: true, name: 'categoryId' }));
+        const catSel = F.select('categoryId', [{ value: '', label: '— Chọn danh mục —' }].concat(this.categoryOptions(st, 'expense', original ? [original.categoryId] : [])), raw.categoryId);
+        add(F.field('Danh mục', catSel, { required: true, name: 'categoryId' }));
+        // Trả lãi vay từ tài khoản → gắn với khoản nợ (lưu thành "Trả nợ" gốc 0, lãi = số tiền) để khoản nợ hiện đúng số lãi đã trả.
+        const debtOpts = this.debtOptions(st, {});
+        const intSel = F.select('interestDebtId', [{ value: '', label: 'Không gắn khoản nợ' }].concat(debtOpts), raw.interestDebtId || (debtOpts.length === 1 ? debtOpts[0].value : ''));
+        const intField = F.field('Lãi của khoản nợ', intSel, { name: 'interestDebtId', hint: 'Giao dịch được lưu thành "Trả nợ" với tiền gốc 0 và tiền lãi bằng số tiền này — vẫn tính vào chi tiêu "Trả lãi vay".' });
+        const srcSel = grid.querySelector('select[name="accountId"]');
+        const syncInt = () => { intField.hidden = !debtOpts.length || catSel.value !== INTEREST_CAT_ID || (srcSel && srcSel.value.startsWith('debt:')); };
+        catSel.addEventListener('change', syncInt); if (srcSel) srcSel.addEventListener('change', syncInt);
+        add(intField); syncInt();
         add(F.field('Chi cho / Nơi chi', F.input('payee', raw.payee, { placeholder: 'VD: Siêu thị, Grab…', maxlength: 120 }), { name: 'payee' }));
         break;
       }
@@ -4925,7 +4955,7 @@ const Forms = {
         const updHint = () => { const id = dsel.value; if (!id) { hint.textContent = ''; return; } const bal = Ledger.debtBalanceExcluding(st, id, original ? original.id : null); hint.textContent = 'Dư nợ còn lại (không tính giao dịch này): ' + Money.format(bal); };
         dsel.addEventListener('change', updHint); updHint();
         add(F.field('Khoản nợ', dsel, { required: true, name: 'debtId', hint }), dateField());
-        add(F.field('Tiền gốc', F.money('principal', null, { value: raw.principal, placeholder: '0' }), { name: 'principal', hint: 'Giảm dư nợ — không tính là chi tiêu.' }));
+        add(F.field('Tiền gốc', F.money('principal', null, { value: raw.principal, placeholder: '0' }), { name: 'principal', hint: 'Giảm dư nợ — không tính là chi tiêu. Chỉ trả lãi thì để trống/0.' }));
         add(F.field('Tiền lãi', F.money('interest', null, { value: raw.interest, placeholder: '0' }), { name: 'interest', hint: 'Ghi nhận là chi tiêu "Trả lãi vay".' }));
         add(F.field('Trả từ tài khoản', F.select('accountId', accOpts, this.plainAcc(raw.accountId)), { required: true, name: 'accountId' }));
         add(F.field('Nội dung', F.input('payee', raw.payee, { maxlength: 120, placeholder: 'VD: Trả góp tháng 10' }), { name: 'payee' }));
@@ -4967,6 +4997,9 @@ const Forms = {
     if (form.elements.direction) o.direction = F.val(form, 'direction');
     if (form.elements.goalId) o.goalId = F.val(form, 'goalId');
     if (form.elements.goalDir) o.goalDir = o.goalId ? F.val(form, 'goalDir') : '';
+    if (type === 'expense' && o.categoryId === INTEREST_CAT_ID && o.accountId && form.elements.interestDebtId && F.val(form, 'interestDebtId')) {
+      Object.assign(o, { type: 'debt_payment', debtId: F.val(form, 'interestDebtId'), categoryId: '', principal: 0, interest: o.amount });
+    }
     o.payee = F.val(form, 'payee'); o.note = F.val(form, 'note'); o.tags = F.val(form, 'tags');
     o.reconciled = form.elements.reconciled ? form.elements.reconciled.checked : false;
     return { obj: o, errs };
@@ -5341,14 +5374,14 @@ const Forms = {
     for (const t of st.transactions) {
       if (t.debtId !== debt.id) continue;
       if (t.type === 'borrow') rows.push({ date: t.date, label: 'Nhận tiền vay', delta: t.amount, note: (acc.get(t.accountId) || {}).name, txn: t });
-      else if (t.type === 'expense') rows.push({ date: t.date, label: 'Chi bằng nợ/thẻ', delta: t.amount, note: t.payee || t.note, txn: t });
+      else if (t.type === 'expense') rows.push({ date: t.date, label: t.categoryId === INTEREST_CAT_ID ? 'Lãi tính vào dư nợ' : 'Chi bằng nợ/thẻ', delta: t.amount, interest: t.categoryId === INTEREST_CAT_ID ? t.amount : undefined, note: t.payee || t.note, txn: t });
       else if (t.type === 'debt_payment') rows.push({ date: t.date, label: 'Trả nợ', delta: -t.principal, interest: t.interest, note: (acc.get(t.accountId) || {}).name, txn: t });
     }
     rows.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
     let run = 0; for (const r of rows) { run += r.delta; r.bal = run; }
     const s = Ledger.debtStats(st).get(debt.id);
     const body = h('div', {},
-      h('div', { class: 'summary-strip' }, h('span', {}, 'Đã trả gốc: ', h('b', { class: 'money' }, Money.format(s.principalPaid))), h('span', {}, 'Đã trả lãi: ', h('b', { class: 'money' }, Money.format(s.interestPaid))), h('span', {}, 'Dư nợ hiện tại (đến hôm nay): ', h('b', { class: 'money' }, Money.format(Ledger.current(st).debtBalances.get(debt.id) || 0)))),
+      h('div', { class: 'summary-strip' }, h('span', {}, 'Đã trả gốc: ', h('b', { class: 'money' }, Money.format(s.principalPaid))), h('span', {}, 'Đã trả lãi: ', h('b', { class: 'money' }, Money.format(s.interestPaid))), s.interestCharged ? h('span', {}, 'Lãi tính vào dư nợ: ', h('b', { class: 'money' }, Money.format(s.interestCharged))) : null, h('span', {}, 'Dư nợ hiện tại (đến hôm nay): ', h('b', { class: 'money' }, Money.format(Ledger.current(st).debtBalances.get(debt.id) || 0)))),
       h('div', { class: 'table-wrap', style: { maxHeight: '55vh' } }, h('table', { class: 'table responsive' },
         h('thead', {}, h('tr', {}, h('th', {}, 'Ngày'), h('th', {}, 'Nghiệp vụ'), h('th', { class: 'num' }, 'Thay đổi dư nợ'), h('th', { class: 'num' }, 'Lãi'), h('th', { class: 'num' }, 'Dư nợ lũy kế'), h('th', {}, ''))),
         h('tbody', {}, rows.map(r => h('tr', {}, h('td', { dataset: { label: 'Ngày' } }, DateUtil.toVN(r.date)), h('td', { dataset: { label: 'Nghiệp vụ' } }, h('div', { class: 'cell-main', text: r.label }), r.note ? h('div', { class: 'cell-sub', text: r.note }) : null), h('td', { class: 'num', dataset: { label: 'Thay đổi' } }, C.money(r.delta, { sign: true })), h('td', { class: 'num', dataset: { label: 'Lãi' } }, r.interest ? C.money(r.interest) : '—'), h('td', { class: 'num', dataset: { label: 'Lũy kế' } }, C.money(r.bal)),
@@ -5798,7 +5831,7 @@ Pages.budgets = function (view) {
   const st = App.state; const month = App.ui.budgetMonth || DateUtil.monthKey(DateUtil.today()); App.ui.budgetMonth = month;
   const bu = Budget.usage(st, month);
   const nav = h('div', { class: 'month-nav' }, C.iconBtn('left', 'Tháng trước', () => { App.ui.budgetMonth = DateUtil.addMonthKey(month, -1); App.render(); }), h('span', { class: 'ml', text: DateUtil.monthLabel(month) }), C.iconBtn('right', 'Tháng sau', () => { App.ui.budgetMonth = DateUtil.addMonthKey(month, 1); App.render(); }), month !== DateUtil.monthKey(DateUtil.today()) ? C.btn('Tháng này', () => { App.ui.budgetMonth = null; App.render(); }, { cls: 'btn-sm btn-ghost' }) : null);
-  view.append(C.pageHead('Ngân sách & kiểm soát chi tiêu', 'Hạn mức theo tháng và danh mục. Số đã chi lấy từ giao dịch chi tiêu thực tế (gồm phần lãi khi trả nợ), không gồm chuyển tiền nội bộ. Ngân sách tháng nào chỉ áp dụng cho tháng đó.', [
+  view.append(C.pageHead('Ngân sách & kiểm soát chi tiêu', 'Hạn mức theo tháng và danh mục. Số đã chi lấy từ giao dịch chi tiêu thực tế (gồm phần lãi khi trả nợ), không gồm chuyển tiền nội bộ. ' + (st.settings.budgetCarryOver === false ? 'Ngân sách tháng nào chỉ áp dụng cho tháng đó.' : 'Hạn mức tháng trước bị vượt sẽ trừ vào tháng sau, còn dư sẽ cộng thêm cho tháng sau (tối đa 1,5 lần hạn mức gốc; cùng danh mục / ngân sách tổng).'), [
     C.btn('Sao chép tháng trước', () => Pages.copyBudgets(month, 'prev'), { icon: 'copy' }),
     st.settings.defaultBudgets.length ? C.btn('Áp dụng mặc định', () => Pages.copyBudgets(month, 'default'), { icon: 'repeat' }) : null,
     C.btn('Thêm ngân sách', () => Forms.openBudget(month), { icon: 'plus', cls: 'btn-primary' })]));
@@ -5809,10 +5842,11 @@ Pages.budgets = function (view) {
     const A = bu.all; const s = Budget.STATUS[A.status];
     const perDay = isCur && A.remaining > 0 ? Math.floor(A.remaining / daysLeft) : null;
     view.append(h('div', { class: 'kpi-grid mb-12' },
-      C.kpi({ label: A.exclude.length ? 'Hạn mức ngân sách tổng' : 'Hạn mức tất cả chi tiêu', value: C.money(A.limit), icon: 'pie', featured: true, sub: bu.rows.length ? `Các danh mục riêng: ${Money.compact(bu.limit)} (${bu.rows.length} danh mục)` : 'Chưa đặt hạn mức riêng cho danh mục nào' }),
+      C.kpi({ label: A.exclude.length ? 'Hạn mức ngân sách tổng' : 'Hạn mức tất cả chi tiêu', value: C.money(A.limit), icon: 'pie', featured: true, sub: A.carry ? `Gốc ${Money.compact(A.baseLimit)} ${A.carry > 0 ? '− vượt' : '+ dư'} tháng trước ${Money.compact(Math.abs(A.limit - A.baseLimit))}${A.carry < 0 && A.limit - A.baseLimit < -A.carry ? ' (trần)' : ''}` : bu.rows.length ? `Các danh mục riêng: ${Money.compact(bu.limit)} (${bu.rows.length} danh mục)` : 'Chưa đặt hạn mức riêng cho danh mục nào' }),
       C.kpi({ label: 'Đã chi cả tháng', value: C.money(A.spent, { tone: 'neg' }), icon: 'trendDown', sub: `Đã dùng ${Util.fmtPct(A.pct, 0)} · ${A.exclude.length ? 'trừ ' + A.excludeNames.join(', ') : 'mọi danh mục'}`, extra: h('div', { class: 'kpi-bar' }, C.progress(A.pct, s.tone)) }),
       C.kpi({ label: A.remaining >= 0 ? 'Còn được chi' : 'Vượt hạn mức', value: C.money(Math.abs(A.remaining)), tone: A.remaining >= 0 ? 'green' : 'red', icon: 'coins', sub: perDay !== null ? `Còn ${daysLeft} ngày · bình quân ${Money.compact(perDay)}/ngày` : s.label }),
       C.kpi({ label: 'Danh mục vượt', value: String(bu.overCount), tone: bu.overCount ? 'red' : 'green', icon: 'alert', sub: bu.rows.length ? 'Vượt 100% hạn mức riêng' : '—' })));
+    if (A.carry) view.append(h('div', { class: 'mb-12' }, (A.carry > 0 ? C.callout('alert', `Tháng trước chi vượt ngân sách tổng ${Money.format(A.carry)} — đã trừ vào hạn mức tháng này: ${Money.format(A.baseLimit)} − ${Money.format(A.carry)} = ${Money.format(A.limit)}.`, 'warn') : C.callout('coins', `Tháng trước còn dư ngân sách tổng ${Money.format(-A.carry)} — đã cộng vào hạn mức tháng này: ${Money.format(A.baseLimit)} + ${Money.format(A.limit - A.baseLimit)} = ${Money.format(A.limit)}${A.limit - A.baseLimit < -A.carry ? ` (chạm trần ${String(BUDGET_CARRY_CAP).replace('.', ',')} lần hạn mức gốc)` : ''}.`, 'good'))));
     if (bu.inScopeLimit > A.limit) view.append(h('div', { class: 'mb-12' }, C.callout('info', `Tổng hạn mức các danh mục nằm trong ngân sách tổng (${Money.format(bu.inScopeLimit)}) lớn hơn hạn mức tổng (${Money.format(A.limit)}) — tiêu hết các danh mục sẽ vượt hạn mức tổng.`)));
     view.append(h('div', { class: 'mb-12' }, C.card(null, h('div', { class: 'flex between flex-wrap', style: { gap: '12px' } },
       h('div', { class: 'grow', style: { minWidth: '220px' } }, h('div', { class: 'cell-main' }, '🧾 ' + A.label, ' ', C.badge(s.label, s.tone)), h('div', { class: 'small muted' }, `${Money.format(A.spent)} / ${Money.format(A.limit)} · ${A.exclude.length ? `KHÔNG gồm ${A.excludeNames.join(', ')} (tháng này ${Money.format(A.excludedSpent)}, theo dõi riêng)` : 'gồm cả danh mục chưa có hạn mức riêng'}`), h('div', { class: 'mt-8' }, C.progress(A.pct, s.tone, true))),
@@ -5830,7 +5864,7 @@ Pages.budgets = function (view) {
       h('thead', {}, h('tr', {}, h('th', {}, 'Danh mục'), h('th', { class: 'num' }, 'Hạn mức'), h('th', { class: 'num' }, 'Đã chi'), h('th', { class: 'num' }, 'Còn lại'), h('th', { style: { width: '22%' } }, 'Tỷ lệ sử dụng'), h('th', {}, 'Trạng thái'), h('th', {}, ''))),
       h('tbody', {}, bu.rows.map(r => { const s = Budget.STATUS[r.status]; return h('tr', {},
         h('td', { class: 'td-main' }, C.catChip(r.cat), bu.all && bu.excluded.has(r.budget.categoryId) ? h('div', {}, C.badge('không tính vào tổng', 'blue')) : null),
-        h('td', { class: 'num', dataset: { label: 'Hạn mức' } }, C.money(r.limit)),
+        h('td', { class: 'num', dataset: { label: 'Hạn mức' } }, C.money(r.limit), r.carry ? h('div', { class: 'tiny muted', title: 'Hạn mức gốc điều chỉnh theo phần vượt (trừ) / dư (cộng) của tháng trước; tối đa 1,5 lần hạn mức gốc' }, `${Money.compact(r.baseLimit)} ${r.carry > 0 ? '−' : '+'} ${Money.compact(Math.abs(r.limit - r.baseLimit))} ${r.carry > 0 ? 'vượt' : 'dư'} T.trước${r.carry < 0 && r.limit - r.baseLimit < -r.carry ? ' (trần)' : ''}`) : null),
         h('td', { class: 'num', dataset: { label: 'Đã chi' } }, C.money(r.spent)),
         h('td', { class: 'num', dataset: { label: 'Còn lại' } }, C.money(r.remaining, { tone: r.remaining < 0 ? 'neg' : '' })),
         h('td', { dataset: { label: 'Sử dụng' } }, h('div', { class: 'flex', style: { minWidth: '140px' } }, h('div', { class: 'grow' }, C.progress(r.pct, s.tone)), h('span', { class: 'small num', style: { width: '44px', textAlign: 'right' } }, Util.fmtPct(r.pct, 0)))),
@@ -5838,7 +5872,7 @@ Pages.budgets = function (view) {
         h('td', { class: 'actions' }, C.iconBtn('list', 'Xem giao dịch', () => { Object.assign(App.ui.txnFilter, { q: '', from: DateUtil.monthStart(month), to: DateUtil.monthEnd(month), type: '', categoryId: r.budget.categoryId, accountId: '', page: 1 }); App.navigate('transactions'); }), C.iconBtn('edit', 'Sửa', () => Forms.openBudget(month, r.budget)), C.iconBtn('trash', 'Xóa', async () => { if (!(await Modal.confirm({ title: 'Xóa ngân sách?', message: `${r.cat ? r.cat.name : ''} — ${DateUtil.monthLabel(month)}`, confirmText: 'Xóa', danger: true }))) return; try { await App.commit('Xóa ngân sách', d => { d.budgets = d.budgets.filter(x => x.id !== r.budget.id); }, { undoLabel: 'Đã xóa ngân sách' }); Toast.show('Đã xóa ngân sách', { type: 'success', action: { label: 'Hoàn tác', fn: () => App.undo() } }); } catch (e) { Toast.show(e.message, { type: 'error' }); } }, 'danger'))); })),
       h('tfoot', {}, h('tr', {}, h('td', {}, 'Tổng'), h('td', { class: 'num', dataset: { label: 'Hạn mức' } }, C.money(bu.limit)), h('td', { class: 'num', dataset: { label: 'Đã chi' } }, C.money(bu.spent)), h('td', { class: 'num', dataset: { label: 'Còn lại' } }, C.money(bu.remaining, { tone: bu.remaining < 0 ? 'neg' : '' })), h('td', { dataset: { label: 'Sử dụng' } }, Util.fmtPct(bu.pct, 0)), h('td', {}), h('td', {}))));
     const chart = chartBox(260);
-    view.append(h('div', { class: 'grid-12' }, C.card('Bảng ngân sách', h('div', { class: 'table-wrap' }, table), { cls: 'span-7', sub: 'Cảnh báo ở mốc 80%, 100% và khi vượt hạn mức' }), C.card('So sánh hạn mức và thực chi', chart, { cls: 'span-5' })));
+    view.append(h('div', { class: 'grid-12' }, C.card('Bảng ngân sách', h('div', { class: 'table-wrap' }, table), { cls: 'span-7', sub: 'Cảnh báo ở mốc 80%, 100% và khi vượt hạn mức' + (bu.rows.some(r => r.carry) ? ' · hạn mức đã điều chỉnh theo phần vượt/dư tháng trước' : '') }), C.card('So sánh hạn mức và thực chi', chart, { cls: 'span-5' })));
     lateRender(() => Charts.safe(chart, () => Charts.bars(chart, { labels: bu.rows.map(r => r.cat ? r.cat.name.slice(0, 10) : '?'), tipLabels: bu.rows.map(r => r.cat ? r.cat.name : '?'), series: [{ name: 'Hạn mức', color: 'var(--primary)', values: bu.rows.map(r => r.limit) }, { name: 'Thực chi', color: 'var(--red)', values: bu.rows.map(r => r.spent) }] })));
   }
   if (bu.unbudgeted.length) view.append(h('div', { style: { marginTop: '16px' } }, C.card(bu.all ? 'Danh mục chưa có hạn mức riêng' : 'Chi tiêu chưa có ngân sách', h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' }, h('thead', {}, h('tr', {}, h('th', {}, 'Danh mục'), h('th', { class: 'num' }, 'Đã chi'), h('th', { class: 'num' }, 'Số khoản'), h('th', {}, ''))), h('tbody', {}, bu.unbudgeted.map(u => h('tr', {}, h('td', { class: 'td-main' }, C.catChip(u.cat), bu.excluded.has(u.categoryId) ? h('span', {}, ' ', C.badge('không tính vào tổng', 'blue')) : null), h('td', { class: 'num', dataset: { label: 'Đã chi' } }, C.money(u.spent)), h('td', { class: 'num', dataset: { label: 'Số khoản' } }, String(u.count)), h('td', { class: 'actions' }, u.cat && u.cat.active ? C.btn('Đặt hạn mức', () => Forms.openBudget(month, null, u.categoryId), { cls: 'btn-sm btn-ghost' }) : null)))))), { sub: DateUtil.monthLabel(month) })));
@@ -6001,11 +6035,12 @@ Pages.assets = function (view) {
       return h('tr', { style: d.active ? null : { opacity: .6 } },
         h('td', { class: 'td-main' }, h('div', { class: 'cell-main' }, d.name, d.active ? '' : ' (đã đóng)'), h('div', { class: 'cell-sub', text: DEBT_TYPES[d.type] + ' · từ ' + DateUtil.toVN(d.startDate) }), totalOrig > 0 ? h('div', { style: { maxWidth: '200px', marginTop: '4px' } }, C.progress(Math.min(100, s.principalPaid / totalOrig * 100), 'green')) : null),
         h('td', { class: 'num', dataset: { label: 'Dư nợ' } }, C.money(bal, { tone: bal > 0 ? 'neg' : '' }), est ? h('div', { class: 'tiny muted', title: 'Ước tính trả đều (gốc + lãi) theo công thức niên kim, chỉ để tham khảo' }, `~${Money.compact(est)}/tháng (ước tính)`) : null),
-        h('td', { class: 'num', dataset: { label: 'Đã trả' } }, h('div', {}, C.money(s.principalPaid)), h('div', { class: 'tiny muted' }, 'Lãi ' + Money.format(s.interestPaid))),
+        h('td', { class: 'num', dataset: { label: 'Đã trả' } }, h('div', {}, C.money(s.principalPaid)), h('div', { class: 'tiny muted', title: s.interestCharged ? `Trả lãi ${Money.format(s.interestPaid)} + lãi tính vào dư nợ ${Money.format(s.interestCharged)}` : 'Tiền lãi đã trả cho khoản nợ này' }, 'Lãi ' + Money.format(s.interestPaid + s.interestCharged))),
         h('td', { dataset: { label: 'Lãi suất' }, class: 'small' }, d.interestRate === null ? '—' : d.interestRate.toLocaleString('vi-VN') + '%/năm', d.termMonths ? ` · ${d.termMonths} tháng` : ''),
         h('td', { dataset: { label: 'Đến hạn' }, class: 'small' }, d.dueDate ? DateUtil.toVN(d.dueDate) : '—', d.dueDate && d.dueDate < today && bal > 0 ? h('div', { class: 'tiny neg' }, 'Quá hạn') : null),
         h('td', { class: 'actions' },
           d.active && bal > 0 ? C.btn('Trả nợ', () => Forms.openTxn({ preset: { type: 'debt_payment', debtId: d.id } }), { cls: 'btn-sm btn-primary' }) : null,
+          d.active ? C.iconBtn('coins', 'Trả lãi (không trả gốc)', () => Forms.openTxn({ preset: { type: 'debt_payment', debtId: d.id, principal: 0 } })) : null,
           C.iconBtn('history', 'Lịch sử', () => Forms.openDebtHistory(d)),
           d.active ? C.iconBtn('plus', 'Nhận thêm tiền vay', () => Forms.openTxn({ preset: { type: 'borrow', debtId: d.id } })) : null,
           d.active ? C.iconBtn('swap', 'Điều chỉnh dư nợ', () => Forms.openDebtAdjust(d)) : null,
@@ -6013,10 +6048,52 @@ Pages.assets = function (view) {
           C.iconBtn(d.active ? 'eyeOff' : 'eye', d.active ? 'Đóng khoản nợ' : 'Mở lại', () => Pages.toggleDebt(d, bal)),
           C.iconBtn('trash', 'Xóa', () => Pages.deleteDebt(d), 'danger')));
     })))) : C.empty('coins', 'Chưa có khoản nợ', 'Ghi nhận khoản vay ngân hàng, vay cá nhân, dư nợ thẻ tín dụng…', [C.btn('Thêm khoản nợ', () => Forms.openDebt(), { icon: 'plus', cls: 'btn-primary' })]);
-  view.append(h('div', { style: { height: '16px' } }), C.card('Nợ phải trả', debtBody, { sub: 'Trả nợ: phần gốc làm giảm dư nợ (không là chi tiêu), phần lãi được ghi vào chi tiêu "Trả lãi vay".' }));
+  view.append(h('div', { style: { height: '16px' } }), C.card('Nợ phải trả', debtBody, { sub: 'Trả nợ: phần gốc làm giảm dư nợ (không là chi tiêu), phần lãi được ghi vào chi tiêu "Trả lãi vay" và cộng vào cột Lãi của khoản nợ.' }));
+  const unl = Pages.unlinkedInterestCard(st); if (unl) view.append(h('div', { style: { height: '16px' } }), unl);
   const ch = chartBox(220); const snaps = st.snapshots.slice(-120);
   view.append(h('div', { style: { height: '16px' } }), C.card('Lịch sử tài sản ròng', ch, { sub: `${st.snapshots.length} bản chụp đã lưu`, actions: [C.btn('Chụp số liệu hôm nay', () => Pages.manualSnapshot(), { cls: 'btn-sm', icon: 'camera' }), C.btn('Xem báo cáo', () => { App.ui.reportTab = 'networth'; App.navigate('reports'); }, { cls: 'btn-sm btn-ghost' })] }));
   lateRender(() => Charts.safe(ch, () => Charts.line(ch, { labels: snaps.map(s => DateUtil.shortVN(s.date)), tipLabels: snaps.map(s => DateUtil.toVN(s.date)), series: [{ name: 'Tài sản ròng', color: 'var(--primary)', values: snaps.map(s => s.netWorth) }], emptyText: 'Cần ít nhất 2 bản chụp để vẽ biểu đồ.' })));
+};
+// Gắn các khoản chi "Trả lãi vay" cũ vào khoản nợ: chuyển thành giao dịch "Trả nợ" với gốc 0, lãi = số tiền.
+// Tổng chi tiêu, số dư tài khoản và dư nợ KHÔNG đổi — chỉ thêm liên kết để khoản nợ hiện đúng số lãi đã trả.
+Pages.guessDebt = function (st, t) {
+  const hay = Util.norm([t.payee, t.note, (t.tags || []).join(' ')].join(' '));
+  const hit = st.debts.filter(d => d.active && hay && Util.norm(d.name).length >= 2 && hay.includes(Util.norm(d.name)));
+  if (hit.length === 1) return hit[0].id;
+  const act = st.debts.filter(d => d.active && (d.interestRate || 0) > 0);
+  return act.length === 1 ? act[0].id : '';
+};
+Pages.linkInterest = async function (pairs) {
+  pairs = pairs.filter(x => x.debtId);
+  if (!pairs.length) return Toast.show('Chọn khoản nợ cho giao dịch cần gắn.', { type: 'warn' });
+  try {
+    await App.commit('Gắn lãi vay vào khoản nợ', d => {
+      for (const { id, debtId } of pairs) {
+        const i = d.transactions.findIndex(x => x.id === id); if (i < 0) continue; const t = d.transactions[i];
+        if (!d.debts.some(x => x.id === debtId)) throw new AppError('Khoản nợ không tồn tại.');
+        d.transactions[i] = Model.transaction({ ...t, type: 'debt_payment', debtId, categoryId: '', principal: 0, interest: t.amount, updatedAt: Util.nowISO() });
+      }
+    }, { undoLabel: 'Đã gắn lãi vay' });
+    Toast.show(`Đã gắn ${pairs.length} khoản lãi vào khoản nợ.`, { type: 'success', action: { label: 'Hoàn tác', fn: () => App.undo() } });
+  } catch (e) { Toast.show(e.message, { type: 'error' }); }
+};
+Pages.unlinkedInterestCard = function (st) {
+  const list = Ledger.unlinkedInterest(st); const debts = st.debts.filter(d => d.active);
+  if (!list.length || !debts.length) return null;
+  const acc = Util.byId(st.accounts); const sels = [];
+  const opts = [{ value: '', label: '— Chọn khoản nợ —' }].concat(debts.map(d => ({ value: d.id, label: d.name })));
+  const rows = list.slice(0, 50).map(t => {
+    const sel = F.select('link_' + t.id, opts, Pages.guessDebt(st, t)); sels.push({ id: t.id, sel });
+    return h('tr', {},
+      h('td', { dataset: { label: 'Ngày' } }, DateUtil.toVN(t.date)),
+      h('td', { class: 'td-main' }, h('div', { class: 'cell-main', text: t.payee || 'Trả lãi vay' }), h('div', { class: 'cell-sub', text: (acc.get(t.accountId) || {}).name || '' })),
+      h('td', { class: 'num', dataset: { label: 'Tiền lãi' } }, C.money(t.amount)),
+      h('td', { dataset: { label: 'Khoản nợ' }, style: { minWidth: '180px' } }, sel),
+      h('td', { class: 'actions' }, C.btn('Gắn', () => Pages.linkInterest([{ id: t.id, debtId: sel.value }]), { cls: 'btn-sm btn-primary' })));
+  });
+  const table = h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' }, h('thead', {}, h('tr', {}, h('th', {}, 'Ngày'), h('th', {}, 'Nội dung'), h('th', { class: 'num' }, 'Tiền lãi'), h('th', {}, 'Khoản nợ'), h('th', {}, ''))), h('tbody', {}, rows)));
+  return C.card(`Lãi vay chưa gắn khoản nợ (${list.length})`, h('div', {}, h('div', { class: 'small muted mb-12', text: 'Các khoản chi "Trả lãi vay" dưới đây chưa biết là lãi của khoản nợ nào nên cột Lãi đang hiện 0 ₫. Chọn khoản nợ rồi bấm Gắn — tổng chi tiêu, số dư tài khoản và dư nợ không thay đổi.' }), table, list.length > 50 ? h('div', { class: 'tiny muted mt-8', text: `Đang hiện 50/${list.length} khoản mới nhất.` }) : null),
+    { actions: [C.btn('Gắn tất cả đã chọn', () => Pages.linkInterest(sels.map(x => ({ id: x.id, debtId: x.sel.value }))), { cls: 'btn-sm btn-primary', icon: 'check' })] });
 };
 Pages.toggleDebt = async function (d, bal) {
   if (d.active && bal > 0 && !(await Modal.confirm({ title: 'Đóng khoản nợ?', message: `Khoản nợ còn dư ${Money.format(bal)}. Đóng chỉ ẩn khỏi danh sách chọn; dư nợ vẫn được tính vào tổng nợ.`, confirmText: 'Đóng' }))) return;
@@ -6327,12 +6404,13 @@ Pages.settings = function (view) {
   const sr = F.input('savingsRateTarget', s.savingsRateTarget, { inputmode: 'numeric' }); sr.addEventListener('change', () => { const v = Number(sr.value); if (!Number.isInteger(v) || v < 0 || v > 100) { Toast.show('Mục tiêu tiết kiệm phải từ 0 đến 100%.', { type: 'error' }); sr.value = s.savingsRateTarget; return; } save('Mục tiêu tiết kiệm', x => { x.savingsRateTarget = v; }); });
   const em = F.input('emergencyTargetMonths', s.emergencyTargetMonths, { inputmode: 'numeric' }); em.addEventListener('change', () => { const v = Number(em.value); if (!Number.isInteger(v) || v < 1 || v > 36) { Toast.show('Số tháng dự phòng phải từ 1 đến 36.', { type: 'error' }); em.value = s.emergencyTargetMonths; return; } save('Mục tiêu dự phòng', x => { x.emergencyTargetMonths = v; }); });
   const ins = F.check('showInsights', s.showInsights, 'Hiện "Góc nhìn tài chính" trên Tổng quan'); ins.querySelector('input').addEventListener('change', e => save('Hiển thị góc nhìn', x => { x.showInsights = e.target.checked; }));
+  const bco = F.check('budgetCarryOver', s.budgetCarryOver !== false, 'Chuyển hạn mức sang tháng sau: vượt thì trừ, dư thì cộng (tối đa 1,5 lần hạn mức gốc)'); bco.querySelector('input').addEventListener('change', e => save('Chuyển vượt/dư ngân sách', x => { x.budgetCarryOver = e.target.checked; }));
   const priv = F.check('privacy', App.prefs.privacyMode, 'Ẩn số tiền (làm mờ — rê chuột để xem)'); priv.querySelector('input').addEventListener('change', e => { App.setPref('privacyMode', e.target.checked); App.applyPrivacy(); });
   grid.append(C.card('Hiển thị & mặc định', h('div', { class: 'form-grid' },
     F.field('Giao diện (thiết bị này)', themeS), F.field('Ký hiệu tiền tệ', curS, { hint: 'Ứng dụng ghi nhận bằng VND, số nguyên đồng để tránh sai số làm tròn.' }),
     F.field('Tài khoản mặc định khi nhập', accS), F.field('Phân trang giao dịch', pageS),
     F.field('Mục tiêu tỷ lệ tiết kiệm (%)', sr), F.field('Mục tiêu quỹ dự phòng (tháng chi tiêu)', em),
-    h('div', { class: 'field' }, ins), h('div', { class: 'field' }, priv)), { cls: 'span-6' }));
+    h('div', { class: 'field' }, ins), h('div', { class: 'field' }, bco), h('div', { class: 'field' }, priv)), { cls: 'span-6' }));
 
   // Ngân sách mặc định
   const expCats = st.categories.filter(c => c.kind === 'expense' && c.active);
